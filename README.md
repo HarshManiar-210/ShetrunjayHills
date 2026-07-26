@@ -135,17 +135,31 @@ preflight from the `http://localhost:3000` origin returns `204` with the CORS he
 
 _Files: `apps/web/` (create-next-app output), `apps/web/.env.local.example`_
 
-- [ ] `create-next-app` in `apps/web` (App Router, TS strict, Tailwind)
-- [ ] `shadcn` init + only the components needed (button, input, card, form)
-- [ ] Base layout, root page, `.env.local.example` with `NEXT_PUBLIC_API_URL`
+- [x] `create-next-app` in `apps/web` (App Router, TS strict, Tailwind)
+- [x] `shadcn` init + only the components needed (button, input, card, dialog, label)
+- [x] Base layout, root page, `.env.local.example` with `NEXT_PUBLIC_API_URL`
+
+Verified: `pnpm build` and `pnpm lint` pass from the repo root (workspace-filtered to `web`).
+`shadcn`'s `form` component pulls in react-hook-form/zod, which the login page below doesn't
+need, so it was skipped in favor of plain controlled inputs; `dialog` and `label` were added
+instead to support the login page.
 
 ### Phase 6 — Auth UI
 
 _Files: `apps/web/app/login/page.tsx`_
 
-- [ ] `/login` page with 3 buttons ("Log in as regular_user / admin / support_team")
-- [ ] POST to `/api/login`, store JWT in `localStorage`
-- [ ] Redirect to `/login` when no token present
+- [x] `/login` page: email/password form (superseding the original "3 quick-login buttons" spec
+      per explicit request), with a "Forgot Password?" link opening a modal pointing to support
+- [x] POST to `/api/login`, store JWT in `localStorage`
+- [x] Redirect to `/login` when no token present (root page checks `localStorage` and redirects)
+
+Verified: curled `/api/login` as `regular_user`/`admin_user`/`support_user` (password
+`password123` for all three per `infra/postgis-init/init.sql`) — each returns a valid JWT.
+Drove the actual `/login` page with Playwright against the running dev server: submitting
+`admin_user`/`password123` stores the token in `localStorage` and redirects to `/`; screenshotted
+the page at desktop (1280px) and mobile (390px) widths and in both light/dark
+`prefers-color-scheme` to confirm the split-panel layout collapses correctly on small screens and
+themes render correctly; the "Forgot Password?" modal shows the support contact.
 
 ### Phase 7 — Map dashboard
 
