@@ -93,11 +93,14 @@ layers, `ST_AsGeoJSON` output is correct, RBAC join returns `regular_user`→2 l
 _Files: `apps/api/cmd/api/main.go`, `apps/api/internal/db`, `apps/api/internal/models`,
 `apps/api/internal/repository`_
 
-- [ ] `cmd/api/main.go`: config from env, pgx pool, chi router, graceful shutdown
-- [ ] `internal/db`: pgx pool helper
-- [ ] `internal/models`: `User`, `Role`, `Layer`, `Permission` structs
-- [ ] `internal/repository`: base query layer
-- [ ] `GET /healthz`
+- [x] `cmd/api/main.go`: config from env, pgx pool, chi router, graceful shutdown
+- [x] `internal/db`: pgx pool helper
+- [x] `internal/models`: `User`, `Role`, `Layer`, `Permission` structs
+- [x] `internal/repository`: base query layer
+- [x] `GET /healthz`
+
+Verified against the real `db` container from Phase 1: `go build`/`go vet`/`go test` pass, and the
+running binary's `/healthz` returns `200` once the pgx pool can ping Postgres.
 
 ### Phase 3 — Auth
 
