@@ -70,3 +70,37 @@ func TestAuth(t *testing.T) {
 		})
 	}
 }
+
+func TestCORS(t *testing.T) {
+	reached := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := CORS("https://gis.example.com")(next)
+
+	t.Run("echoes the configured origin", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/layers", nil))
+
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://gis.example.com" {
+			t.Errorf("allow-origin = %q, want the configured origin", got)
+		}
+		if !reached {
+			t.Error("next handler not reached on a normal request")
+		}
+	})
+
+	t.Run("preflight short-circuits", func(t *testing.T) {
+		reached = false
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodOptions, "/api/layers", nil))
+
+		if w.Code != http.StatusNoContent {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNoContent)
+		}
+		if reached {
+			t.Error("preflight reached the next handler; it should short-circuit")
+		}
+	})
+}
