@@ -69,10 +69,24 @@ _Files: `pnpm-workspace.yaml`, root `package.json`, `.editorconfig`, `.nvmrc`, `
 
 _Files: `infra/postgis-init/init.sql`, `docker-compose.yml` (db service only)_
 
-- [ ] `init.sql`: `CREATE EXTENSION postgis`, tables `roles`, `users`, `layers` (geometry column),
+- [x] `init.sql`: `CREATE EXTENSION postgis`, tables `roles`, `users`, `layers` (geometry column),
       `role_layer_permissions`
-- [ ] Seed 3 roles, 3 users (bcrypt-hashed passwords), 3 Ahmedabad geometries, permission rows
-- [ ] Standalone `docker-compose.yml` with just the `postgis` service to validate the init script
+- [x] Seed 3 roles, 3 users (bcrypt-hashed passwords), 3 Ahmedabad geometries, permission rows
+- [x] Standalone `docker-compose.yml` with just the `postgis` service to validate the init script
+      (host port `5433` — a local Postgres 17 already held `5432`; containers added in Phase 8
+      still reach it at `db:5432`)
+
+Verified against a real container: schema matches, `ST_GeometryType`/`ST_IsValid` pass for all 3
+layers, `ST_AsGeoJSON` output is correct, RBAC join returns `regular_user`→2 layers,
+`admin`/`support_team`→3, and data survives a container restart.
+
+**Mock credentials** (password `password123` for all three):
+
+| Username        | Role            |
+|-----------------|-----------------|
+| `regular_user`  | `regular_user`  |
+| `admin_user`    | `admin`         |
+| `support_user`  | `support_team`  |
 
 ### Phase 2 — Go backend core
 

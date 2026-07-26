@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shetrunjay
+      POSTGRES_PASSWORD: shetrunjay
+      POSTGRES_DB: shetrunjay
+    ports:
+      # Host 5433 avoids clashing with a locally installed Postgres on 5432.
+      # Containers on this compose network (added in Phase 8) still reach
+      # this service at db:5432.
+      - "5433:5432"
+    volumes:
+      - postgis-data:/var/lib/postgresql/data
+      - ./infra/postgis-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shetrunjay -d shetrunjay"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgis-data:
