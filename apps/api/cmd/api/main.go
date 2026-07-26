@@ -48,8 +48,14 @@ func main() {
 	repo := repository.New(pool)
 
 	r := chi.NewRouter()
+	r.Use(handlers.CORS)
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
+
+	r.Group(func(r chi.Router) {
+		r.Use(handlers.Auth([]byte(jwtSecret)))
+		r.Get("/api/layers", handlers.Layers(repo))
+	})
 
 	srv := &http.Server{Addr: ":" + port, Handler: r}
 
