@@ -29,12 +29,23 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+    if (!trimmedUsername || !trimmedPassword) {
+      setError("Username and password are required.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({
+          username: trimmedUsername,
+          password: trimmedPassword,
+        }),
       });
       if (!res.ok) {
         setError("Invalid username or password.");
@@ -59,7 +70,7 @@ export default function LoginPage() {
             <CardContent className="flex flex-col gap-4">
               <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="username">Email</Label>
+                  <Label htmlFor="username">Username</Label>
                   <Input
                     id="username"
                     type="text"

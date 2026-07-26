@@ -8,3 +8,26 @@ export function getToken(): string | null {
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
 }
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export interface AuthUser {
+  username: string;
+  role: string;
+}
+
+// JWT claims are base64url, not encrypted — safe to decode client-side for display only.
+export function getUser(): AuthUser | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const claims = JSON.parse(json) as { sub: string; role_name: string };
+    return { username: claims.sub, role: claims.role_name };
+  } catch {
+    return null;
+  }
+}

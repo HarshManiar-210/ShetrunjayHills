@@ -161,6 +161,26 @@ the page at desktop (1280px) and mobile (390px) widths and in both light/dark
 `prefers-color-scheme` to confirm the split-panel layout collapses correctly on small screens and
 themes render correctly; the "Forgot Password?" modal shows the support contact.
 
+### Phase 6.1 — UI improvements
+
+_Files: `apps/web/app/page.tsx`, `apps/web/app/login/page.tsx`, `apps/web/components/theme-toggle.tsx`,
+`apps/web/lib/auth.ts`, `apps/web/app/globals.css`_
+
+- [x] Settings dialog on the authenticated page showing the logged-in username + role (decoded from
+      the JWT), with a Logout button that clears the token and redirects to `/login`
+- [x] Manual light/dark theme toggle button, persisted in `localStorage`, defaulting to OS
+      preference on first visit
+- [x] Login screen validation: field relabeled to "Username" (the backend has no real email
+      addresses, only usernames like `regular_user`), rejects empty/whitespace-only submissions
+      with an inline error before hitting the API
+
+Verified with Playwright against the running dev server: submitting whitespace-only
+username/password shows the inline "Username and password are required." error without hitting
+the API; logging in as `admin_user`, clicking the theme toggle flips the `dark` class on `<html>`
+and persists `theme=dark` to `localStorage`; opening Settings shows "Logged in as admin_user
+(admin)"; clicking Log out clears the token and redirects to `/login`. No console errors in any
+case. `pnpm build`/`pnpm lint` pass.
+
 ### Phase 7 — Map dashboard
 
 _Files: `apps/web/components/Map.tsx`, `apps/web/app/(dashboard)/map/page.tsx`_
