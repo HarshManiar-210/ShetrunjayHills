@@ -40,6 +40,24 @@ cd apps/api
 DATABASE_URL=postgres://shetrunjay:shetrunjay@localhost:5433/shetrunjay go test ./...
 ```
 
+### API environment
+
+| Variable       | Required | Default (when unset)                    |
+|----------------|----------|-----------------------------------------|
+| `DATABASE_URL` | no       | `postgres://…@localhost:5433/shetrunjay` |
+| `JWT_SECRET`   | **yes**  | none — the API exits if it's not set     |
+| `CORS_ORIGIN`  | no       | `http://localhost:3000`                  |
+| `PORT`         | no       | `8080`                                   |
+
+`JWT_SECRET` has no built-in fallback on purpose: a default would mean any deployment that forgot
+to set it accepted tokens forged with a secret published in this repo. Compose supplies a
+local-only value so `docker compose up` stays a single command — override both it and `CORS_ORIGIN`
+from the shell or a root `.env` for anything that isn't your laptop:
+
+```
+JWT_SECRET=$(openssl rand -hex 32) CORS_ORIGIN=https://your.host docker compose up --build
+```
+
 ## Folder Tree (target)
 
 ```

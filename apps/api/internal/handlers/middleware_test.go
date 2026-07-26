@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -21,6 +22,12 @@ func TestAuth(t *testing.T) {
 	secret := []byte("test-secret")
 	validToken := signToken(t, secret, jwt.MapClaims{"role_id": float64(2), "role_name": "admin"})
 	wrongSecretToken := signToken(t, []byte("other-secret"), jwt.MapClaims{"role_id": float64(2), "role_name": "admin"})
+	noRoleToken := signToken(t, secret, jwt.MapClaims{"role_name": "admin"})
+	stringRoleToken := signToken(t, secret, jwt.MapClaims{"role_id": "2"})
+	expiredToken := signToken(t, secret, jwt.MapClaims{
+		"role_id": float64(2),
+		"exp":     time.Now().Add(-time.Hour).Unix(),
+	})
 
 	cases := []struct {
 		name   string
@@ -31,16 +38,18 @@ func TestAuth(t *testing.T) {
 		{"not bearer", "Token abc", http.StatusUnauthorized},
 		{"invalid token", "Bearer not-a-jwt", http.StatusUnauthorized},
 		{"wrong secret", "Bearer " + wrongSecretToken, http.StatusUnauthorized},
+		{"expired token", "Bearer " + expiredToken, http.StatusUnauthorized},
+		// Signed by us, but no usable role — must not fall through as role 0.
+		{"missing role_id claim", "Bearer " + noRoleToken, http.StatusUnauthorized},
+		{"non-numeric role_id claim", "Bearer " + stringRoleToken, http.StatusUnauthorized},
 		{"valid token", "Bearer " + validToken, http.StatusOK},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var gotRoleID int
-			var gotRoleName string
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotRoleID, _ = RoleIDFromContext(r.Context())
-				gotRoleName, _ = RoleNameFromContext(r.Context())
 				w.WriteHeader(http.StatusOK)
 			})
 
@@ -55,11 +64,43 @@ func TestAuth(t *testing.T) {
 			if w.Code != tc.want {
 				t.Fatalf("status = %d, want %d", w.Code, tc.want)
 			}
-			if tc.want == http.StatusOK {
-				if gotRoleID != 2 || gotRoleName != "admin" {
-					t.Errorf("context = (%d, %q), want (2, %q)", gotRoleID, gotRoleName, "admin")
-				}
+			if tc.want == http.StatusOK && gotRoleID != 2 {
+				t.Errorf("role_id in context = %d, want 2", gotRoleID)
 			}
 		})
 	}
+}
+
+func TestCORS(t *testing.T) {
+	reached := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := CORS("https://gis.example.com")(next)
+
+	t.Run("echoes the configured origin", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/layers", nil))
+
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://gis.example.com" {
+			t.Errorf("allow-origin = %q, want the configured origin", got)
+		}
+		if !reached {
+			t.Error("next handler not reached on a normal request")
+		}
+	})
+
+	t.Run("preflight short-circuits", func(t *testing.T) {
+		reached = false
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, httptest.NewRequest(http.MethodOptions, "/api/layers", nil))
+
+		if w.Code != http.StatusNoContent {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusNoContent)
+		}
+		if reached {
+			t.Error("preflight reached the next handler; it should short-circuit")
+		}
+	})
 }

@@ -31,9 +31,15 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	// No default: a built-in fallback means any deployment that forgets to set
+	// this accepts tokens forged with a secret that's public in this repo.
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "dev-secret-change-me"
+		log.Fatal("JWT_SECRET must be set")
+	}
+	corsOrigin := os.Getenv("CORS_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = "http://localhost:3000"
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -48,7 +54,7 @@ func main() {
 	repo := repository.New(pool)
 
 	r := chi.NewRouter()
-	r.Use(handlers.CORS)
+	r.Use(handlers.CORS(corsOrigin))
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
 

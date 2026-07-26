@@ -10,10 +10,7 @@ import (
 
 type contextKey string
 
-const (
-	ctxKeyRoleID   contextKey = "role_id"
-	ctxKeyRoleName contextKey = "role_name"
-)
+const ctxKeyRoleID contextKey = "role_id"
 
 // RoleIDFromContext reads the role_id injected by Auth.
 func RoleIDFromContext(ctx context.Context) (int, bool) {
@@ -21,25 +18,22 @@ func RoleIDFromContext(ctx context.Context) (int, bool) {
 	return v, ok
 }
 
-// RoleNameFromContext reads the role_name injected by Auth.
-func RoleNameFromContext(ctx context.Context) (string, bool) {
-	v, ok := ctx.Value(ctxKeyRoleName).(string)
-	return v, ok
-}
-
-// CORS allows the Next.js dev server to call the API with a Bearer token
-// from the browser.
-func CORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// CORS allows a single browser origin to call the API with a Bearer token.
+// Takes the origin so a deployment isn't pinned to the dev server's; still
+// hand-rolled rather than pulling in a CORS package.
+func CORS(origin string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // Auth validates the Bearer JWT and injects role_id/role_name into the
@@ -55,7 +49,7 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 
 			token, err := jwt.Parse(
 				strings.TrimPrefix(header, "Bearer "),
-				func(t *jwt.Token) (interface{}, error) { return jwtSecret, nil },
+				func(t *jwt.Token) (any, error) { return jwtSecret, nil },
 				jwt.WithValidMethods([]string{"HS256"}),
 			)
 			if err != nil || !token.Valid {
@@ -68,11 +62,16 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 				http.Error(w, "invalid token", http.StatusUnauthorized)
 				return
 			}
-			roleID, _ := claims["role_id"].(float64)
-			roleName, _ := claims["role_name"].(string)
+			// Fail closed: a signed token with a missing or non-numeric
+			// role_id would otherwise pass through as role 0 and be served an
+			// empty layer set instead of being rejected.
+			roleID, ok := claims["role_id"].(float64)
+			if !ok {
+				http.Error(w, "invalid token", http.StatusUnauthorized)
+				return
+			}
 
 			ctx := context.WithValue(r.Context(), ctxKeyRoleID, int(roleID))
-			ctx = context.WithValue(ctx, ctxKeyRoleName, roleName)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

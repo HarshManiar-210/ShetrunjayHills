@@ -8,8 +8,7 @@ services:
       POSTGRES_DB: shetrunjay
     ports:
       # Host 5433 avoids clashing with a locally installed Postgres on 5432.
-      # Containers on this compose network (added in Phase 8) still reach
-      # this service at db:5432.
+      # Containers on this compose network still reach this service at db:5432.
       - "5433:5432"
     volumes:
       - postgis-data:/var/lib/postgresql/data
@@ -26,7 +25,11 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://shetrunjay:shetrunjay@db:5432/shetrunjay
-      JWT_SECRET: dev-secret-change-me
+      # Local-only default so `docker compose up` stays one command. The API
+      # refuses to boot without this set, so a real deployment must override it
+      # (shell env or a root .env) — never ship the fallback.
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-local-only}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       PORT: "8080"
     ports:
       - "8080:8080"
