@@ -160,3 +160,5 @@ go.work.sum
 # ---- Infra ----
 # Local Postgres data volumes if ever bind-mounted
 infra/postgis-data/
+
+*.DS_Store
