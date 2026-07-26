@@ -10,3 +10,17 @@
 - Wait for explicit approval (e.g., "yes", "commit it", or a provided commit message) before proceeding.
 - If the user declines or does not respond with approval, do not perform any commit-related action.
 - This rule takes precedence over any workflow or automation that would otherwise commit changes automatically.
+
+## UI Responsiveness Rules
+
+### Rule: All UI elements and pages must be responsive
+
+- Every page and component built in `apps/web` must render correctly across mobile, tablet, and
+  desktop viewport widths — mobile users must not get a broken or degraded layout.
+- Use responsive Tailwind utilities (`sm:`/`md:`/`lg:` breakpoints, flex/grid wrapping) rather than
+  fixed pixel widths or desktop-only layouts.
+- Purely decorative elements (e.g. large illustration/brand panels) may be hidden on small
+  viewports (`hidden md:flex` and similar), but the functional content of the page must remain
+  fully usable at all widths.
+- Verify responsiveness (e.g. by resizing the browser or checking multiple viewport widths) before
+  considering a UI task complete.
