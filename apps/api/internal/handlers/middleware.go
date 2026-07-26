@@ -10,20 +10,11 @@ import (
 
 type contextKey string
 
-const (
-	ctxKeyRoleID   contextKey = "role_id"
-	ctxKeyRoleName contextKey = "role_name"
-)
+const ctxKeyRoleID contextKey = "role_id"
 
 // RoleIDFromContext reads the role_id injected by Auth.
 func RoleIDFromContext(ctx context.Context) (int, bool) {
 	v, ok := ctx.Value(ctxKeyRoleID).(int)
-	return v, ok
-}
-
-// RoleNameFromContext reads the role_name injected by Auth.
-func RoleNameFromContext(ctx context.Context) (string, bool) {
-	v, ok := ctx.Value(ctxKeyRoleName).(string)
 	return v, ok
 }
 
@@ -55,7 +46,7 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 
 			token, err := jwt.Parse(
 				strings.TrimPrefix(header, "Bearer "),
-				func(t *jwt.Token) (interface{}, error) { return jwtSecret, nil },
+				func(t *jwt.Token) (any, error) { return jwtSecret, nil },
 				jwt.WithValidMethods([]string{"HS256"}),
 			)
 			if err != nil || !token.Valid {
@@ -68,11 +59,16 @@ func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
 				http.Error(w, "invalid token", http.StatusUnauthorized)
 				return
 			}
-			roleID, _ := claims["role_id"].(float64)
-			roleName, _ := claims["role_name"].(string)
+			// Fail closed: a signed token with a missing or non-numeric
+			// role_id would otherwise pass through as role 0 and be served an
+			// empty layer set instead of being rejected.
+			roleID, ok := claims["role_id"].(float64)
+			if !ok {
+				http.Error(w, "invalid token", http.StatusUnauthorized)
+				return
+			}
 
 			ctx := context.WithValue(r.Context(), ctxKeyRoleID, int(roleID))
-			ctx = context.WithValue(ctx, ctxKeyRoleName, roleName)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
