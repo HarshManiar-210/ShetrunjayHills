@@ -41,32 +41,15 @@ string is a bug, not a shortcut.
 - **Scope discipline**: PMTiles basemaps and real ecological/historical data are explicitly out
   of scope (see README Future Enhancements) — don't pull them in unless asked.
 
-## Phased Development
-
-README.md's "Phases" section (Phase 0 through Phase 9) is the authoritative task list and build
-order for this project. On every task:
-
-1. Read the Phases checklist in README.md before starting work to find the next unchecked `[ ]`
-   item(s).
-2. Work phases in order — don't start a later phase's files while an earlier phase has unchecked
-   boxes, since later phases depend on earlier ones (e.g. the Layers API needs the DB schema and
-   auth middleware first).
-3. Touch only the files listed under that phase's `_Files:_` line unless the task clearly requires
-   more.
-4. When a checklist item is done and verified, edit README.md and check its box (`[ ]` → `[x]`) as
-   part of that same commit.
-5. If asked for something not on the checklist (e.g. a Future Enhancement), implement it but leave
-   the checklist alone — don't invent new phases or reorder existing ones without being asked.
-
 ## Git Workflow & Autonomous Branching
 
 You (Claude Code) must strictly adhere to the following Git workflow for every task you execute:
 
 1. **Never commit to main:** Before writing or modifying any code, run `git status`. If you are on the `main` branch, you MUST immediately create and switch to a new branch.
-2. **Branch Naming Convention:** Use the following prefixes based on the task type:
+2. **Branch naming convention:** Use the following prefixes based on the task type:
    - `feature/<kebab-case-name>` (for new endpoints, UI components, etc.)
    - `bugfix/<kebab-case-name>` (for fixing broken code)
    - `docs/<kebab-case-name>` (for updating README or standard documentation)
    - `chore/<kebab-case-name>` (for tooling, docker updates, or dependency bumps)
-3. **Commit Messages:** You must use Conventional Commits format (e.g., `feat: add postgis init script`, `fix: resolve next.js dynamic import ssr bug`).
-4. **Micro-Commits:** Do not wait until the entire task is done to commit. Commit logically chunked milestones (e.g., commit the DB init script before moving on to the Go routing code).
+3. **Commit messages:** Use Conventional Commits format (e.g., `feat: add postgis init script`, `fix: resolve next.js dynamic import ssr bug`).
+4. **Micro-commits:** Do not wait until the entire task is done to commit. Commit logically chunked milestones (e.g., commit the DB init script before moving on to the Go routing code).
