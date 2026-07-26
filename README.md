@@ -107,9 +107,14 @@ running binary's `/healthz` returns `200` once the pgx pool can ping Postgres.
 _Files: `apps/api/internal/handlers/login.go`, `apps/api/internal/repository`,
 `apps/api/internal/handlers/middleware.go`_
 
-- [ ] `GetUserByUsername` repository query
-- [ ] `POST /api/login`: bcrypt password compare, issue signed JWT (`role_id`, `role_name`)
-- [ ] Auth middleware: validate JWT, inject role into request context
+- [x] `GetUserByUsername` repository query
+- [x] `POST /api/login`: bcrypt password compare, issue signed JWT (`role_id`, `role_name`)
+- [x] Auth middleware: validate JWT, inject role into request context
+
+Verified against the real `db` container: `go test ./...` passes (login and middleware table-driven
+tests), and curling `/api/login` as `regular_user`/`admin_user`/`support_user` returns a JWT whose
+decoded claims carry the correct `role_id`/`role_name` per user; wrong password and unknown
+username both return `401`.
 
 ### Phase 4 — Layers API
 
