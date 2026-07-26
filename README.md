@@ -57,12 +57,13 @@ phase touches.
 
 _Files: `pnpm-workspace.yaml`, root `package.json`, `.editorconfig`, `.nvmrc`, `.gitignore`_
 
-- [ ] `pnpm-workspace.yaml` listing `apps/*`
-- [ ] Root `package.json` with workspace-level `dev` script
-- [ ] Create `apps/web`, `apps/api`, `infra/postgis-init` directories
-- [ ] `.editorconfig` + `.nvmrc` pinning Node 24
-- [ ] Extend `.gitignore` with Go-specific entries (binaries, `apps/api/tmp`)
-- [ ] Single Go module at `apps/api/go.mod`
+- [x] `pnpm-workspace.yaml` listing `apps/*`
+- [x] Root `package.json` with workspace-level `dev` script
+- [x] Create `apps/web`, `apps/api`, `infra/postgis-init` directories
+- [x] `.editorconfig` + `.nvmrc` pinning Node 24
+- [x] Extend `.gitignore` with Go-specific entries (binaries, `apps/api/tmp`)
+- [x] Single Go module at `apps/api/go.mod`
+      (`github.com/HarshManiar-210/ShetrunjayHills/apps/api`, `go 1.26`)
 
 ### Phase 1 — Database layer
 
