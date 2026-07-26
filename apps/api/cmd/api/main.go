@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/HarshManiar-210/ShetrunjayHills/apps/api/internal/db"
+	"github.com/HarshManiar-210/ShetrunjayHills/apps/api/internal/handlers"
 	"github.com/HarshManiar-210/ShetrunjayHills/apps/api/internal/repository"
 )
 
@@ -30,6 +31,10 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-me"
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -44,6 +49,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Get("/healthz", healthzHandler(repo))
+	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
 
 	srv := &http.Server{Addr: ":" + port, Handler: r}
 
