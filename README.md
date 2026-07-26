@@ -185,19 +185,50 @@ case. `pnpm build`/`pnpm lint` pass.
 
 _Files: `apps/web/components/Map.tsx`, `apps/web/app/(dashboard)/map/page.tsx`_
 
-- [ ] MapLibre component loaded via `next/dynamic({ ssr: false })`
-- [ ] Fetch `/api/layers` with Bearer token
-- [ ] Render each geometry type as a MapLibre GeoJSON source/layer (blank canvas, no basemap tiles
+- [x] MapLibre component loaded via `next/dynamic({ ssr: false })`
+- [x] Fetch `/api/layers` with Bearer token
+- [x] Render each geometry type as a MapLibre GeoJSON source/layer (blank canvas, no basemap tiles
       yet — see Future Enhancements)
+
+`/map` lives in a new `apps/web/app/(dashboard)/` route group (`layout.tsx` carries the header —
+theme toggle, Settings/Logout — moved out of the old root page; `apps/web/app/page.tsx` is now a
+thin redirect to `/map` or `/login` based on token presence). Geometries are split client-side by
+`feature.geometry.type` into two GeoJSON sources (polygons, lines) rather than using MapLibre
+filter expressions — `["==", ["geometry-type"], "Polygon"]` filters silently matched nothing.
+`maplibre-gl` is pinned to `^5.24.0`; **do not upgrade to 6.x** — `6.0.0` (its first stable
+release) never fires the map's `load`/`isStyleLoaded` state under Next.js/Turbopack bundling
+(confirmed via a raw unbundled ESM reproduction outside Next.js, where 6.0.0 also hangs but 5.24.0
+renders correctly), so nothing paints even though data reaches the source. The map view fits to
+the data's bounds (computed client-side) rather than a hardcoded center/zoom.
+
+Verified: `pnpm build`/`pnpm lint` pass. Playwright against a running dev server and again against
+a production `next build`/`next start` — logged in as each of the 3 mock users and confirmed the
+canvas renders the correct feature count per role (`regular_user` → polygon + 1 line,
+`admin_user`/`support_user` → polygon + 2 lines), no console errors.
 
 ### Phase 8 — Docker Compose integration
 
 _Files: `docker-compose.yml`, `apps/api/Dockerfile`, `apps/web/Dockerfile`_
 
-- [ ] Full `docker-compose.yml`: `postgis`, `api`, `web` services
-- [ ] Dockerfiles for api (multi-stage Go build) and web (Next.js build)
-- [ ] Wire env vars / service DNS (api ↔ db, browser ↔ api)
-- [ ] End-to-end smoke test: `docker compose up`, log in as each user, confirm correct layers render
+- [x] Full `docker-compose.yml`: `postgis`, `api`, `web` services
+- [x] Dockerfiles for api (multi-stage Go build) and web (Next.js build)
+- [x] Wire env vars / service DNS (api ↔ db, browser ↔ api)
+- [x] End-to-end smoke test: `docker compose up`, log in as each user, confirm correct layers render
+
+`apps/web/Dockerfile` builds with the repo root as context (pnpm workspace) and uses Next's
+`output: "standalone"` (set in `next.config.ts`) for a lean runtime image. `NEXT_PUBLIC_API_URL`
+is passed as a build `ARG`/`ENV` — Next.js inlines `NEXT_PUBLIC_*` vars into the client bundle at
+build time, so it can't be a plain runtime env var. It's set to `http://localhost:8080`, not an
+internal service DNS name, because the *browser* (running on the host) calls the api directly via
+its published port — same reasoning as the existing hardcoded CORS origin
+(`http://localhost:3000`) in `apps/api/internal/handlers/middleware.go`, which needed no changes.
+Only `api → db` uses container-internal DNS (`db:5432`).
+
+Verified against the real stack: `docker compose up --build -d` builds and starts all 3
+containers; `/healthz` and `/login` return `200` on their published ports; curled `/api/login` as
+each of the 3 mock users; drove the actual dockerized `/map` page with Playwright logged in as
+each user and confirmed the correct per-role feature count renders with no console errors;
+`docker compose logs` clean for both `api` and `web`.
 
 ### Phase 9 — Polish/docs
 
