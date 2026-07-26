@@ -20,5 +20,34 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: ./apps/api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://shetrunjay:shetrunjay@db:5432/shetrunjay
+      JWT_SECRET: dev-secret-change-me
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # baked in at build time (Next.js NEXT_PUBLIC_* vars are inlined into the
+        # client bundle) — the browser reaches the api via the published host
+        # port, not the container-internal DNS name, so this stays localhost
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
 volumes:
   postgis-data:
