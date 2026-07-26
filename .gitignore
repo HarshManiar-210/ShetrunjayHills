@@ -141,3 +141,22 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# ---- Go (apps/api) ----
+# Compiled binaries and test artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+apps/api/bin/
+apps/api/tmp/
+# Go workspace files (single-module repo; not used)
+go.work
+go.work.sum
+
+# ---- Infra ----
+# Local Postgres data volumes if ever bind-mounted
+infra/postgis-data/
