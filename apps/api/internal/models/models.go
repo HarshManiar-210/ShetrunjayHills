@@ -2,11 +2,6 @@
 // repositories. Rows, not code, define which roles/layers/permissions exist.
 package models
 
-type Role struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
 type User struct {
 	ID           int    `json:"id"`
 	Username     string `json:"username"`
@@ -20,9 +15,4 @@ type Layer struct {
 	ID      int    `json:"id"`
 	Name    string `json:"name"`
 	GeoJSON string `json:"geometry"`
-}
-
-type Permission struct {
-	RoleID  int `json:"role_id"`
-	LayerID int `json:"layer_id"`
 }
