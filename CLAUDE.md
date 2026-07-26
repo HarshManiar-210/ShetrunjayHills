@@ -23,6 +23,13 @@ string is a bug, not a shortcut.
   handlers. Layer geometries leave the DB as GeoJSON via `ST_AsGeoJSON` — don't hand-roll
   geometry serialization. JWT carries `role_id`/`role_name`; auth middleware injects role into
   request context, handlers read it from there.
+- **Handler testability**: handlers depend on a small interface naming only the repository
+  methods they use (e.g. `userGetter`, `layersGetter`, `pinger`), not `*repository.Repository`
+  directly — this lets `go test` fake the DB layer with no live connection. Mirror this pattern
+  for new handlers rather than taking the concrete repository type.
+- **CORS**: hand-rolled in `internal/handlers/middleware.go` (`CORS`) rather than a new
+  dependency — a few header lines covered the Next.js dev origin; don't reach for a CORS package
+  unless requirements outgrow that.
 - **Frontend (`apps/web`)**: fetches to the API always send the Bearer token from
   `localStorage`; no token → redirect to `/login`. Only add shadcn components actually used by a
   page.

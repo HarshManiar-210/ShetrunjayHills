@@ -120,10 +120,16 @@ username both return `401`.
 
 _Files: `apps/api/internal/repository/layers.go`, `apps/api/internal/handlers/layers.go`_
 
-- [ ] Repository query joining `layers` + `role_layer_permissions` by role, using `ST_AsGeoJSON`
-- [ ] `GET /api/layers`: build GeoJSON `FeatureCollection` from authorized layers
-- [ ] CORS middleware for the Next.js dev origin
-- [ ] Manual verification: curl as each of the 3 users, confirm correct layer counts
+- [x] Repository query joining `layers` + `role_layer_permissions` by role, using `ST_AsGeoJSON`
+- [x] `GET /api/layers`: build GeoJSON `FeatureCollection` from authorized layers
+- [x] CORS middleware for the Next.js dev origin
+- [x] Manual verification: curl as each of the 3 users, confirm correct layer counts
+
+Verified against the real `db` container: `go build`/`go vet`/`go test` pass, and curling
+`/api/layers` (behind the `Auth` middleware, same JWTs as Phase 3) as each mock user returns the
+right `FeatureCollection` size — `regular_user`→2 features (`city_border`, `roads`),
+`admin_user`/`support_user`→3 (adds `metro_train`). No-token requests return `401`; an `OPTIONS`
+preflight from the `http://localhost:3000` origin returns `204` with the CORS headers set.
 
 ### Phase 5 — Frontend scaffolding
 
