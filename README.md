@@ -14,6 +14,32 @@ Postgres, so adding a new role or layer is a data change, not a code change.
 - **GIS**: MapLibre GL JS (client-side only, via `next/dynamic({ ssr: false })`), PostGIS.
 - **Infra**: Docker Compose (postgis + api + web).
 
+## Running the app
+
+```
+docker compose up --build
+```
+
+This starts `postgis` (host port `5433`), `api` (`http://localhost:8080`), and `web`
+(`http://localhost:3000`). Once all three are up, open `http://localhost:3000` and log in with
+one of the mock users below.
+
+**Mock credentials** (password `password123` for all three):
+
+| Username        | Role            | Sees layers                              |
+|-----------------|-----------------|-------------------------------------------|
+| `regular_user`  | `regular_user`  | `city_border`, `roads`                     |
+| `admin_user`    | `admin`         | `city_border`, `roads`, `metro_train`      |
+| `support_user`  | `support_team`  | `city_border`, `roads`, `metro_train`      |
+
+To run the API's Go test suite, including the RBAC repository integration test, against the
+running `db` container:
+
+```
+cd apps/api
+DATABASE_URL=postgres://shetrunjay:shetrunjay@localhost:5433/shetrunjay go test ./...
+```
+
 ## Folder Tree (target)
 
 ```
@@ -234,9 +260,22 @@ each user and confirmed the correct per-role feature count renders with no conso
 
 _Files: `README.md`_
 
-- [ ] Run instructions (`docker compose up`) + mock credentials table
-- [ ] Basic error/loading states on frontend fetches
-- [ ] Optional: one Go test for the RBAC repository query
+- [x] Run instructions (`docker compose up`) + mock credentials table
+- [x] Basic error/loading states on frontend fetches
+- [x] Optional: one Go test for the RBAC repository query
+
+Frontend error/loading states were already in place from earlier phases: `/login`
+(`apps/web/app/login/page.tsx`) shows a disabled "Logging in..." submit state and an inline error
+on bad credentials or an unreachable API; `/map` (`apps/web/app/(dashboard)/map/page.tsx`) shows a
+"Loading map..." placeholder while `/api/layers` is in flight and a "Could not load map layers."
+message on failure. Added `apps/api/internal/repository/layers_test.go`, an integration test
+(skipped when `DATABASE_URL` is unset) that calls `GetLayersByRoleID` against the real `db`
+container and checks each of the 3 mock roles gets the right layer count.
+
+Verified: added the "Running the app" section above and ran through it from a clean shell —
+`docker compose up --build` then logging into `http://localhost:3000` as each mock user. Ran
+`go build`/`go vet`/`go test ./...` in `apps/api` with `DATABASE_URL` pointed at the running `db`
+container — the new RBAC test passes for `regular_user`/`admin`/`support_team`.
 
 ## Future Enhancements (out of scope for now)
 
