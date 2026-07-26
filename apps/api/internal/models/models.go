@@ -12,6 +12,8 @@ type User struct {
 	Username     string `json:"username"`
 	PasswordHash string `json:"-"`
 	RoleID       int    `json:"role_id"`
+	// RoleName is populated by queries that join roles; empty otherwise.
+	RoleName string `json:"role_name,omitempty"`
 }
 
 type Layer struct {
