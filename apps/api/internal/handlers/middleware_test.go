@@ -20,6 +20,7 @@ func signToken(t *testing.T, secret []byte, claims jwt.MapClaims) string {
 
 func TestAuth(t *testing.T) {
 	secret := []byte("test-secret")
+	const publicRoleID = 4
 	validToken := signToken(t, secret, jwt.MapClaims{"role_id": float64(2), "role_name": "admin"})
 	wrongSecretToken := signToken(t, []byte("other-secret"), jwt.MapClaims{"role_id": float64(2), "role_name": "admin"})
 	noRoleToken := signToken(t, secret, jwt.MapClaims{"role_name": "admin"})
@@ -30,19 +31,23 @@ func TestAuth(t *testing.T) {
 	})
 
 	cases := []struct {
-		name   string
-		header string
-		want   int
+		name        string
+		header      string
+		want        int
+		wantRoleID  int
+		checkRoleID bool
 	}{
-		{"missing header", "", http.StatusUnauthorized},
-		{"not bearer", "Token abc", http.StatusUnauthorized},
-		{"invalid token", "Bearer not-a-jwt", http.StatusUnauthorized},
-		{"wrong secret", "Bearer " + wrongSecretToken, http.StatusUnauthorized},
-		{"expired token", "Bearer " + expiredToken, http.StatusUnauthorized},
+		// No Authorization header at all is anonymous, not invalid — it
+		// resolves to the public role rather than failing.
+		{"missing header", "", http.StatusOK, publicRoleID, true},
+		{"not bearer", "Token abc", http.StatusUnauthorized, 0, false},
+		{"invalid token", "Bearer not-a-jwt", http.StatusUnauthorized, 0, false},
+		{"wrong secret", "Bearer " + wrongSecretToken, http.StatusUnauthorized, 0, false},
+		{"expired token", "Bearer " + expiredToken, http.StatusUnauthorized, 0, false},
 		// Signed by us, but no usable role — must not fall through as role 0.
-		{"missing role_id claim", "Bearer " + noRoleToken, http.StatusUnauthorized},
-		{"non-numeric role_id claim", "Bearer " + stringRoleToken, http.StatusUnauthorized},
-		{"valid token", "Bearer " + validToken, http.StatusOK},
+		{"missing role_id claim", "Bearer " + noRoleToken, http.StatusUnauthorized, 0, false},
+		{"non-numeric role_id claim", "Bearer " + stringRoleToken, http.StatusUnauthorized, 0, false},
+		{"valid token", "Bearer " + validToken, http.StatusOK, 2, true},
 	}
 
 	for _, tc := range cases {
@@ -59,13 +64,13 @@ func TestAuth(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 
-			Auth(secret)(next).ServeHTTP(w, req)
+			Auth(secret, publicRoleID)(next).ServeHTTP(w, req)
 
 			if w.Code != tc.want {
 				t.Fatalf("status = %d, want %d", w.Code, tc.want)
 			}
-			if tc.want == http.StatusOK && gotRoleID != 2 {
-				t.Errorf("role_id in context = %d, want 2", gotRoleID)
+			if tc.checkRoleID && gotRoleID != tc.wantRoleID {
+				t.Errorf("role_id in context = %d, want %d", gotRoleID, tc.wantRoleID)
 			}
 		})
 	}

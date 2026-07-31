@@ -53,13 +53,20 @@ func main() {
 
 	repo := repository.New(pool)
 
+	// Resolved once at startup, not hardcoded: whichever row is named
+	// 'public' in this deployment's seed data is the anonymous role.
+	publicRoleID, err := repo.GetRoleIDByName(ctx, "public")
+	if err != nil {
+		log.Fatalf("resolve public role id: %v", err)
+	}
+
 	r := chi.NewRouter()
 	r.Use(handlers.CORS(corsOrigin))
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
 
 	r.Group(func(r chi.Router) {
-		r.Use(handlers.Auth([]byte(jwtSecret)))
+		r.Use(handlers.Auth([]byte(jwtSecret), publicRoleID))
 		r.Get("/api/layers", handlers.Layers(repo))
 	})
 

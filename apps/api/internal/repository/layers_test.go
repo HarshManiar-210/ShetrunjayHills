@@ -31,9 +31,10 @@ func TestGetLayersByRoleID_RBAC(t *testing.T) {
 		wantCount   int
 		wantMissing string
 	}{
-		{"regular_user", 2, "metro_train"},
-		{"admin", 3, ""},
-		{"support_team", 3, ""},
+		{"public", 4, "metro_train"},
+		{"regular_user", 4, "metro_train"},
+		{"admin", 5, ""},
+		{"support_team", 5, ""},
 	}
 
 	for _, tc := range cases {
