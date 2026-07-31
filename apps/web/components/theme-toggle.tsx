@@ -1,6 +1,6 @@
 "use client";
 
-import { MoonIcon, SunIcon } from "lucide-react";
+import { SunMoon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function toggleTheme() {
@@ -18,8 +18,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label="Toggle theme"
     >
-      <SunIcon className="hidden dark:block" />
-      <MoonIcon className="block dark:hidden" />
+      <SunMoon strokeWidth={1.75} />
     </Button>
   );
 }
