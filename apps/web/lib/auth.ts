@@ -18,6 +18,8 @@ export interface AuthUser {
   role: string;
 }
 
+export type Role = "anonymous" | "regular_user" | "admin" | "support_team";
+
 // JWT claims are base64url, not encrypted — safe to decode client-side for display only.
 export function getUser(): AuthUser | null {
   const token = getToken();

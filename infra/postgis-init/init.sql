@@ -58,7 +58,12 @@ INSERT INTO users (username, password_hash, role_id) VALUES
     ('support_user', '$2b$10$6M2JLxqpCoDqqcwvA0Ubd.nEOAvxYm4zUfBJ5Jabiuptc3b4doREq', (SELECT id FROM roles WHERE name = 'support_team'));
 
 -- ---------------------------------------------------------------------------
--- Seed: layers (mock geometries around Ahmedabad, EPSG:4326)
+-- Seed: layers
+-- city_border/roads/metro_train are mock geometry (shape only, not surveyed),
+-- centered on the real Shetrunjay Hill Range near Palitana, Bhavnagar
+-- district, Gujarat (~21.4719N, 71.7800E) rather than the earlier Ahmedabad
+-- placeholder. shetrunjay_hills_range is real: a single geocoded point at
+-- that location.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO layers (name, geometry) VALUES
@@ -67,11 +72,11 @@ INSERT INTO layers (name, geometry) VALUES
         ST_GeomFromGeoJSON('{
             "type": "Polygon",
             "coordinates": [[
-                [72.50, 23.10],
-                [72.65, 23.10],
-                [72.65, 22.95],
-                [72.50, 22.95],
-                [72.50, 23.10]
+                [71.7086, 21.5494],
+                [71.8586, 21.5494],
+                [71.8586, 21.3994],
+                [71.7086, 21.3994],
+                [71.7086, 21.5494]
             ]]
         }')
     ),
@@ -80,10 +85,10 @@ INSERT INTO layers (name, geometry) VALUES
         ST_GeomFromGeoJSON('{
             "type": "LineString",
             "coordinates": [
-                [72.5060, 23.0300],
-                [72.5150, 23.0150],
-                [72.5250, 23.0000],
-                [72.5300, 22.9850]
+                [71.7146, 21.4794],
+                [71.7236, 21.4644],
+                [71.7336, 21.4494],
+                [71.7386, 21.4344]
             ]
         }')
     ),
@@ -92,19 +97,26 @@ INSERT INTO layers (name, geometry) VALUES
         ST_GeomFromGeoJSON('{
             "type": "LineString",
             "coordinates": [
-                [72.5966, 23.1140],
-                [72.5850, 23.0700],
-                [72.5797, 23.0395],
-                [72.5713, 23.0225],
-                [72.5680, 22.9900]
+                [71.8052, 21.5634],
+                [71.7936, 21.5194],
+                [71.7883, 21.4889],
+                [71.7799, 21.4719],
+                [71.7766, 21.4394]
             ]
+        }')
+    ),
+    (
+        'shetrunjay_hills_range',
+        ST_GeomFromGeoJSON('{
+            "type": "Point",
+            "coordinates": [71.7800412, 21.4718707]
         }')
     );
 
 -- ---------------------------------------------------------------------------
 -- Seed: permissions
--- regular_user -> city_border, roads
--- admin, support_team -> all three
+-- regular_user -> city_border, roads, shetrunjay_hills_range
+-- admin, support_team -> all four
 -- ---------------------------------------------------------------------------
 
 INSERT INTO role_layer_permissions (role_id, layer_id)
@@ -112,5 +124,5 @@ SELECT r.id, l.id
 FROM roles r
 CROSS JOIN layers l
 WHERE
-    (r.name = 'regular_user' AND l.name IN ('city_border', 'roads'))
+    (r.name = 'regular_user' AND l.name IN ('city_border', 'roads', 'shetrunjay_hills_range'))
     OR (r.name IN ('admin', 'support_team'));
