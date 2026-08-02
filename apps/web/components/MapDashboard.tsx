@@ -35,15 +35,14 @@ export function MapDashboard() {
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
 
   const token = getToken();
-  const locked = !auth.user;
-  const displayedLayers = token ? layers : null;
-  const loading = Boolean(token) && displayedLayers === null && !error;
+  const loading = layers === null && !error;
 
-  // Refetch whenever the token or retry count changes; the returned cleanup
-  // clears any previous user's data before the new fetch lands, rather than
+  // Refetch whenever the token or retry count changes — with no token the
+  // API resolves the request to its public role rather than rejecting it,
+  // so this runs for anonymous visitors too. The returned cleanup clears
+  // the previous role's data before the new fetch lands, rather than
   // setting state synchronously in the effect body itself.
   useEffect(() => {
-    if (!token) return;
     let cancelled = false;
     fetchLayers(token)
       .then((fc) => {
@@ -79,7 +78,7 @@ export function MapDashboard() {
     }
   }
 
-  const visibleLayers = (displayedLayers ?? EMPTY).features;
+  const visibleLayers = (layers ?? EMPTY).features;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -103,7 +102,7 @@ export function MapDashboard() {
           <div className="flex min-h-0 flex-1">
             <div className="relative min-w-0 flex-1">
               <Map
-                data={displayedLayers ?? EMPTY}
+                data={layers ?? EMPTY}
                 visibility={visibility}
                 onReady={setMap}
                 onToggleLayers={handleToggleLayersControl}
@@ -121,15 +120,13 @@ export function MapDashboard() {
               )}
             >
               <LayerPanel
-                layers={displayedLayers?.features ?? null}
+                layers={layers?.features ?? null}
                 loading={loading}
                 error={error}
-                locked={locked}
                 visibility={visibility}
                 onToggle={toggleVisibility}
                 onZoomTo={zoomTo}
                 onRetry={() => setRetryTick((t) => t + 1)}
-                onLoginClick={auth.openLogin}
               />
               <DatasetInfoCard />
             </aside>
@@ -191,15 +188,13 @@ export function MapDashboard() {
         <SheetContent side="bottom" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
           <SheetTitle className="sr-only">Layers</SheetTitle>
           <LayerPanel
-            layers={displayedLayers?.features ?? null}
+            layers={layers?.features ?? null}
             loading={loading}
             error={error}
-            locked={locked}
             visibility={visibility}
             onToggle={toggleVisibility}
             onZoomTo={zoomTo}
             onRetry={() => setRetryTick((t) => t + 1)}
-            onLoginClick={auth.openLogin}
           />
           <DatasetInfoCard />
         </SheetContent>

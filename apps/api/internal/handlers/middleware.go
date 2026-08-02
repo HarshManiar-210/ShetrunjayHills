@@ -37,11 +37,20 @@ func CORS(origin string) func(http.Handler) http.Handler {
 }
 
 // Auth validates the Bearer JWT and injects role_id/role_name into the
-// request context for downstream handlers to read.
-func Auth(jwtSecret []byte) func(http.Handler) http.Handler {
+// request context for downstream handlers to read. A request with no
+// Authorization header at all is anonymous, not invalid — it's injected
+// with publicRoleID instead of being rejected. A header that IS present but
+// malformed, expired, or wrongly signed still fails closed with 401: that's
+// a failed auth attempt, not the "no token" case.
+func Auth(jwtSecret []byte, publicRoleID int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
+			if header == "" {
+				ctx := context.WithValue(r.Context(), ctxKeyRoleID, publicRoleID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 			if !strings.HasPrefix(header, "Bearer ") {
 				http.Error(w, "missing bearer token", http.StatusUnauthorized)
 				return

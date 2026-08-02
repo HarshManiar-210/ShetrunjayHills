@@ -10,9 +10,11 @@ export interface LayerCollection extends GeoJSON.FeatureCollection {
 
 export class UnauthorizedError extends Error {}
 
-export async function fetchLayers(token: string): Promise<LayerCollection> {
+// token is null for an anonymous visitor — the API resolves a request with
+// no Authorization header to its public role rather than rejecting it.
+export async function fetchLayers(token: string | null): Promise<LayerCollection> {
   const res = await fetch(`${API_URL}/api/layers`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new Error("failed to load layers");
