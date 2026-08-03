@@ -55,6 +55,18 @@ gate only on the 3 still-open items — audit logging, hosting environment, and 
 persistence — none of which block schema/role/layer work, only the specific features tied to
 them (see `Project_Document.md` §9 "Still open" for what each blocks).
 
+**Update (31 July 2026):** the `Dashboard_workflow.docx` 14-theme catalog referenced above by
+citation only is now transcribed in full — `specs/001-database-rbac-temporal/spec.md`'s new
+"14-Theme Filter & Output Catalog" section gives the concrete `filter_config` keys, data format,
+and outputs for all 14 themes plus the 8 base/reference layers, and `specs/002-backend-api` /
+`specs/003-frontend-web-dashboard` have been updated to reference it (FR-010, FR-017) instead of
+the generic "year, satellite/drone source, village, zone/grid, fauna" placeholder. Two dashboard
+functions from that document that weren't previously named as their own requirement — **Zoom to
+Layer** and **Layer Transparency** — are now `003`'s FR-021 (Scenario 11); **Identify Feature
+Tool** is recorded as already satisfied by the existing feature-click flow (`003`'s FR-022, no new
+work). Still not resolved by this update: `FRD.md` and `Project_Document.md` themselves remain
+absent from this repository — only their citations and this one source document exist here.
+
 ## Using this with `/specify`, `/plan`, `/tasks` commands
 
 If your spec-kit tooling supports regenerating or extending these via slash commands, treat the

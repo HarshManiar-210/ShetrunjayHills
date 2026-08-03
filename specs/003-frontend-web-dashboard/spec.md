@@ -95,10 +95,25 @@ both render and both trigger a map fly-to on selection.
 Selecting the "Forest Cover" theme surfaces its Year and Satellite filters; choosing a year
 auto-enables the Satellite/Drone layer (togglable) and populates a Statistics panel for that
 theme/year — all driven by the theme's `filter_config` from the API (Backend spec `002` FR-010),
-not a hardcoded per-theme component branch.
+not a hardcoded per-theme component branch. The same mechanism, with different `filter_config`
+values, drives every other theme — e.g. selecting "Cadastral Map" surfaces a Village filter
+instead, "Forest Status" surfaces a Raster/Vector toggle instead of Year, and "Wildlife Corridor"
+surfaces a Fauna selector (see spec `001`'s 14-Theme Filter & Output Catalog for the full mapping).
 
 **Acceptance**: Component test — swapping the mocked theme metadata's `filter_config` changes
-which filter controls render, without a code change.
+which filter controls render, without a code change; parameterized across at least Forest Cover
+(year+satellite), Cadastral Map (village), Forest Status (raster/vector toggle), Watershed
+(sub_theme), and Wildlife Corridor (fauna) to prove the component tree branches on data, not on
+theme name.
+
+### Scenario 11 — Zoom to Layer and transparency (`Dashboard_workflow.docx` common functions)
+From a layer's overflow menu, "Zoom to Layer" fits the map to that layer's `bounds` (Backend spec
+`002` FR-005) with no hardcoded per-layer coordinates, and a transparency slider adjusts that
+layer's on-map opacity live via `setPaintProperty`, independent of any other layer's opacity.
+
+**Acceptance**: Component test — invoking "Zoom to Layer" on a mocked layer calls the map's
+fit-bounds API with that layer's `bounds` value; the transparency slider's value is reflected in
+the layer's paint property and no other layer's.
 
 ## Requirements
 
@@ -148,10 +163,19 @@ which filter controls render, without a code change.
   addition to, the Context Panel's feature-selected state (per mockup).
 - **FR-016**: A floating **Legend** card MUST render as its own element (not merged into the
   Layers panel), listing symbol/colour per active layer.
-- **FR-017**: Per-theme filter controls (Year, Satellite/Drone toggle, Village, Zone/Grid, Fauna
-  selection) and a per-theme **Statistics panel** MUST render according to each theme's
-  `filter_config` (Backend spec `002` FR-010) — no per-theme `if`/`switch` in the component tree
-  (Constitution Principle I, Scenario 10).
+- **FR-017**: Per-theme filter controls — Year, Satellite toggle, Raster/Vector toggle (Forest
+  Status), Village (Cadastral Map), Zone/Grid, Fauna selection (Wildlife Corridor, Habitat
+  Suitability), and a sub-theme selector (Watershed: Streams / Geology / Potential SMC) — and a
+  per-theme **Statistics panel** MUST render according to each theme's `filter_config` (Backend
+  spec `002` FR-010) — no per-theme `if`/`switch` in the component tree (Constitution Principle I,
+  Scenario 10).
+- **FR-021**: Every layer's overflow menu MUST offer **Zoom to Layer** (fits the map to that
+  layer's `bounds` from Backend spec `002`'s metadata endpoint) and a **Layer Transparency**
+  slider (per-layer opacity, client-side only — no API round trip), per
+  `Dashboard_workflow.docx`'s common dashboard functions (Scenario 11).
+- **FR-022**: The existing feature-click-to-inspect flow (FR-006's Context Panel feature-selected
+  state) satisfies `Dashboard_workflow.docx`'s "Identify Feature Tool" — no separate tool/mode is
+  required; this FR exists only to record that the requirement is met, not open.
 - **FR-018**: Export action (where authorized) offers **PDF, Excel, and CSV** (resolved — FRD
   FR-6.1), reachable from both the Context Panel (per-feature) and the theme Statistics panel
   (per-theme/dataset).
@@ -167,8 +191,11 @@ which filter controls render, without a code change.
 - `TimeSelection` — single year or range, sourced from available-years metadata.
 - `SelectedFeature` — geometry + properties for the Context Panel's feature-selected state.
 - `AuthState` — current role (including "anonymous"), token, expiry.
-- `ThemeFilterState` — active theme, its `filter_config`-driven control values (year, source,
-  village, zone/grid, fauna), and the fetched `ThemeStatistic` payload for the current selection.
+- `ThemeFilterState` — active theme, its `filter_config`-driven control values (year, satellite,
+  raster/vector toggle, village, zone/grid, fauna, sub_theme), and the fetched `ThemeStatistic`
+  payload for the current selection.
+- `LayerOverflowState` — per layer: transparency/opacity value (client-only), zoom-to-layer
+  trigger (reads `LayerMetadata.bounds`).
 - `SearchState` — query string, result set (mixed attribute-match + geocode-match), selected
   result.
 - `AdminFormState` — role/layer/theme/permission/user CRUD form state for the Users screen

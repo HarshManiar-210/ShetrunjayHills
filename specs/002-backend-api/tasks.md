@@ -36,7 +36,8 @@ queries) being complete.
 
 ## Phase 3 — Layer Metadata Endpoint (unblocks Frontend spec 003's layer panel + time control)
 - [ ] T013 `apps/api/internal/models/layer.go` — `LayerMetadata` DTO: id, name, category, color,
-      fill_opacity, delivery mode, available years/range.
+      fill_opacity, delivery mode, available years/range, bounds (bbox — backs Frontend spec
+      `003`'s "Zoom to Layer" action).
 - [ ] T014 `apps/api/internal/handlers/layers.go` — `GET /api/layers/metadata` (or fold into
       existing `GET /api/layers` response shape — decide in review) returning `LayerMetadata[]`,
       role-filtered.
@@ -51,8 +52,10 @@ queries) being complete.
 - [ ] T013c `apps/api/internal/handlers/themes.go` — `GET /api/themes/{id}/statistics`, filtered
       by year and zone/grid/village scope where applicable (FR-011).
 - [ ] T013d Handler test: filter_config drives which query params a theme accepts (e.g.
-      Cadastral Map accepts `village`, Wildlife Corridor accepts `fauna`) — reading from data, not
-      a per-theme `switch` in the handler (Constitution Principle I).
+      Cadastral Map accepts `village`, Wildlife Corridor accepts `fauna`, Forest Status accepts
+      `raster_toggle`/`vector_toggle`, Watershed accepts `sub_theme` — full mapping in spec `001`'s
+      14-Theme Filter & Output Catalog) — reading from data, not a per-theme `switch` in the
+      handler (Constitution Principle I).
 
 ## Phase 4 — Tiled Delivery (conditional on T002 resolving remaining Open Item as "needed now")
 - [ ] T016 `apps/api/internal/handlers/tiles.go` — `GET /api/tiles/{id}/{z}/{x}/{y}`, delegates

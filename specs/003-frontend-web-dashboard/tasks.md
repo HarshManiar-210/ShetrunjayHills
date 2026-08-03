@@ -53,11 +53,16 @@
 - [ ] T014 `apps/web/lib/layers-api.ts` — typed client for the metadata endpoint from spec `002`
       Phase 3.
 - [ ] T015 `apps/web/components/LayerPanel.tsx` — render layers grouped by the 14-theme catalog
-      (FRD §6.8) plus a base/reference-layers group, toggle switches, colour/line-style swatches,
-      overflow menu per layer (per mockup) — sourced from theme metadata, not a hardcoded group
-      list.
+      (spec `001`'s 14-Theme Filter & Output Catalog) plus a base/reference-layers group, toggle
+      switches, colour/line-style swatches, overflow menu per layer (per mockup) — sourced from
+      theme metadata, not a hardcoded group list.
+- [ ] T015a `apps/web/components/LayerPanel.tsx` — overflow menu actions: **Zoom to Layer** (map
+      fit-bounds using `LayerMetadata.bounds` from spec `002`) and **Layer Transparency** (opacity
+      slider, `setPaintProperty`, client-only, per-layer) (FR-021, Scenario 11).
 - [ ] T016 Component test (Scenario 2): panel renders exactly the layers present in a mocked
       metadata response, no more/no less.
+- [ ] T016a Component test (Scenario 11): Zoom to Layer calls fit-bounds with the correct layer's
+      `bounds`; transparency slider changes only its own layer's opacity.
 - [ ] T017 Error/retry state for a failed metadata fetch (Edge Case from spec.md) — not a
       silently empty panel.
 
@@ -68,10 +73,13 @@
       mockup, symbol/colour per active layer, independent of `LayerPanel.tsx`.
 - [ ] T017c `apps/web/lib/themes-api.ts` — typed client for spec `002`'s theme/statistics
       endpoints.
-- [ ] T017d `apps/web/components/ThemeFilterPanel.tsx` — renders Year/Satellite/Village/Zone-Grid/
-      Fauna controls per the selected theme's `filter_config` (FR-017), plus its Statistics panel.
+- [ ] T017d `apps/web/components/ThemeFilterPanel.tsx` — renders Year, Satellite toggle,
+      Raster/Vector toggle, Village, Zone/Grid, Fauna, and sub-theme (Watershed) controls per the
+      selected theme's `filter_config` (FR-017, full per-theme mapping in spec `001`'s 14-Theme
+      Filter & Output Catalog), plus its Statistics panel.
 - [ ] T017e Component test (Scenario 10): swapping mocked `filter_config` changes which controls
-      render, no code change required.
+      render, no code change required — parameterized across Forest Cover, Cadastral Map, Forest
+      Status, Watershed, and Wildlife Corridor's differing `filter_config` shapes.
 
 ## Phase 4 — Time Control (blocked on T002)
 - [ ] T018 `apps/web/components/TimeControl.tsx` — year/range selector sourced from metadata's
@@ -145,6 +153,7 @@
 - Phase 1a can proceed in parallel with Phase 1 (mostly static UI), but the theme toggle's
   state-preservation (T009e) depends on Phase 1's filter-state plumbing.
 - Phase 3 / 3a require Backend spec `002` Phase 3 / 3a (metadata + theme/statistics endpoints).
+- T015a (Zoom to Layer) requires `LayerMetadata.bounds` from Backend spec `002` T013.
 - Phase 4 is blocked on T002 (Open Item 1 resolution).
 - Phase 4a requires Backend spec `002` Phase 5a (search endpoint).
 - Phase 5's T027a requires Backend spec `002` Phase 5 (export endpoint).

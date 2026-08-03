@@ -43,10 +43,12 @@ apps/web/
 │   ├── Sidebar.tsx                    # NEW — Dashboard/Layers/Users(admin)/About/Logout (FR-012)
 │   ├── Header.tsx                     # NEW — search bar, theme toggle, role avatar (FR-013/014)
 │   ├── Map.tsx                        # MODIFY — remove hardcoded match, camera-fit-once (FR-003/004)
-│   ├── LayerPanel.tsx                 # NEW/MODIFY — theme-grouped, metadata-driven (FR-002/011/017)
+│   ├── LayerPanel.tsx                 # NEW/MODIFY — theme-grouped, metadata-driven (FR-002/011/017),
+│   │                                  #   overflow menu: Zoom to Layer + Transparency slider (FR-021)
 │   ├── DatasetInfoCard.tsx            # NEW — persistent dataset metadata card (FR-015)
 │   ├── LegendCard.tsx                 # NEW — floating legend, independent of LayerPanel (FR-016)
-│   ├── ThemeFilterPanel.tsx           # NEW — filter_config-driven controls + stats (FR-017)
+│   ├── ThemeFilterPanel.tsx           # NEW — filter_config-driven controls (year/satellite/
+│   │                                  #   raster-vector/village/zone-grid/fauna/sub_theme) + stats (FR-017)
 │   ├── SearchBar.tsx                  # NEW — attribute + geocode search, ⌘K (FR-014)
 │   ├── TimeControl.tsx                # NEW — continuous year slider (FR-007)
 │   ├── ExportMenu.tsx                 # NEW — PDF/Excel/CSV action (FR-018)

@@ -53,7 +53,12 @@ different files, no shared dependency). Tasks without `[P]` are sequential.
 - [ ] T017 `infra/migrations/005_real_roles.sql` — insert the 3 confirmed roles: `public`,
       `regular_user`, `admin`.
 - [ ] T018 `infra/migrations/006_real_themes_and_layers.sql` — insert the 14 confirmed themes
-      (FRD §6.8) plus the 8 base/reference layers, with categories and styling.
+      (`spec.md`'s 14-Theme Filter & Output Catalog: Forest Cover, Forest Type, Vegetation Change,
+      Fragmentation, LULC, Forest Status, Cadastral Map, Tree Count, Tree Species, Tree Height,
+      Watershed [+ sub-theme layers: Streams, Geology, Potential SMC/Mati Pala/Check Dam/Pond],
+      Wildlife Corridor, Habitat Suitability Model, Carbon Stock) with each theme's `filter_config`
+      row, plus the 8 base/reference layers (Roads, Rivers, Railways, Canals, Grid, Village
+      Boundaries, Zone Boundaries, SOI Toposheets), with categories and styling.
 - [ ] T019 `infra/migrations/007_real_permissions.sql` — insert the confirmed
       role-to-layer permission matrix (Project_Document.md §6) — per-theme public/restricted
       split still needs client sign-off at the individual-layer level; seed a reasonable default

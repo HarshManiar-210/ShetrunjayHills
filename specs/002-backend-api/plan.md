@@ -40,8 +40,8 @@ apps/api/
 │   │   ├── layers.go            # EXTEND — consumes spec 001's year-scoped methods
 │   │   └── themes.go            # NEW — consumes spec 001's themes/theme_statistics tables
 │   └── models/
-│       ├── layer.go             # EXTEND — LayerMetadata DTO (delivery mode, available years)
-│       └── theme.go             # NEW — Theme DTO (filter_config, data_format)
+│       ├── layer.go             # EXTEND — LayerMetadata DTO (delivery mode, available years, bounds)
+│       └── theme.go             # NEW — Theme DTO (filter_config per spec 001's 14-theme catalog, data_format)
 ```
 
 ## Phase 0 — Research

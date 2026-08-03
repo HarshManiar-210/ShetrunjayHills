@@ -65,8 +65,9 @@ metadata endpoint (data-driven, not a frontend-hardcoded list — Constitution P
 - **FR-004**: The API MUST support filtering by layer/category via query parameters or distinct
   per-layer endpoints (design choice left to Phase 1; either satisfies the FRD's FR-3.1).
 - **FR-005**: The API MUST expose enough layer metadata (id, name, category, color, fill_opacity,
-  delivery mode, available years) for the frontend to build the layer panel and time control
-  without hardcoding any of that information client-side.
+  delivery mode, available years, geometry bounds/extent) for the frontend to build the layer
+  panel, time control, and the "Zoom to Layer" action (Dashboard_workflow.docx's common function
+  list, spec `001`) without hardcoding any of that information client-side.
 - **FR-006**: Export endpoints (where authorized) MUST apply identical role-based filtering to
   read endpoints — an export is not a separate trust boundary.
 - **FR-007**: The API SHOULD expose a tile endpoint (`ST_AsMVT`-backed) for layers whose data
@@ -78,9 +79,12 @@ metadata endpoint (data-driven, not a frontend-hardcoded list — Constitution P
 - **FR-009**: All endpoints MUST continue to satisfy the existing handler-testability pattern
   (Constitution Principle II) — new handlers depend on narrow repository interfaces, not the
   concrete repository type.
-- **FR-010**: The API MUST expose per-theme filter options (year, satellite/drone source, village,
-  zone/grid, fauna) driven by each theme's `filter_config` (spec `001` FR-009) — the handler reads
-  which filters apply from data, never a per-theme `switch`/`if theme == "..."` branch.
+- **FR-010**: The API MUST expose per-theme filter options (`year`, `satellite`, `raster_toggle`/
+  `vector_toggle`, `village`, `zone`/`grid`, `fauna`, `sub_theme` — see spec `001`'s 14-Theme
+  Filter & Output Catalog for the exact per-theme mapping, e.g. Forest Status uses
+  `raster_toggle`/`vector_toggle`, Cadastral Map uses `village`, Watershed uses `sub_theme`)
+  driven by each theme's `filter_config` (spec `001` FR-009) — the handler reads which filters
+  apply from data, never a per-theme `switch`/`if theme == "..."` branch.
 - **FR-011**: The API MUST expose a per-theme statistics endpoint (spec `001`'s `theme_statistics`,
   FR-010) returning area/zone/grid-wise figures for the selected theme/year/scope.
 - **FR-012**: **Resolved — export in PDF, Excel, and CSV** for authenticated/authorized roles
@@ -92,11 +96,20 @@ metadata endpoint (data-driven, not a frontend-hardcoded list — Constitution P
   Items).
 
 ## Key Entities (API-level DTOs, not DB tables)
-- `LayerMetadata` — id, name, category, color, fill_opacity, delivery mode, available years/range.
+- `LayerMetadata` — id, name, category, color, fill_opacity, delivery mode, available years/range,
+  bounds (bbox, backs the "Zoom to Layer" common function — FR-005).
 - `FeatureCollection` (GeoJSON) — existing shape, extended with per-feature `properties.color`
   where applicable.
+- `Theme` — id, name, filter_config (JSONB per spec `001`'s catalog), data_format.
 - `AuthContext` — resolved role, injected into request context by middleware (existing pattern,
   extended to include the anonymous case).
+
+## Client-side-only functions (no new endpoint — noted for traceability to `Dashboard_workflow.docx`)
+- **Layer Transparency**: per-layer opacity, applied client-side via MapLibre
+  `setPaintProperty` (Frontend spec `003`) — no backend field beyond the existing `fill_opacity`
+  default.
+- **Identify Feature Tool**: satisfied by the existing feature-click flow — `FeatureCollection`
+  properties already returned by the read endpoints are sufficient; no separate query endpoint.
 
 ## Non-Goals (this spec)
 - The tiling *database* function itself (covered by spec `001`, FR-008 there).
