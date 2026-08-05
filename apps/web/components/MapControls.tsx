@@ -23,7 +23,7 @@ export function MapControls({
   }
 
   return (
-    <div className="absolute top-3 left-3 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-sm ring-1 ring-foreground/10">
+    <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-sm ring-1 ring-foreground/10">
       <Button
         variant="ghost"
         size="icon-sm"

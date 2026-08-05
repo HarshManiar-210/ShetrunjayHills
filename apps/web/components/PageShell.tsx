@@ -12,23 +12,21 @@ export function PageShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
+    <div className="flex h-screen flex-col overflow-hidden">
+      <Header
         user={auth.user}
+        onMenuClick={() => setMenuOpen(true)}
         onLoginClick={auth.openLogin}
         onLogoutClick={auth.logout}
-        className="hidden w-64 shrink-0 border-r border-sidebar-border xl:flex"
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header
+      <div className="relative min-h-0 flex-1 overflow-y-auto">
+        <Sidebar
           user={auth.user}
-          map={null}
-          onMenuClick={() => setMenuOpen(true)}
           onLoginClick={auth.openLogin}
           onLogoutClick={auth.logout}
         />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        {children}
       </div>
 
       <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -36,12 +34,12 @@ export function PageShell({ children }: { children: React.ReactNode }) {
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar
             user={auth.user}
+            variant="embedded"
             onLoginClick={() => {
               setMenuOpen(false);
               auth.openLogin();
             }}
             onLogoutClick={auth.logout}
-            className="flex"
           />
         </SheetContent>
       </Sheet>

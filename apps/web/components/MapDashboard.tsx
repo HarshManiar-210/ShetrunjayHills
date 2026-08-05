@@ -9,9 +9,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import { LayerPanel } from "@/components/LayerPanel";
-import { DatasetInfoCard } from "@/components/DatasetInfoCard";
 import { LegendCard } from "@/components/LegendCard";
-import { cn } from "@/lib/utils";
 import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection, type LayerFeature } from "@/lib/layers-api";
@@ -31,7 +29,6 @@ export function MapDashboard() {
   const [retryTick, setRetryTick] = useState(0);
   const [visibility, setVisibility] = useState<Record<number, boolean>>({});
   const [map, setMap] = useState<MapLibreMap | null>(null);
-  const [railCollapsed, setRailCollapsed] = useState(false);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
 
   const token = getToken();
@@ -70,68 +67,46 @@ export function MapDashboard() {
     if (map && bounds) map.fitBounds(bounds, { padding: 60 });
   }
 
-  function handleToggleLayersControl() {
-    if (window.matchMedia("(min-width: 1280px)").matches) {
-      setRailCollapsed((c) => !c);
-    } else {
-      setMobileSheet((s) => (s === "layers" ? null : "layers"));
-    }
-  }
-
   const visibleLayers = (layers ?? EMPTY).features;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1">
+      <Header
+        user={auth.user}
+        onMenuClick={() => setMobileSheet("menu")}
+        onLoginClick={auth.openLogin}
+        onLogoutClick={auth.logout}
+      />
+
+      <div className="relative min-h-0 flex-1">
+        <Map
+          data={layers ?? EMPTY}
+          visibility={visibility}
+          onReady={setMap}
+          onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
+        />
+
         <Sidebar
           user={auth.user}
           onLoginClick={auth.openLogin}
           onLogoutClick={auth.logout}
-          className="hidden w-64 shrink-0 border-r border-sidebar-border xl:flex"
         />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Header
-            user={auth.user}
-            map={map}
-            onMenuClick={() => setMobileSheet("menu")}
-            onLoginClick={auth.openLogin}
-            onLogoutClick={auth.logout}
-          />
+        <LayerPanel
+          layers={layers?.features ?? null}
+          loading={loading}
+          error={error}
+          visibility={visibility}
+          onToggle={toggleVisibility}
+          onZoomTo={zoomTo}
+          onRetry={() => setRetryTick((t) => t + 1)}
+          className="absolute top-4 right-4 hidden w-72 xl:flex"
+        />
 
-          <div className="flex min-h-0 flex-1">
-            <div className="relative min-w-0 flex-1">
-              <Map
-                data={layers ?? EMPTY}
-                visibility={visibility}
-                onReady={setMap}
-                onToggleLayers={handleToggleLayersControl}
-              />
-              <LegendCard
-                layers={visibleLayers}
-                className="absolute right-4 bottom-4 hidden w-64 xl:flex"
-              />
-            </div>
-
-            <aside
-              className={cn(
-                "hidden w-80 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-background p-3 xl:flex",
-                railCollapsed && "xl:hidden",
-              )}
-            >
-              <LayerPanel
-                layers={layers?.features ?? null}
-                loading={loading}
-                error={error}
-                visibility={visibility}
-                onToggle={toggleVisibility}
-                onZoomTo={zoomTo}
-                onRetry={() => setRetryTick((t) => t + 1)}
-              />
-              <DatasetInfoCard />
-            </aside>
-          </div>
-        </div>
+        <LegendCard
+          layers={visibleLayers}
+          className="absolute right-4 bottom-4 hidden w-64 xl:flex"
+        />
       </div>
 
       <nav className="flex items-center justify-around border-t border-border bg-card py-1 md:hidden">
@@ -174,12 +149,12 @@ export function MapDashboard() {
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar
             user={auth.user}
+            variant="embedded"
             onLoginClick={() => {
               setMobileSheet(null);
               auth.openLogin();
             }}
             onLogoutClick={auth.logout}
-            className="flex"
           />
         </SheetContent>
       </Sheet>
@@ -196,7 +171,6 @@ export function MapDashboard() {
             onZoomTo={zoomTo}
             onRetry={() => setRetryTick((t) => t + 1)}
           />
-          <DatasetInfoCard />
         </SheetContent>
       </Sheet>
 

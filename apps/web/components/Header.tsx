@@ -1,9 +1,8 @@
 "use client";
 
-import { Menu, Bell, ChevronDown, LogIn, LogOut } from "lucide-react";
+import { Menu, Mountain, ChevronDown, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SearchBar } from "@/components/SearchBar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { AuthUser } from "@/lib/auth";
-import type { Map as MapLibreMap } from "maplibre-gl";
 
 const ROLE_LABELS: Record<string, string> = {
   regular_user: "Regular User",
@@ -27,13 +25,11 @@ function initialsFor(username: string): string {
 
 export function Header({
   user,
-  map,
   onMenuClick,
   onLoginClick,
   onLogoutClick,
 }: {
   user: AuthUser | null;
-  map: MapLibreMap | null;
   onMenuClick: () => void;
   onLoginClick: () => void;
   onLogoutClick: () => void;
@@ -43,20 +39,27 @@ export function Header({
       <Button
         variant="ghost"
         size="icon"
-        className="lg:hidden"
+        className="xl:hidden"
         aria-label="Open menu"
         onClick={onMenuClick}
       >
         <Menu />
       </Button>
 
-      <SearchBar map={map} className="flex-1" />
-      <div className="flex items-center gap-2">
-        <ThemeToggle />
+      <div className="flex min-w-0 items-center gap-2">
+        <Mountain className="size-6 shrink-0 text-primary" strokeWidth={1.75} />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold leading-tight">
+            Shetrunjay Hills
+          </p>
+          <p className="truncate text-xs leading-tight text-muted-foreground">
+            Web GIS Dashboard
+          </p>
+        </div>
+      </div>
 
-        <Button variant="ghost" size="icon" aria-label="Notifications">
-          <Bell />
-        </Button>
+      <div className="flex flex-1 items-center justify-end gap-2">
+        <ThemeToggle />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
