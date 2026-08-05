@@ -64,8 +64,10 @@ infra/
 ## Phase 1 — Design Outputs
 
 - `data-model.md` (ready to generate — Open Items resolved) — entity list, columns, indexes,
-  constraints for: `roles` (3 rows), `users`, `themes` (14 rows), `layers`, `theme_statistics`,
-  `role_layer_permissions`, and the new temporal entity.
+  constraints for: `roles` (3 rows), `users`, `themes` (14 rows — `filter_config` values per
+  `spec.md`'s 14-Theme Filter & Output Catalog), `layers` (14 themes' layers + 8 base/reference
+  layers, Watershed's sub-themes as same-`theme_id` rows distinguished by `category`),
+  `theme_statistics`, `role_layer_permissions`, and the new temporal entity.
 - `contracts/` — not applicable at the database layer directly; the query *shapes* the backend
   spec's contracts depend on are documented here as repository method signatures (Go interfaces),
   e.g.:

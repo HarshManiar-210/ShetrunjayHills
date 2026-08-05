@@ -14,7 +14,8 @@ data layer, (b) the real Shetrunjay Hills role set (**3 roles**: `public`, `regu
 `admin` — `support_team` dropped) and the **14-theme layer catalog** (FRD §6.8: Forest Cover,
 Forest Type, Vegetation Change, Fragmentation, LULC, Forest Status, Cadastral Map, Tree Count,
 Tree Species, Tree Height, Watershed, Wildlife Corridor, Habitat Suitability, Carbon Stock, plus
-8 base/reference layers), and (c) a **continuous** temporal (year) dimension so ~40 years of
+8 base/reference layers — see the 14-Theme Filter & Output Catalog below for the transcribed
+per-theme filter/output detail), and (c) a **continuous** temporal (year) dimension so ~40 years of
 ecological data can be queried and rendered without one row per feature per year colliding with
 performance. This is the foundation spec — the backend and frontend specs both depend on the
 shapes defined here.
@@ -87,21 +88,58 @@ query result feature's properties.
 - **FR-008**: The system SHOULD support geometry delivery suitable for tiling (`ST_AsMVT`) as an
   alternative to full `ST_AsGeoJSON` responses for high-volume layers, without requiring a second,
   parallel schema — see Backend spec (002) for the endpoint that consumes this.
-- **FR-009**: Each theme's per-filter behaviour (year, satellite/drone source, village, zone/grid,
-  fauna selection) MUST be representable as rows/columns, not per-theme code branches — e.g. a
-  `themes` table with a `filter_config` (JSONB) column describing which filters apply, rather than
-  a switch statement keyed on theme name (Principle I).
+- **FR-009**: Each theme's per-filter behaviour (`year`, `satellite`, `raster_toggle`/
+  `vector_toggle`, `village`, `zone`/`grid`, `fauna`, `sub_theme` — see the 14-Theme catalog below
+  for which theme uses which) MUST be representable as rows/columns, not per-theme code branches —
+  e.g. a `themes` table with a `filter_config` (JSONB) column describing which filters apply,
+  rather than a switch statement keyed on theme name (Principle I).
 - **FR-010**: Each theme MUST support a queryable **statistics** result (area/zone/grid-wise, per
   FRD §6.8's Outputs column) — either precomputed rows refreshed on data load, or a view/query
   computed on demand; either satisfies this requirement, choice is an implementation decision.
+
+## 14-Theme Filter & Output Catalog (`Dashboard_workflow.docx`, transcribed 31 July 2026)
+
+This is the concrete data the FRD §6.8 summary and Theme entity below were placeholders for.
+Every row is seed data (FR-006, migration `006_real_themes_and_layers.sql`) — no theme name,
+filter name, or output name appears in application code (Principle I).
+
+| # | Theme | `filter_config` keys | Auto-display source (togglable) | `data_format` | Outputs (feeds `theme_statistics`) |
+|---|---|---|---|---|---|
+| 1 | Forest Cover | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster | Zonal/grid stats, area summary, % change |
+| 2 | Forest Type | *(none — no year filter)* | Drone | raster | Area-wise distribution stats |
+| 3 | Vegetation Change | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster | Gain/loss stats, change analysis |
+| 4 | Fragmentation | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster | Fragmentation stats, patch analysis |
+| 5 | LULC | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster + vector | Area-wise classification stats |
+| 6 | Forest Status | `raster_toggle`, `vector_toggle` | — (FSI & other categories, both formats) | raster + vector | Category-wise stats |
+| 7 | Cadastral Map | `village` | — | vector | Survey boundaries, village-wise display |
+| 8 | Tree Count | `zone`, `grid` | Drone | point | Total count, zone-wise + grid-wise stats |
+| 9 | Tree Species | `zone`, `grid` | Drone | point | Family-wise (NDDB classification) species stats, zone/grid-wise |
+| 10 | Tree Height | `zone`, `grid` | Drone/LiDAR | point | Height-class distribution, zone/grid-wise |
+| 11 | Watershed | `sub_theme` (Streams \| Geology \| Potential SMC), `zone`, `grid` | Drone | vector (mixed: line/polygon/point per sub-theme) | Potential SMC stats (Mati Pala, Check Dam, Pond), structure-wise analysis |
+| 12 | Wildlife Corridor | `fauna` (Lion, Leopard — expandable) | Drone | vector + point | Corridor map, wildlife locations |
+| 13 | Habitat Suitability Model | `fauna`, `raster_toggle` | Drone + separate raster on/off | raster + point | Suitability map, wildlife observation locations |
+| 14 | Carbon Stock | `zone`, `grid` | — | vector | Zone-wise + overall carbon stock, summary stats |
+
+**Watershed sub-themes** (theme 11 only): Streams, Geology, and Potential SMC — the latter itself
+covering Mati Pala, Check Dam, and Pond structures. Modeled as `layers` rows sharing
+`theme_id` = Watershed, distinguished by `category` (Principle I: still data, not a code branch).
+
+**Base/reference layers** (8, independent on/off toggle, `theme_id IS NULL` per FR-006): Roads,
+Rivers, Railways, Canals, Grid, Village Boundaries, Zone Boundaries, SOI Toposheets.
+
+**Cross-theme dashboard functions** (not part of any one theme's `filter_config`; Backend spec
+`002` / Frontend spec `003` concern, listed here for traceability to the source document):
+Statistics Panel, Area Calculation, Export (PDF/Excel/CSV), Legend, Layer Transparency, Search
+Tool, Zoom to Layer, Identify Feature Tool.
 
 ## Key Entities
 
 - **Role** — id, name (`public` | `regular_user` | `admin`), is_public/anonymous marker,
   description. Final, closed set of 3 for v1 (still data rows, not an enum in code).
 - **User** — id, username, password hash, role_id.
-- **Theme** — id, name (one of the 14, FRD §6.8), filter_config (JSONB — which of Year/
-  Satellite/Village/Zone/Grid/Fauna apply), data_format (raster | vector | point | mixed).
+- **Theme** — id, name (one of the 14 above), filter_config (JSONB — a subset of `year`,
+  `satellite`, `raster_toggle`, `vector_toggle`, `village`, `zone`, `grid`, `fauna`, `sub_theme`,
+  per the catalog above), data_format (raster | vector | point | mixed).
 - **Layer** — id, name, theme_id (nullable for base/reference layers), geometry_type, color,
   fill_opacity, description, category (for panel grouping per design system §2).
 - **RoleLayerPermission** — role_id, layer_id (join; existing pattern, unchanged shape).
