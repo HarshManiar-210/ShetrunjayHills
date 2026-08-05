@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Map as MapIcon, Layers, ListTree, Menu as MenuIcon } from "lucide-react";
+import {
+  Map as MapIcon,
+  Layers,
+  ListTree,
+  TreePine,
+  Menu as MenuIcon,
+  PanelLeftOpen,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/Sidebar";
@@ -10,17 +17,20 @@ import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import { LayerPanel } from "@/components/LayerPanel";
 import { LegendCard } from "@/components/LegendCard";
+import { ThemeFilterPanel } from "@/components/ThemeFilterPanel";
+import { ForestCoverPanel } from "@/components/ForestCoverPanel";
 import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
-import { fetchLayers, UnauthorizedError, type LayerCollection, type LayerFeature } from "@/lib/layers-api";
-import { boundsOfFeature } from "@/lib/geo";
-import type { Map as MapLibreMap } from "maplibre-gl";
+import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
+import { getYearColor, type ForestCoverYear, type ForestCoverSource } from "@/lib/forest-cover-mock";
+import { cn } from "@/lib/utils";
+import type { ThemeOverlay } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
-type MobileSheet = "menu" | "layers" | "legend" | null;
+type MobileSheet = "menu" | "layers" | "legend" | "themes" | null;
 
 export function MapDashboard() {
   const auth = useAuthState();
@@ -28,8 +38,13 @@ export function MapDashboard() {
   const [error, setError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [visibility, setVisibility] = useState<Record<number, boolean>>({});
-  const [map, setMap] = useState<MapLibreMap | null>(null);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [forestCoverYear, setForestCoverYear] = useState<ForestCoverYear | null>(null);
+  const [forestCoverSource, setForestCoverSource] = useState<ForestCoverSource | null>(null);
+  const [forestCoverLayerOn, setForestCoverLayerOn] = useState(false);
 
   const token = getToken();
   const loading = layers === null && !error;
@@ -62,12 +77,21 @@ export function MapDashboard() {
     setVisibility((v) => ({ ...v, [id]: !(v[id] ?? true) }));
   }
 
-  function zoomTo(feature: LayerFeature) {
-    const bounds = boundsOfFeature(feature);
-    if (map && bounds) map.fitBounds(bounds, { padding: 60 });
-  }
-
   const visibleLayers = (layers ?? EMPTY).features;
+
+  // Forest Cover (FRD §1.1): the "satellite/drone layer" is a placeholder
+  // tint over the real hill boundary geometry, standing in for imagery that
+  // doesn't exist yet — swapped per year so the map visibly responds to the
+  // year filter.
+  const boundaryFeature = visibleLayers.find((f) => f.properties.name === "shatrunjay_hill_boundary");
+  const themeOverlay: ThemeOverlay | null =
+    selectedTheme === "forest_cover" && boundaryFeature && forestCoverYear
+      ? {
+          geometry: boundaryFeature.geometry,
+          color: getYearColor(forestCoverYear),
+          visible: forestCoverLayerOn,
+        }
+      : null;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -82,26 +106,63 @@ export function MapDashboard() {
         <Map
           data={layers ?? EMPTY}
           visibility={visibility}
-          onReady={setMap}
           onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
+          themeOverlay={themeOverlay}
         />
 
-        <Sidebar
-          user={auth.user}
-          onLoginClick={auth.openLogin}
-          onLogoutClick={auth.logout}
-        />
+        {sidebarCollapsed ? (
+          <div className="absolute top-4 left-4 z-20 hidden xl:block">
+            <Button
+              variant="secondary"
+              size="icon"
+              className="rounded-full shadow-sm ring-1 ring-foreground/10"
+              aria-label="Expand sidebar"
+              onClick={() => setSidebarCollapsed(false)}
+            >
+              <PanelLeftOpen />
+            </Button>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "absolute top-4 left-4 z-20 hidden w-72 max-h-[calc(100%-2rem)] flex-col divide-y divide-border overflow-y-auto scrollbar-thin rounded-xl bg-card shadow-sm ring-1 ring-foreground/10 xl:flex",
+            )}
+          >
+            <Sidebar
+              variant="combined"
+              user={auth.user}
+              onLoginClick={auth.openLogin}
+              onLogoutClick={auth.logout}
+              onCollapse={() => setSidebarCollapsed(true)}
+            />
+            <ThemeFilterPanel
+              selectedTheme={selectedTheme}
+              onSelectTheme={setSelectedTheme}
+              bare
+            />
+            <LayerPanel
+              layers={layers?.features ?? null}
+              loading={loading}
+              error={error}
+              visibility={visibility}
+              onToggle={toggleVisibility}
+              onRetry={() => setRetryTick((t) => t + 1)}
+              bare
+            />
+          </div>
+        )}
 
-        <LayerPanel
-          layers={layers?.features ?? null}
-          loading={loading}
-          error={error}
-          visibility={visibility}
-          onToggle={toggleVisibility}
-          onZoomTo={zoomTo}
-          onRetry={() => setRetryTick((t) => t + 1)}
-          className="absolute top-4 right-4 hidden w-72 xl:flex"
-        />
+        {selectedTheme === "forest_cover" && (
+          <ForestCoverPanel
+            year={forestCoverYear}
+            onYearChange={setForestCoverYear}
+            source={forestCoverSource}
+            onSourceChange={setForestCoverSource}
+            layerOn={forestCoverLayerOn}
+            onLayerOnChange={setForestCoverLayerOn}
+            className="absolute top-4 right-4 hidden w-72 xl:flex"
+          />
+        )}
 
         <LegendCard
           layers={visibleLayers}
@@ -112,7 +173,7 @@ export function MapDashboard() {
       <nav className="flex items-center justify-around border-t border-border bg-card py-1 md:hidden">
         <Button
           variant="ghost"
-          className="h-auto flex-col gap-0.5 px-4 py-1.5 text-xs"
+          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
           onClick={() => setMobileSheet(null)}
         >
           <MapIcon className="size-4" strokeWidth={1.75} />
@@ -120,7 +181,15 @@ export function MapDashboard() {
         </Button>
         <Button
           variant="ghost"
-          className="h-auto flex-col gap-0.5 px-4 py-1.5 text-xs"
+          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
+          onClick={() => setMobileSheet("themes")}
+        >
+          <TreePine className="size-4" strokeWidth={1.75} />
+          Themes
+        </Button>
+        <Button
+          variant="ghost"
+          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
           onClick={() => setMobileSheet("layers")}
         >
           <Layers className="size-4" strokeWidth={1.75} />
@@ -128,7 +197,7 @@ export function MapDashboard() {
         </Button>
         <Button
           variant="ghost"
-          className="h-auto flex-col gap-0.5 px-4 py-1.5 text-xs"
+          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
           onClick={() => setMobileSheet("legend")}
         >
           <ListTree className="size-4" strokeWidth={1.75} />
@@ -136,7 +205,7 @@ export function MapDashboard() {
         </Button>
         <Button
           variant="ghost"
-          className="h-auto flex-col gap-0.5 px-4 py-1.5 text-xs"
+          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
           onClick={() => setMobileSheet("menu")}
         >
           <MenuIcon className="size-4" strokeWidth={1.75} />
@@ -159,8 +228,25 @@ export function MapDashboard() {
         </SheetContent>
       </Sheet>
 
+      <Sheet open={mobileSheet === "themes"} onOpenChange={(o) => setMobileSheet(o ? "themes" : null)}>
+        <SheetContent side="bottom" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto scrollbar-thin">
+          <SheetTitle className="sr-only">Themes</SheetTitle>
+          <ThemeFilterPanel selectedTheme={selectedTheme} onSelectTheme={setSelectedTheme} />
+          {selectedTheme === "forest_cover" && (
+            <ForestCoverPanel
+              year={forestCoverYear}
+              onYearChange={setForestCoverYear}
+              source={forestCoverSource}
+              onSourceChange={setForestCoverSource}
+              layerOn={forestCoverLayerOn}
+              onLayerOnChange={setForestCoverLayerOn}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
       <Sheet open={mobileSheet === "layers"} onOpenChange={(o) => setMobileSheet(o ? "layers" : null)}>
-        <SheetContent side="bottom" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
+        <SheetContent side="bottom" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto scrollbar-thin">
           <SheetTitle className="sr-only">Layers</SheetTitle>
           <LayerPanel
             layers={layers?.features ?? null}
@@ -168,14 +254,13 @@ export function MapDashboard() {
             error={error}
             visibility={visibility}
             onToggle={toggleVisibility}
-            onZoomTo={zoomTo}
             onRetry={() => setRetryTick((t) => t + 1)}
           />
         </SheetContent>
       </Sheet>
 
       <Sheet open={mobileSheet === "legend"} onOpenChange={(o) => setMobileSheet(o ? "legend" : null)}>
-        <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
+        <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto scrollbar-thin">
           <SheetTitle className="sr-only">Legend</SheetTitle>
           <LegendCard layers={visibleLayers} className="flex" />
         </SheetContent>
