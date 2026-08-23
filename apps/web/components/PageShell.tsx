@@ -21,11 +21,13 @@ export function PageShell({ children }: { children: React.ReactNode }) {
       />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
-        <Sidebar
-          user={auth.user}
-          onLoginClick={auth.openLogin}
-          onLogoutClick={auth.logout}
-        />
+        <div className="absolute top-4 left-4 z-20 max-h-[calc(100%-2rem)]">
+          <Sidebar
+            user={auth.user}
+            onLoginClick={auth.openLogin}
+            onLogoutClick={auth.logout}
+          />
+        </div>
         {children}
       </div>
 

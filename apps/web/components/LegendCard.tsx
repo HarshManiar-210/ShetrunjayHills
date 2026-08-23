@@ -38,7 +38,7 @@ export function LegendCard({
         </CardAction>
       </CardHeader>
       {!collapsed && (
-        <CardContent className="flex max-h-40 flex-col gap-1.5 overflow-y-auto">
+        <CardContent className="flex max-h-40 flex-col gap-1.5 overflow-y-auto scrollbar-thin">
           {layers.map((feature) => (
             <div key={feature.properties.id} className="flex items-center gap-2 text-sm">
               <LayerSwatch feature={feature} />

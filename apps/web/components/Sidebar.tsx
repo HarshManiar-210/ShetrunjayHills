@@ -122,12 +122,14 @@ export function Sidebar({
   onLoginClick,
   onLogoutClick,
   variant = "floating",
+  onCollapse,
   className,
 }: {
   user: AuthUser | null;
   onLoginClick: () => void;
   onLogoutClick: () => void;
-  variant?: "floating" | "embedded";
+  variant?: "floating" | "embedded" | "combined";
+  onCollapse?: () => void;
   className?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -144,9 +146,25 @@ export function Sidebar({
     );
   }
 
+  // Content-only, no shadow/positioning/self-managed collapse — used as the
+  // top section of MapDashboard's combined sidebar+themes+layers panel,
+  // where the parent owns the single collapse toggle for the whole thing.
+  if (variant === "combined") {
+    return (
+      <div className={cn("flex shrink-0 flex-col", className)}>
+        <SidebarContent
+          user={user}
+          onLoginClick={onLoginClick}
+          onLogoutClick={onLogoutClick}
+          onCollapse={onCollapse}
+        />
+      </div>
+    );
+  }
+
   if (collapsed) {
     return (
-      <div className={cn("absolute top-4 left-4 z-20 hidden xl:block", className)}>
+      <div className={cn("hidden xl:block", className)}>
         <Button
           variant="secondary"
           size="icon"
@@ -163,7 +181,7 @@ export function Sidebar({
   return (
     <div
       className={cn(
-        "absolute top-4 left-4 z-20 hidden max-h-[calc(100%-2rem)] w-64 flex-col rounded-xl bg-sidebar shadow-sm ring-1 ring-foreground/10 xl:flex",
+        "hidden w-64 flex-col rounded-xl bg-sidebar shadow-sm ring-1 ring-foreground/10 xl:flex",
         className,
       )}
     >
