@@ -33,6 +33,9 @@ string is a bug, not a shortcut.
 - **Frontend (`apps/web`)**: fetches to the API always send the Bearer token from
   `localStorage`; no token → redirect to `/login`. Only add shadcn components actually used by a
   page.
+- **UI reference image**: `apps/web/public/ref-image/image.png` is the required visual reference
+  for any UI/layout/styling change — check it before implementing, every time, without being
+  asked. Match its spacing, density, and component conventions unless the user says otherwise.
 - **Schema changes**: role/layer/permission changes are seed or migration rows in
   `infra/postgis-init/init.sql`, not conditionals in Go or TypeScript.
 - **Verification over trust**: after touching the layers API or auth, manually verify (curl or

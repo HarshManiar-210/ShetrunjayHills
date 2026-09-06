@@ -3,16 +3,9 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
-import {
-  Map as MapIcon,
-  Layers,
-  ListTree,
-  TreePine,
-  Menu as MenuIcon,
-} from "lucide-react";
+import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
@@ -142,30 +135,6 @@ export function MapDashboard() {
         <Button
           variant="ghost"
           className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
-          onClick={() => setMobileSheet(null)}
-        >
-          <MapIcon className="size-4" strokeWidth={1.75} />
-          Map
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
-          onClick={() => setMobileSheet("themes")}
-        >
-          <TreePine className="size-4" strokeWidth={1.75} />
-          Themes
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
-          onClick={() => setMobileSheet("layers")}
-        >
-          <Layers className="size-4" strokeWidth={1.75} />
-          Layers
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-auto flex-col gap-0.5 px-3 py-1.5 text-xs"
           onClick={() => setMobileSheet("legend")}
         >
           <ListTree className="size-4" strokeWidth={1.75} />
@@ -182,9 +151,9 @@ export function MapDashboard() {
       </nav>
 
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 scrollbar-thin">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <Sidebar user={auth.user} variant="embedded" />
+          <SidebarSections />
         </SheetContent>
       </Sheet>
 
