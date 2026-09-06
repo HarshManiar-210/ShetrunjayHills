@@ -43,6 +43,9 @@ CREATE TABLE role_layer_permissions (
 -- and a file_path the API resolves against DATA_ROOT to serve the asset.
 -- Adding a new overlay (another vector layer, another raster year) is a row
 -- insert here, not a frontend/API code change.
+-- min_lon/min_lat/max_lon/max_lat (SW/NE corners, EPSG:4326) place a raster
+-- overlay on the map — the source imagery has no embedded geo tags of its
+-- own. NULL for vector rows, which carry their own geometry instead.
 CREATE TABLE static_overlays (
     id         SERIAL PRIMARY KEY,
     key        TEXT NOT NULL UNIQUE,
@@ -52,7 +55,11 @@ CREATE TABLE static_overlays (
     kind       TEXT CHECK (kind IN ('line', 'fill')),
     color      TEXT,
     file_path  TEXT NOT NULL,
-    sort_order INTEGER NOT NULL DEFAULT 0
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    min_lon    DOUBLE PRECISION,
+    min_lat    DOUBLE PRECISION,
+    max_lon    DOUBLE PRECISION,
+    max_lat    DOUBLE PRECISION
 );
 
 -- ---------------------------------------------------------------------------
@@ -165,11 +172,11 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
     ('zoneBoundaries', 'Zone Boundaries',    'Base Layers',        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4),
     ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5);
 
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order) VALUES
-    ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980),
-    ('forest_cover_1989', '1989', 'Forest Cover', 'raster', 'raster-data/forest-cover/1989.png', 1989),
-    ('forest_cover_1998', '1998', 'Forest Cover', 'raster', 'raster-data/forest-cover/1998.png', 1998),
-    ('forest_cover_2008', '2008', 'Forest Cover', 'raster', 'raster-data/forest-cover/2008.png', 2008),
-    ('forest_cover_2018', '2018', 'Forest Cover', 'raster', 'raster-data/forest-cover/2018.png', 2018),
-    ('forest_cover_2025', '2025', 'Forest Cover', 'raster', 'raster-data/forest-cover/2025.png', 2025),
-    ('forest_cover_2026', '2026', 'Forest Cover', 'raster', 'raster-data/forest-cover/2026.png', 2026);
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('forest_cover_1989', '1989', 'Forest Cover', 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_1998', '1998', 'Forest Cover', 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_2008', '2008', 'Forest Cover', 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_2018', '2018', 'Forest Cover', 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_2025', '2025', 'Forest Cover', 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
+    ('forest_cover_2026', '2026', 'Forest Cover', 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
