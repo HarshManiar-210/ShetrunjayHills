@@ -33,7 +33,9 @@ type SectionItem = { label: string; icon?: LucideIcon; children?: Item[]; key?: 
 
 // Sections with a master switch gating their own set of map-backed items
 // (see lib/static-overlays.ts for what each item.key actually renders).
-const TOGGLE_SECTIONS = new Set(["Base Layers", "Watershed Analysis"]);
+// Exported so MapDashboard can enforce "only one open at a time" (accordion)
+// without hardcoding the section names a second time.
+export const TOGGLE_SECTIONS = new Set(["Base Layers", "Watershed Analysis"]);
 
 const SECTIONS: { label: string; items?: SectionItem[] }[] = [
   {

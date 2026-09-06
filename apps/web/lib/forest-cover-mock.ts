@@ -1,9 +1,9 @@
-// Placeholder data for the Forest Cover theme (FRD §1.1) until real
-// per-year satellite/drone imagery and zonal statistics are available.
-// Every value here is illustrative, not measured.
+// Placeholder zonal statistics for the Forest Cover theme (FRD §1.1) — the
+// imagery itself is real (served from the `static_overlays` DB rows, see
+// lib/overlays-api.ts), but per-zone/grid cover percentages aren't measured
+// yet.
 
-export const FOREST_COVER_YEARS = [2018, 2020, 2022, 2024] as const;
-export type ForestCoverYear = (typeof FOREST_COVER_YEARS)[number];
+export type ForestCoverYear = number;
 
 export const FOREST_COVER_SOURCES = ["Sentinel-2", "Landsat-8", "Drone Survey"] as const;
 export type ForestCoverSource = (typeof FOREST_COVER_SOURCES)[number];
@@ -24,19 +24,6 @@ const ZONE_AREAS_HA: ReadonlyArray<[string, number]> = [
   ["Zone D", 746],
 ];
 
-// One tint per year so switching the year filter visibly changes the
-// placeholder satellite/drone overlay on the map, not just the stats table.
-const YEAR_COLORS: Record<ForestCoverYear, string> = {
-  2018: "#C56E54",
-  2020: "#D18B2A",
-  2022: "#5AA469",
-  2024: "#2D7D46",
-};
-
-export function getYearColor(year: ForestCoverYear): string {
-  return YEAR_COLORS[year];
-}
-
 // Same real total (~3,396 ha), split into a finer grid instead of the
 // coarser zones above — a regular grid overlay, not a measured subdivision.
 const GRID_AREAS_HA: ReadonlyArray<[string, number]> = [
@@ -52,9 +39,13 @@ const GRID_AREAS_HA: ReadonlyArray<[string, number]> = [
 
 // Cover percentage drifts slightly by year so switching the year filter
 // visibly changes the stats — a deterministic placeholder trend, not a
-// measurement.
+// measurement. Anchored to the latest available raster year (see
+// static_overlays seed data), not derived from it, since stats stay
+// illustrative regardless of which years imagery exists for.
+const LATEST_YEAR = 2026;
+
 function statsFor(areas: ReadonlyArray<[string, number]>, year: ForestCoverYear): ZoneStat[] {
-  const yearsFromLatest = FOREST_COVER_YEARS[FOREST_COVER_YEARS.length - 1] - year;
+  const yearsFromLatest = LATEST_YEAR - year;
   return areas.map(([zone, areaHa], i) => ({
     zone,
     areaHa,

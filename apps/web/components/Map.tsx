@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Map as MapLibreMap, type FilterSpecification, type GeoJSONSource, type IControl } from "maplibre-gl";
+import {
+  Map as MapLibreMap,
+  LngLatBounds,
+  type FilterSpecification,
+  type GeoJSONSource,
+  type ImageSource,
+  type IControl,
+  type LngLatBoundsLike,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
@@ -21,11 +29,17 @@ const INITIAL_ZOOM = 11;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
-export interface ThemeOverlay {
-  geometry: GeoJSON.Geometry;
-  color: string;
+// Forest Cover's real per-year raster (from the `static_overlays` DB row,
+// served through the API — see lib/overlays-api.ts), draped over the extent
+// of a reference vector geometry since the imagery has no embedded geo tags.
+export interface ForestCoverOverlay {
+  url: string;
+  bounds: LngLatBoundsLike;
   visible: boolean;
 }
+
+const RASTER_OVERLAY_SOURCE = "forest-cover-raster";
+const RASTER_OVERLAY_LAYER = "forest-cover-raster-layer";
 
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
@@ -116,6 +130,12 @@ function byGeometryType(
   };
 }
 
+// Unfiltered MapLibre layers draw every feature, which would make a freshly
+// added layer default to "all visible" — the opposite of no default
+// selection. Layers start with this empty-set filter; the visibility effect
+// below replaces it once a switch is actually turned on.
+const NO_FEATURES_FILTER: FilterSpecification = ["in", ["get", "id"], ["literal", []]];
+
 function addLayers(
   map: MapLibreMap,
   polygons: GeoJSON.FeatureCollection,
@@ -130,12 +150,14 @@ function addLayers(
     id: "polygons-fill",
     type: "fill",
     source: "polygons",
+    filter: NO_FEATURES_FILTER,
     paint: { "fill-color": ["get", "color"], "fill-opacity": 0.25 },
   });
   map.addLayer({
     id: "polygons-outline",
     type: "line",
     source: "polygons",
+    filter: NO_FEATURES_FILTER,
     paint: { "line-color": ["get", "color"], "line-width": 2 },
   });
 
@@ -145,6 +167,7 @@ function addLayers(
     id: "lines-casing",
     type: "line",
     source: "lines",
+    filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
     paint: { "line-color": BACKGROUND, "line-width": 5 },
   });
@@ -152,6 +175,7 @@ function addLayers(
     id: "lines",
     type: "line",
     source: "lines",
+    filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
     paint: { "line-color": ["get", "color"], "line-width": 3 },
   });
@@ -160,31 +184,13 @@ function addLayers(
     id: "points",
     type: "circle",
     source: "points",
+    filter: NO_FEATURES_FILTER,
     paint: {
       "circle-color": ["get", "color"],
       "circle-radius": 6,
       "circle-stroke-width": 2,
       "circle-stroke-color": BACKGROUND,
     },
-  });
-
-  // Theme overlay: a stand-in for satellite/drone imagery a theme's filters
-  // would show, using whatever geometry the caller hands it (e.g. the hill
-  // boundary) tinted per-selection. Hidden until a theme sets it visible.
-  map.addSource("theme-overlay", { type: "geojson", data: EMPTY_FC });
-  map.addLayer({
-    id: "theme-overlay-fill",
-    type: "fill",
-    source: "theme-overlay",
-    layout: { visibility: "none" },
-    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 },
-  });
-  map.addLayer({
-    id: "theme-overlay-outline",
-    type: "line",
-    source: "theme-overlay",
-    layout: { visibility: "none" },
-    paint: { "line-color": ["get", "color"], "line-width": 2, "line-dasharray": [2, 2] },
   });
 }
 
@@ -259,13 +265,13 @@ export default function Map({
   data,
   visibility,
   onReady,
-  themeOverlay,
+  forestCoverOverlay,
   overlays,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
   onReady?: (map: MapLibreMap) => void;
-  themeOverlay?: ThemeOverlay | null;
+  forestCoverOverlay?: ForestCoverOverlay | null;
   overlays?: Record<string, boolean>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -294,7 +300,10 @@ export default function Map({
     mapRef.current = map;
 
     const attribution = new CompactAttribution(ATTRIBUTION);
-    map.addControl(attribution, "bottom-right");
+    // bottom-left, not bottom-right: the Legend card docks bottom-right and
+    // collapses to just its header — sharing a corner with the attribution
+    // control would stack the two buttons on top of each other.
+    map.addControl(attribution, "bottom-left");
 
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
@@ -316,28 +325,41 @@ export default function Map({
     if (map && map.isStyleLoaded()) render(map, data, fitOnceRef.current);
   }, [data]);
 
-  // theme overlay: swap the mock satellite/drone tint in place, no refit
+  // Forest Cover raster: an image source needs a real image up front (unlike
+  // a geojson source there's no "empty" state), so it's added/removed
+  // wholesale rather than kept around hidden like the other overlays.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const source = map.getSource<GeoJSONSource>("theme-overlay");
-    if (!source) return;
 
-    const visible = Boolean(themeOverlay?.visible);
-    source.setData(
-      themeOverlay
-        ? {
-            type: "FeatureCollection",
-            features: [
-              { type: "Feature", properties: { color: themeOverlay.color }, geometry: themeOverlay.geometry },
-            ],
-          }
-        : EMPTY_FC,
-    );
-    for (const layerId of ["theme-overlay-fill", "theme-overlay-outline"]) {
-      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    if (!forestCoverOverlay?.visible) {
+      if (map.getLayer(RASTER_OVERLAY_LAYER)) map.removeLayer(RASTER_OVERLAY_LAYER);
+      if (map.getSource(RASTER_OVERLAY_SOURCE)) map.removeSource(RASTER_OVERLAY_SOURCE);
+      return;
     }
-  }, [themeOverlay]);
+
+    const bounds = LngLatBounds.convert(forestCoverOverlay.bounds);
+    const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
+      bounds.getNorthWest().toArray() as [number, number],
+      bounds.getNorthEast().toArray() as [number, number],
+      bounds.getSouthEast().toArray() as [number, number],
+      bounds.getSouthWest().toArray() as [number, number],
+    ];
+
+    const existing = map.getSource<ImageSource>(RASTER_OVERLAY_SOURCE);
+    if (existing) {
+      existing.updateImage({ url: forestCoverOverlay.url, coordinates });
+      return;
+    }
+
+    map.addSource(RASTER_OVERLAY_SOURCE, { type: "image", url: forestCoverOverlay.url, coordinates });
+    map.addLayer({
+      id: RASTER_OVERLAY_LAYER,
+      type: "raster",
+      source: RASTER_OVERLAY_SOURCE,
+      paint: { "raster-opacity": 0.75 },
+    });
+  }, [forestCoverOverlay]);
 
   // static overlays: fetch each file at most once, then just flip
   // layout visibility — cheap and immune to rapid on/off clicking.
@@ -382,16 +404,16 @@ export default function Map({
     }
   }, [overlays]);
 
-  // visibility toggles: filter, never re-fetch or refit
+  // visibility toggles: filter, never re-fetch or refit. No layer is
+  // selected by default, so this shows only ids explicitly switched on
+  // rather than hiding ids explicitly switched off.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const hiddenIds = Object.entries(visibility)
-      .filter(([, visible]) => !visible)
+    const visibleIds = Object.entries(visibility)
+      .filter(([, visible]) => visible)
       .map(([id]) => Number(id));
-    const filter: FilterSpecification | null = hiddenIds.length
-      ? ["!", ["in", ["get", "id"], ["literal", hiddenIds]]]
-      : null;
+    const filter: FilterSpecification = ["in", ["get", "id"], ["literal", visibleIds]];
     for (const layerId of ["polygons-fill", "polygons-outline", "lines-casing", "lines", "points"]) {
       if (map.getLayer(layerId)) map.setFilter(layerId, filter);
     }

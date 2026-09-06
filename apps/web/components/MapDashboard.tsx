@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { SidebarSections } from "@/components/SidebarSections";
+import { SidebarSections, TOGGLE_SECTIONS } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import { LayerPanel } from "@/components/LayerPanel";
@@ -23,8 +23,11 @@ import { ForestCoverPanel } from "@/components/ForestCoverPanel";
 import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
-import { getYearColor, type ForestCoverYear, type ForestCoverSource } from "@/lib/forest-cover-mock";
-import type { ThemeOverlay } from "@/components/Map";
+import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
+import { fetchOverlays, overlayDataUrl } from "@/lib/overlays-api";
+import { boundsOfFeature } from "@/lib/geo";
+import type { ForestCoverYear, ForestCoverSource } from "@/lib/forest-cover-mock";
+import type { ForestCoverOverlay } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -41,9 +44,31 @@ export function MapDashboard() {
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
 
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [forestCoverYears, setForestCoverYears] = useState<ForestCoverYear[]>([]);
   const [forestCoverYear, setForestCoverYear] = useState<ForestCoverYear | null>(null);
   const [forestCoverSource, setForestCoverSource] = useState<ForestCoverSource | null>(null);
   const [forestCoverLayerOn, setForestCoverLayerOn] = useState(false);
+
+  // Available years come from the `static_overlays` DB rows (Forest Cover
+  // section, one row per raster year) rather than a hardcoded list — adding
+  // a year is a seed insert, not a frontend change.
+  useEffect(() => {
+    let cancelled = false;
+    fetchOverlays()
+      .then((overlays) => {
+        if (cancelled) return;
+        const years = overlays
+          .filter((o) => o.section === "Forest Cover" && o.asset_type === "raster")
+          .map((o) => Number(o.label))
+          .filter((y) => !Number.isNaN(y))
+          .sort((a, b) => a - b);
+        setForestCoverYears(years);
+      })
+      .catch(() => setForestCoverYears([]));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Master-toggle sections (Base Layers, Watershed Analysis): each has its
   // own on/off switch that gates its own set of static overlay layers, keyed
@@ -52,12 +77,13 @@ export function MapDashboard() {
   const [sectionVisibility, setSectionVisibility] = useState<Record<string, Record<string, boolean>>>({});
   const [lockedPromptSection, setLockedPromptSection] = useState<string | null>(null);
 
+  // Accordion: only one toggle section (Base Layers / Watershed Analysis) can
+  // be on at a time. Turning one on replaces the whole sectionOn map rather
+  // than merging, so switching sections also clears the other's item
+  // visibility — otherwise its switches would stay "checked" while greyed out.
   function toggleSection(section: string, on: boolean) {
-    setSectionOn((s) => ({ ...s, [section]: on }));
-    // master OFF cascades: every dependent layer in this section turns off,
-    // unchecks, and is removed from the map (Map.tsx hides it once its key
-    // drops out of the merged `overlays` prop below).
-    if (!on) setSectionVisibility((v) => ({ ...v, [section]: {} }));
+    setSectionOn(on ? { [section]: true } : {});
+    setSectionVisibility((v) => (on ? { [section]: v[section] ?? {} } : { ...v, [section]: {} }));
   }
 
   function toggleSectionItem(section: string, key: string) {
@@ -71,6 +97,22 @@ export function MapDashboard() {
     if (on) Object.assign(acc, sectionVisibility[section]);
     return acc;
   }, {});
+
+  // Legend only ever shows the currently-open toggle section (accordion above
+  // guarantees at most one), and only the items actually switched on within it.
+  const activeToggleSection = Object.keys(sectionOn).find(
+    (s) => sectionOn[s] && TOGGLE_SECTIONS.has(s),
+  );
+  const sectionLegendItems = activeToggleSection
+    ? Object.entries(sectionVisibility[activeToggleSection] ?? {})
+        .filter(([, on]) => on)
+        .map(([key]) => STATIC_OVERLAY_SOURCES[key])
+        .filter((o): o is NonNullable<typeof o> => Boolean(o))
+    : [];
+  const sectionLegend =
+    activeToggleSection && sectionLegendItems.length > 0
+      ? { title: activeToggleSection, items: sectionLegendItems }
+      : null;
 
   const token = getToken();
   const loading = layers === null && !error;
@@ -99,22 +141,29 @@ export function MapDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, retryTick]);
 
+  // No layer is selected by default — a fetched layer only draws once its
+  // switch is explicitly turned on.
   function toggleVisibility(id: number) {
-    setVisibility((v) => ({ ...v, [id]: !(v[id] ?? true) }));
+    setVisibility((v) => ({ ...v, [id]: !(v[id] ?? false) }));
   }
 
-  const visibleLayers = (layers ?? EMPTY).features;
+  const allLayers = (layers ?? EMPTY).features;
+  // Legend mirrors what's actually switched on, not everything the role can
+  // see — no layer is selected by default, so an unselected layer shouldn't
+  // show up in the legend either.
+  const legendLayers = allLayers.filter((f) => visibility[f.properties.id]);
 
-  // Forest Cover (FRD §1.1): the "satellite/drone layer" is a placeholder
-  // tint over the real hill boundary geometry, standing in for imagery that
-  // doesn't exist yet — swapped per year so the map visibly responds to the
-  // year filter.
-  const boundaryFeature = visibleLayers.find((f) => f.properties.name === "shatrunjay_hill_boundary");
-  const themeOverlay: ThemeOverlay | null =
-    selectedTheme === "forest_cover" && boundaryFeature && forestCoverYear
+  // Forest Cover (FRD §1.1): the per-year raster (static_overlays row
+  // forest_cover_<year>, served through the API) has no embedded geo
+  // extent, so it's draped over the real hill boundary's bounding box —
+  // looked up regardless of that layer's own visibility toggle.
+  const boundaryFeature = allLayers.find((f) => f.properties.name === "shatrunjay_hill_boundary");
+  const boundaryBounds = boundaryFeature ? boundsOfFeature(boundaryFeature) : null;
+  const forestCoverOverlay: ForestCoverOverlay | null =
+    selectedTheme === "forest_cover" && boundaryBounds && forestCoverYear
       ? {
-          geometry: boundaryFeature.geometry,
-          color: getYearColor(forestCoverYear),
+          url: overlayDataUrl(`forest_cover_${forestCoverYear}`),
+          bounds: boundaryBounds,
           visible: forestCoverLayerOn,
         }
       : null;
@@ -147,13 +196,14 @@ export function MapDashboard() {
             <Map
               data={layers ?? EMPTY}
               visibility={visibility}
-              themeOverlay={themeOverlay}
+              forestCoverOverlay={forestCoverOverlay}
               overlays={overlays}
             />
           </div>
 
           {selectedTheme === "forest_cover" && (
             <ForestCoverPanel
+              years={forestCoverYears}
               year={forestCoverYear}
               onYearChange={setForestCoverYear}
               source={forestCoverSource}
@@ -165,7 +215,8 @@ export function MapDashboard() {
           )}
 
           <LegendCard
-            layers={visibleLayers}
+            layers={legendLayers}
+            sectionLegend={sectionLegend}
             className="absolute right-4 bottom-4 hidden w-64 xl:flex"
           />
         </div>
@@ -209,6 +260,7 @@ export function MapDashboard() {
           <ThemeFilterPanel selectedTheme={selectedTheme} onSelectTheme={setSelectedTheme} />
           {selectedTheme === "forest_cover" && (
             <ForestCoverPanel
+              years={forestCoverYears}
               year={forestCoverYear}
               onYearChange={setForestCoverYear}
               source={forestCoverSource}
@@ -237,7 +289,7 @@ export function MapDashboard() {
       <Sheet open={mobileSheet === "legend"} onOpenChange={(o) => setMobileSheet(o ? "legend" : null)}>
         <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto scrollbar-thin">
           <SheetTitle className="sr-only">Legend</SheetTitle>
-          <LegendCard layers={visibleLayers} className="flex" />
+          <LegendCard layers={legendLayers} sectionLegend={sectionLegend} className="flex" />
         </SheetContent>
       </Sheet>
 
