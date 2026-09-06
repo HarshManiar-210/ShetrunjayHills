@@ -31,8 +31,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-local-only}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
       PORT: "8080"
+      DATA_ROOT: /data
     ports:
       - "8080:8080"
+    volumes:
+      - ./apps/vector-data:/data/vector-data:ro
+      - ./apps/raster-data:/data/raster-data:ro
     depends_on:
       db:
         condition: service_healthy

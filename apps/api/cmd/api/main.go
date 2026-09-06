@@ -41,6 +41,14 @@ func main() {
 	if corsOrigin == "" {
 		corsOrigin = "http://localhost:3000"
 	}
+	// Root static overlay file_path values (e.g. "vector-data/Roads.geojson")
+	// resolve against. Compose mounts vector-data/raster-data at /data/* and
+	// sets DATA_ROOT=/data; the default assumes `go run`/`go test` from
+	// apps/api against a repo checkout, where both live under ../../apps.
+	dataRoot := os.Getenv("DATA_ROOT")
+	if dataRoot == "" {
+		dataRoot = "../../apps"
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -64,6 +72,12 @@ func main() {
 	r.Use(handlers.CORS(corsOrigin))
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
+
+	// Static overlays (Base Layers, Watershed Analysis, Forest Cover raster)
+	// aren't RBAC-permissioned rows, so they sit outside the Auth group —
+	// every visitor sees the same reference geometry/imagery.
+	r.Get("/api/overlays", handlers.Overlays(repo))
+	r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
 
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.Auth([]byte(jwtSecret), publicRoleID))

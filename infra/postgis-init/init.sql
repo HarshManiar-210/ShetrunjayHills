@@ -37,6 +37,24 @@ CREATE TABLE role_layer_permissions (
     PRIMARY KEY (role_id, layer_id)
 );
 
+-- Base Layers / Watershed Analysis vector reference geometry and Forest
+-- Cover raster imagery. Not RBAC-permissioned (every visitor sees the same
+-- reference data), so no role_id here — just a key the frontend switches on
+-- and a file_path the API resolves against DATA_ROOT to serve the asset.
+-- Adding a new overlay (another vector layer, another raster year) is a row
+-- insert here, not a frontend/API code change.
+CREATE TABLE static_overlays (
+    id         SERIAL PRIMARY KEY,
+    key        TEXT NOT NULL UNIQUE,
+    label      TEXT NOT NULL,
+    section    TEXT NOT NULL,
+    asset_type TEXT NOT NULL CHECK (asset_type IN ('vector', 'raster')),
+    kind       TEXT CHECK (kind IN ('line', 'fill')),
+    color      TEXT,
+    file_path  TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
 -- ---------------------------------------------------------------------------
 -- Seed: roles
 -- ---------------------------------------------------------------------------
@@ -130,3 +148,28 @@ CROSS JOIN layers l
 WHERE
     (r.name IN ('public', 'regular_user') AND l.name IN ('shatrunjay_hill_boundary', 'roads', 'shetrunjay_hills_range', 'species_points'))
     OR (r.name IN ('admin', 'support_team'));
+
+-- ---------------------------------------------------------------------------
+-- Seed: static overlays
+-- file_path is relative to DATA_ROOT (see apps/api/cmd/api/main.go), which
+-- points at the monorepo's apps/ directory — so these are relative to
+-- apps/vector-data and apps/raster-data.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
+    ('streams',        'Streams',            'Watershed Analysis', 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           1),
+    ('watershed',      'Watershed',          'Watershed Analysis', 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2),
+    ('roads',          'Roads',              'Base Layers',        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1),
+    ('rivers',         'Rivers',             'Base Layers',        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2),
+    ('villages',       'Village Boundaries', 'Base Layers',        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3),
+    ('zoneBoundaries', 'Zone Boundaries',    'Base Layers',        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4),
+    ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5);
+
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order) VALUES
+    ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980),
+    ('forest_cover_1989', '1989', 'Forest Cover', 'raster', 'raster-data/forest-cover/1989.png', 1989),
+    ('forest_cover_1998', '1998', 'Forest Cover', 'raster', 'raster-data/forest-cover/1998.png', 1998),
+    ('forest_cover_2008', '2008', 'Forest Cover', 'raster', 'raster-data/forest-cover/2008.png', 2008),
+    ('forest_cover_2018', '2018', 'Forest Cover', 'raster', 'raster-data/forest-cover/2018.png', 2018),
+    ('forest_cover_2025', '2025', 'Forest Cover', 'raster', 'raster-data/forest-cover/2025.png', 2025),
+    ('forest_cover_2026', '2026', 'Forest Cover', 'raster', 'raster-data/forest-cover/2026.png', 2026);

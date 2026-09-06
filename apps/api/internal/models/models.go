@@ -16,3 +16,17 @@ type Layer struct {
 	Name    string `json:"name"`
 	GeoJSON string `json:"geometry"`
 }
+
+// StaticOverlay is a base-layer/watershed/raster reference asset — its
+// FilePath is resolved against DATA_ROOT server-side and never serialized to
+// the client; the client fetches the asset itself through OverlayData by Key.
+type StaticOverlay struct {
+	ID        int    `json:"id"`
+	Key       string `json:"key"`
+	Label     string `json:"label"`
+	Section   string `json:"section"`
+	AssetType string `json:"asset_type"`
+	Kind      string `json:"kind,omitempty"`
+	Color     string `json:"color,omitempty"`
+	FilePath  string `json:"-"`
+}

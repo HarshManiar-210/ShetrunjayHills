@@ -48,6 +48,7 @@ DATABASE_URL=postgres://shetrunjay:shetrunjay@localhost:5433/shetrunjay go test 
 | `JWT_SECRET`   | **yes**  | none — the API exits if it's not set     |
 | `CORS_ORIGIN`  | no       | `http://localhost:3000`                  |
 | `PORT`         | no       | `8080`                                   |
+| `DATA_ROOT`    | no       | `../../apps` (assumes running from `apps/api` against a repo checkout) |
 
 `JWT_SECRET` has no built-in fallback on purpose: a default would mean any deployment that forgot
 to set it accepted tokens forged with a secret published in this repo. Compose supplies a
@@ -57,6 +58,11 @@ from the shell or a root `.env` for anything that isn't your laptop:
 ```
 JWT_SECRET=$(openssl rand -hex 32) CORS_ORIGIN=https://your.host docker compose up --build
 ```
+
+`DATA_ROOT` is where the `static_overlays` table's `file_path` rows (Base Layers/Watershed
+GeoJSON in `apps/vector-data`, Forest Cover raster in `apps/raster-data`) resolve against —
+`GET /api/overlays/{key}/data` serves whatever's on disk there. Compose mounts both folders
+read-only into the `api` container at `/data` and sets `DATA_ROOT` to match.
 
 ## Folder Tree (target)
 
