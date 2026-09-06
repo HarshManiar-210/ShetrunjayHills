@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Map as MapLibreMap, type FilterSpecification, type GeoJSONSource, type IControl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
 import { layerColor } from "@/lib/layer-style";
 import { MapControls } from "@/components/MapControls";
+import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 
 const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
@@ -13,6 +15,9 @@ const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
 
 const BACKGROUND = "#EDEDE8";
+
+const INITIAL_CENTER: [number, number] = [71.7800412, 21.4718707]; // Shetrunjay Hill Range, near Palitana
+const INITIAL_ZOOM = 11;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -183,6 +188,47 @@ function addLayers(
   });
 }
 
+// Static overlays (Base Layers + Watershed Analysis sections): added once,
+// hidden, and toggled purely via layout visibility — the same lazy pattern
+// as the theme overlay above, which avoids the add/remove churn that causes
+// "missing layer" errors when a switch is flipped rapidly.
+function addOverlaySources(map: MapLibreMap) {
+  for (const { key, kind } of Object.values(STATIC_OVERLAY_SOURCES)) {
+    const sourceId = `overlay-${key}`;
+    if (map.getSource(sourceId)) continue;
+    map.addSource(sourceId, { type: "geojson", data: EMPTY_FC });
+    const color = STATIC_OVERLAY_SOURCES[key].color;
+    if (kind === "line") {
+      map.addLayer({
+        id: `${sourceId}-line`,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": color, "line-width": 2 },
+      });
+    } else {
+      map.addLayer({
+        id: `${sourceId}-fill`,
+        type: "fill",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: { "fill-color": color, "fill-opacity": 0.15 },
+      });
+      map.addLayer({
+        id: `${sourceId}-outline`,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: { "line-color": color, "line-width": 1.5 },
+      });
+    }
+  }
+}
+
+function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
+  return kind === "line" ? [`${sourceId}-line`] : [`${sourceId}-fill`, `${sourceId}-outline`];
+}
+
 function render(map: MapLibreMap, data: LayerCollection, fitOnce: { done: boolean }) {
   const polygons = byGeometryType(data, POLYGON_TYPES);
   const lines = byGeometryType(data, LINE_TYPES);
@@ -213,19 +259,22 @@ export default function Map({
   data,
   visibility,
   onReady,
-  onToggleLayers,
   themeOverlay,
+  overlays,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
   onReady?: (map: MapLibreMap) => void;
-  onToggleLayers?: () => void;
   themeOverlay?: ThemeOverlay | null;
+  overlays?: Record<string, boolean>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const dataRef = useRef(data);
   const fitOnceRef = useRef({ done: false });
+  const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [loadingOverlays, setLoadingOverlays] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     dataRef.current = data;
@@ -238,8 +287,8 @@ export default function Map({
     const map = new MapLibreMap({
       container: containerRef.current,
       style: mapStyle(),
-      center: [71.7800412, 21.4718707], // Shetrunjay Hill Range, near Palitana
-      zoom: 11,
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
       attributionControl: false,
     });
     mapRef.current = map;
@@ -249,6 +298,8 @@ export default function Map({
 
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
+      addOverlaySources(map);
+      setMapLoaded(true);
       onReady?.(map);
     });
 
@@ -288,6 +339,49 @@ export default function Map({
     }
   }, [themeOverlay]);
 
+  // static overlays: fetch each file at most once, then just flip
+  // layout visibility — cheap and immune to rapid on/off clicking.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !overlays) return;
+
+    for (const def of Object.values(STATIC_OVERLAY_SOURCES)) {
+      const sourceId = `overlay-${def.key}`;
+      const source = map.getSource<GeoJSONSource>(sourceId);
+      if (!source) continue;
+
+      const visible = Boolean(overlays[def.key]);
+      const cached = overlayCacheRef.current[def.key];
+
+      if (visible && !cached) {
+        overlayCacheRef.current[def.key] = "loading";
+        setLoadingOverlays((s) => new Set(s).add(def.key));
+        fetch(def.url)
+          .then((res) => res.json())
+          .then((geojson: GeoJSON.FeatureCollection) => {
+            overlayCacheRef.current[def.key] = geojson;
+            map.getSource<GeoJSONSource>(sourceId)?.setData(geojson);
+          })
+          .catch(() => {
+            delete overlayCacheRef.current[def.key];
+          })
+          .finally(() => {
+            setLoadingOverlays((s) => {
+              const next = new Set(s);
+              next.delete(def.key);
+              return next;
+            });
+          });
+      } else if (visible && cached && cached !== "loading") {
+        source.setData(cached);
+      }
+
+      for (const layerId of overlayLayerIds(def.kind, sourceId)) {
+        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    }
+  }, [overlays]);
+
   // visibility toggles: filter, never re-fetch or refit
   useEffect(() => {
     const map = mapRef.current;
@@ -311,13 +405,21 @@ export default function Map({
       <div ref={containerRef} className="size-full" />
       <MapControls
         mapRef={mapRef}
-        fitBounds={() => {
-          const map = mapRef.current;
-          const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
-          if (map && bounds) map.fitBounds(bounds, { padding: 40 });
-        }}
-        onToggleLayers={onToggleLayers}
+        resetView={() => mapRef.current?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM })}
       />
+
+      {!mapLoaded && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
+          <Loader2 className="size-8 animate-spin text-primary" strokeWidth={1.75} />
+        </div>
+      )}
+
+      {mapLoaded && loadingOverlays.size > 0 && (
+        <div className="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm text-foreground shadow-sm ring-1 ring-foreground/10">
+          <Loader2 className="size-4 animate-spin text-primary" strokeWidth={1.75} />
+          Loading layer…
+        </div>
+      )}
     </div>
   );
 }

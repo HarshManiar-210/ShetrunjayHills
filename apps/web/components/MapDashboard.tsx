@@ -6,6 +6,13 @@ import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
@@ -37,6 +44,33 @@ export function MapDashboard() {
   const [forestCoverYear, setForestCoverYear] = useState<ForestCoverYear | null>(null);
   const [forestCoverSource, setForestCoverSource] = useState<ForestCoverSource | null>(null);
   const [forestCoverLayerOn, setForestCoverLayerOn] = useState(false);
+
+  // Master-toggle sections (Base Layers, Watershed Analysis): each has its
+  // own on/off switch that gates its own set of static overlay layers, keyed
+  // by section label so the two never interfere with each other.
+  const [sectionOn, setSectionOn] = useState<Record<string, boolean>>({});
+  const [sectionVisibility, setSectionVisibility] = useState<Record<string, Record<string, boolean>>>({});
+  const [lockedPromptSection, setLockedPromptSection] = useState<string | null>(null);
+
+  function toggleSection(section: string, on: boolean) {
+    setSectionOn((s) => ({ ...s, [section]: on }));
+    // master OFF cascades: every dependent layer in this section turns off,
+    // unchecks, and is removed from the map (Map.tsx hides it once its key
+    // drops out of the merged `overlays` prop below).
+    if (!on) setSectionVisibility((v) => ({ ...v, [section]: {} }));
+  }
+
+  function toggleSectionItem(section: string, key: string) {
+    setSectionVisibility((v) => ({
+      ...v,
+      [section]: { ...v[section], [key]: !v[section]?.[key] },
+    }));
+  }
+
+  const overlays = Object.entries(sectionOn).reduce<Record<string, boolean>>((acc, [section, on]) => {
+    if (on) Object.assign(acc, sectionVisibility[section]);
+    return acc;
+  }, {});
 
   const token = getToken();
   const loading = layers === null && !error;
@@ -95,7 +129,13 @@ export function MapDashboard() {
             className="min-h-0 flex-1"
             options={{ scrollbars: { theme: "os-theme-dark", autoHide: "leave" } }}
           >
-            <SidebarSections />
+            <SidebarSections
+              sectionOn={sectionOn}
+              onToggleSection={toggleSection}
+              sectionVisibility={sectionVisibility}
+              onToggleSectionItem={toggleSectionItem}
+              onDisabledClick={setLockedPromptSection}
+            />
           </OverlayScrollbarsComponent>
           <p className="shrink-0 border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
             © Shetrunjay Hills {new Date().getFullYear()}
@@ -107,8 +147,8 @@ export function MapDashboard() {
             <Map
               data={layers ?? EMPTY}
               visibility={visibility}
-              onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
               themeOverlay={themeOverlay}
+              overlays={overlays}
             />
           </div>
 
@@ -153,7 +193,13 @@ export function MapDashboard() {
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
         <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 scrollbar-thin">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SidebarSections />
+          <SidebarSections
+            sectionOn={sectionOn}
+            onToggleSection={toggleSection}
+            sectionVisibility={sectionVisibility}
+            onToggleSectionItem={toggleSectionItem}
+            onDisabledClick={setLockedPromptSection}
+          />
         </SheetContent>
       </Sheet>
 
@@ -200,6 +246,17 @@ export function MapDashboard() {
         onOpenChange={auth.setLoginOpen}
         onSuccess={auth.onLoginSuccess}
       />
+
+      <Dialog open={lockedPromptSection !== null} onOpenChange={(o) => !o && setLockedPromptSection(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{lockedPromptSection} is off</DialogTitle>
+            <DialogDescription>
+              Please enable the {lockedPromptSection} switch first to interact with these layers.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
