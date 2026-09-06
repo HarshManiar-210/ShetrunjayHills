@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  FOREST_COVER_YEARS,
   FOREST_COVER_SOURCES,
   getZoneStats,
   getGridStats,
@@ -25,6 +24,7 @@ import {
 type StatsView = "zone" | "grid";
 
 export function ForestCoverPanel({
+  years,
   year,
   onYearChange,
   source,
@@ -33,6 +33,7 @@ export function ForestCoverPanel({
   onLayerOnChange,
   className,
 }: {
+  years: ForestCoverYear[];
   year: ForestCoverYear | null;
   onYearChange: (year: ForestCoverYear) => void;
   source: ForestCoverSource | null;
@@ -79,7 +80,7 @@ export function ForestCoverPanel({
                 <SelectValue placeholder="Select a year" />
               </SelectTrigger>
               <SelectContent>
-                {FOREST_COVER_YEARS.map((y) => (
+                {years.map((y) => (
                   <SelectItem key={y} value={String(y)}>
                     {y}
                   </SelectItem>

@@ -76,7 +76,7 @@ export function LayerPanel({
               </span>
               <Switch
                 size="sm"
-                checked={visibility[id] ?? true}
+                checked={visibility[id] ?? false}
                 onCheckedChange={() => onToggle(id)}
                 aria-label={`Toggle ${name} layer`}
               />

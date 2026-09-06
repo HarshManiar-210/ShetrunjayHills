@@ -1,34 +1,47 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { Map as MapLibreMap, type FilterSpecification, type GeoJSONSource, type IControl } from "maplibre-gl";
+import { useEffect, useRef, useState } from "react";
+import {
+  Map as MapLibreMap,
+  LngLatBounds,
+  type FilterSpecification,
+  type GeoJSONSource,
+  type ImageSource,
+  type IControl,
+  type LngLatBoundsLike,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
 import { layerColor } from "@/lib/layer-style";
 import { MapControls } from "@/components/MapControls";
+import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 
 const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
 const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
 
-const BACKGROUND_LIGHT = "#EDEDE8";
-const BACKGROUND_DARK = "#0E100F";
+const BACKGROUND = "#EDEDE8";
+
+const INITIAL_CENTER: [number, number] = [71.7800412, 21.4718707]; // Shetrunjay Hill Range, near Palitana
+const INITIAL_ZOOM = 11;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
-export interface ThemeOverlay {
-  geometry: GeoJSON.Geometry;
-  color: string;
+// Forest Cover's real per-year raster (from the `static_overlays` DB row,
+// served through the API — see lib/overlays-api.ts), draped over the extent
+// of a reference vector geometry since the imagery has no embedded geo tags.
+export interface ForestCoverOverlay {
+  url: string;
+  bounds: LngLatBoundsLike;
   visible: boolean;
 }
 
-const ATTRIBUTION_LIGHT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-const ATTRIBUTION_DARK = `${ATTRIBUTION_LIGHT} &copy; <a href="https://carto.com/attributions">CARTO</a>`;
+const RASTER_OVERLAY_SOURCE = "forest-cover-raster";
+const RASTER_OVERLAY_LAYER = "forest-cover-raster-layer";
 
-function isDark(): boolean {
-  return document.documentElement.classList.contains("dark");
-}
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 // MapLibre's built-in attribution control is a native <details>/<summary>
 // element that opens itself on first paint no matter what options it's
@@ -74,58 +87,30 @@ class CompactAttribution implements IControl {
   }
 }
 
-// Raster basemap: OpenStreetMap tiles for light, CARTO Dark Matter for dark
-// — an actual dark map style, not a CSS/paint colour trick over one raster
-// source (hue-rotate over light tiles reads as grey, not dark).
 function mapStyle() {
-  const dark = isDark();
   return {
     version: 8 as const,
     sources: {
-      "basemap-light": {
+      basemap: {
         type: "raster" as const,
         tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
         tileSize: 256,
-        attribution: ATTRIBUTION_LIGHT,
-      },
-      "basemap-dark": {
-        type: "raster" as const,
-        tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: ATTRIBUTION_DARK,
+        attribution: ATTRIBUTION,
       },
     },
     layers: [
       {
         id: "background",
         type: "background" as const,
-        paint: { "background-color": dark ? BACKGROUND_DARK : BACKGROUND_LIGHT },
+        paint: { "background-color": BACKGROUND },
       },
       {
-        id: "basemap-light",
+        id: "basemap",
         type: "raster" as const,
-        source: "basemap-light",
-        layout: { visibility: (dark ? "none" : "visible") as "none" | "visible" },
-      },
-      {
-        id: "basemap-dark",
-        type: "raster" as const,
-        source: "basemap-dark",
-        layout: { visibility: (dark ? "visible" : "none") as "none" | "visible" },
+        source: "basemap",
       },
     ],
   };
-}
-
-function applyBasemapTheme(map: MapLibreMap, dark: boolean, attribution: CompactAttribution) {
-  const bg = dark ? BACKGROUND_DARK : BACKGROUND_LIGHT;
-  map.setPaintProperty("background", "background-color", bg);
-  map.setLayoutProperty("basemap-light", "visibility", dark ? "none" : "visible");
-  map.setLayoutProperty("basemap-dark", "visibility", dark ? "visible" : "none");
-  if (map.getLayer("lines-casing")) {
-    map.setPaintProperty("lines-casing", "line-color", bg);
-  }
-  attribution.setHTML(dark ? ATTRIBUTION_DARK : ATTRIBUTION_LIGHT);
 }
 
 function byGeometryType(
@@ -145,6 +130,12 @@ function byGeometryType(
   };
 }
 
+// Unfiltered MapLibre layers draw every feature, which would make a freshly
+// added layer default to "all visible" — the opposite of no default
+// selection. Layers start with this empty-set filter; the visibility effect
+// below replaces it once a switch is actually turned on.
+const NO_FEATURES_FILTER: FilterSpecification = ["in", ["get", "id"], ["literal", []]];
+
 function addLayers(
   map: MapLibreMap,
   polygons: GeoJSON.FeatureCollection,
@@ -159,28 +150,32 @@ function addLayers(
     id: "polygons-fill",
     type: "fill",
     source: "polygons",
+    filter: NO_FEATURES_FILTER,
     paint: { "fill-color": ["get", "color"], "fill-opacity": 0.25 },
   });
   map.addLayer({
     id: "polygons-outline",
     type: "line",
     source: "polygons",
+    filter: NO_FEATURES_FILTER,
     paint: { "line-color": ["get", "color"], "line-width": 2 },
   });
 
   // casing under stroke: a wider surface-colour line beneath the layer
-  // colour keeps every line legible on both themes (design system §2).
+  // colour keeps every line legible against the basemap (design system §2).
   map.addLayer({
     id: "lines-casing",
     type: "line",
     source: "lines",
+    filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": isDark() ? BACKGROUND_DARK : BACKGROUND_LIGHT, "line-width": 5 },
+    paint: { "line-color": BACKGROUND, "line-width": 5 },
   });
   map.addLayer({
     id: "lines",
     type: "line",
     source: "lines",
+    filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
     paint: { "line-color": ["get", "color"], "line-width": 3 },
   });
@@ -189,32 +184,55 @@ function addLayers(
     id: "points",
     type: "circle",
     source: "points",
+    filter: NO_FEATURES_FILTER,
     paint: {
       "circle-color": ["get", "color"],
       "circle-radius": 6,
       "circle-stroke-width": 2,
-      "circle-stroke-color": isDark() ? BACKGROUND_DARK : BACKGROUND_LIGHT,
+      "circle-stroke-color": BACKGROUND,
     },
   });
+}
 
-  // Theme overlay: a stand-in for satellite/drone imagery a theme's filters
-  // would show, using whatever geometry the caller hands it (e.g. the hill
-  // boundary) tinted per-selection. Hidden until a theme sets it visible.
-  map.addSource("theme-overlay", { type: "geojson", data: EMPTY_FC });
-  map.addLayer({
-    id: "theme-overlay-fill",
-    type: "fill",
-    source: "theme-overlay",
-    layout: { visibility: "none" },
-    paint: { "fill-color": ["get", "color"], "fill-opacity": 0.45 },
-  });
-  map.addLayer({
-    id: "theme-overlay-outline",
-    type: "line",
-    source: "theme-overlay",
-    layout: { visibility: "none" },
-    paint: { "line-color": ["get", "color"], "line-width": 2, "line-dasharray": [2, 2] },
-  });
+// Static overlays (Base Layers + Watershed Analysis sections): added once,
+// hidden, and toggled purely via layout visibility — the same lazy pattern
+// as the theme overlay above, which avoids the add/remove churn that causes
+// "missing layer" errors when a switch is flipped rapidly.
+function addOverlaySources(map: MapLibreMap) {
+  for (const { key, kind } of Object.values(STATIC_OVERLAY_SOURCES)) {
+    const sourceId = `overlay-${key}`;
+    if (map.getSource(sourceId)) continue;
+    map.addSource(sourceId, { type: "geojson", data: EMPTY_FC });
+    const color = STATIC_OVERLAY_SOURCES[key].color;
+    if (kind === "line") {
+      map.addLayer({
+        id: `${sourceId}-line`,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": color, "line-width": 2 },
+      });
+    } else {
+      map.addLayer({
+        id: `${sourceId}-fill`,
+        type: "fill",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: { "fill-color": color, "fill-opacity": 0.15 },
+      });
+      map.addLayer({
+        id: `${sourceId}-outline`,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: { "line-color": color, "line-width": 1.5 },
+      });
+    }
+  }
+}
+
+function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
+  return kind === "line" ? [`${sourceId}-line`] : [`${sourceId}-fill`, `${sourceId}-outline`];
 }
 
 function render(map: MapLibreMap, data: LayerCollection, fitOnce: { done: boolean }) {
@@ -247,19 +265,22 @@ export default function Map({
   data,
   visibility,
   onReady,
-  onToggleLayers,
-  themeOverlay,
+  forestCoverOverlay,
+  overlays,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
   onReady?: (map: MapLibreMap) => void;
-  onToggleLayers?: () => void;
-  themeOverlay?: ThemeOverlay | null;
+  forestCoverOverlay?: ForestCoverOverlay | null;
+  overlays?: Record<string, boolean>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const dataRef = useRef(data);
   const fitOnceRef = useRef({ done: false });
+  const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [loadingOverlays, setLoadingOverlays] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     dataRef.current = data;
@@ -272,28 +293,26 @@ export default function Map({
     const map = new MapLibreMap({
       container: containerRef.current,
       style: mapStyle(),
-      center: [71.7800412, 21.4718707], // Shetrunjay Hill Range, near Palitana
-      zoom: 11,
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
       attributionControl: false,
     });
     mapRef.current = map;
 
-    const attribution = new CompactAttribution(isDark() ? ATTRIBUTION_DARK : ATTRIBUTION_LIGHT);
-    map.addControl(attribution, "bottom-right");
+    const attribution = new CompactAttribution(ATTRIBUTION);
+    // bottom-left, not bottom-right: the Legend card docks bottom-right and
+    // collapses to just its header — sharing a corner with the attribution
+    // control would stack the two buttons on top of each other.
+    map.addControl(attribution, "bottom-left");
 
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
+      addOverlaySources(map);
+      setMapLoaded(true);
       onReady?.(map);
     });
 
-    const observer = new MutationObserver(() => {
-      if (!map.isStyleLoaded()) return;
-      applyBasemapTheme(map, isDark(), attribution);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-
     return () => {
-      observer.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -306,39 +325,95 @@ export default function Map({
     if (map && map.isStyleLoaded()) render(map, data, fitOnceRef.current);
   }, [data]);
 
-  // theme overlay: swap the mock satellite/drone tint in place, no refit
+  // Forest Cover raster: an image source needs a real image up front (unlike
+  // a geojson source there's no "empty" state), so it's added/removed
+  // wholesale rather than kept around hidden like the other overlays.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const source = map.getSource<GeoJSONSource>("theme-overlay");
-    if (!source) return;
 
-    const visible = Boolean(themeOverlay?.visible);
-    source.setData(
-      themeOverlay
-        ? {
-            type: "FeatureCollection",
-            features: [
-              { type: "Feature", properties: { color: themeOverlay.color }, geometry: themeOverlay.geometry },
-            ],
-          }
-        : EMPTY_FC,
-    );
-    for (const layerId of ["theme-overlay-fill", "theme-overlay-outline"]) {
-      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    if (!forestCoverOverlay?.visible) {
+      if (map.getLayer(RASTER_OVERLAY_LAYER)) map.removeLayer(RASTER_OVERLAY_LAYER);
+      if (map.getSource(RASTER_OVERLAY_SOURCE)) map.removeSource(RASTER_OVERLAY_SOURCE);
+      return;
     }
-  }, [themeOverlay]);
 
-  // visibility toggles: filter, never re-fetch or refit
+    const bounds = LngLatBounds.convert(forestCoverOverlay.bounds);
+    const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
+      bounds.getNorthWest().toArray() as [number, number],
+      bounds.getNorthEast().toArray() as [number, number],
+      bounds.getSouthEast().toArray() as [number, number],
+      bounds.getSouthWest().toArray() as [number, number],
+    ];
+
+    const existing = map.getSource<ImageSource>(RASTER_OVERLAY_SOURCE);
+    if (existing) {
+      existing.updateImage({ url: forestCoverOverlay.url, coordinates });
+      return;
+    }
+
+    map.addSource(RASTER_OVERLAY_SOURCE, { type: "image", url: forestCoverOverlay.url, coordinates });
+    map.addLayer({
+      id: RASTER_OVERLAY_LAYER,
+      type: "raster",
+      source: RASTER_OVERLAY_SOURCE,
+      paint: { "raster-opacity": 0.75 },
+    });
+  }, [forestCoverOverlay]);
+
+  // static overlays: fetch each file at most once, then just flip
+  // layout visibility — cheap and immune to rapid on/off clicking.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded() || !overlays) return;
+
+    for (const def of Object.values(STATIC_OVERLAY_SOURCES)) {
+      const sourceId = `overlay-${def.key}`;
+      const source = map.getSource<GeoJSONSource>(sourceId);
+      if (!source) continue;
+
+      const visible = Boolean(overlays[def.key]);
+      const cached = overlayCacheRef.current[def.key];
+
+      if (visible && !cached) {
+        overlayCacheRef.current[def.key] = "loading";
+        setLoadingOverlays((s) => new Set(s).add(def.key));
+        fetch(def.url)
+          .then((res) => res.json())
+          .then((geojson: GeoJSON.FeatureCollection) => {
+            overlayCacheRef.current[def.key] = geojson;
+            map.getSource<GeoJSONSource>(sourceId)?.setData(geojson);
+          })
+          .catch(() => {
+            delete overlayCacheRef.current[def.key];
+          })
+          .finally(() => {
+            setLoadingOverlays((s) => {
+              const next = new Set(s);
+              next.delete(def.key);
+              return next;
+            });
+          });
+      } else if (visible && cached && cached !== "loading") {
+        source.setData(cached);
+      }
+
+      for (const layerId of overlayLayerIds(def.kind, sourceId)) {
+        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    }
+  }, [overlays]);
+
+  // visibility toggles: filter, never re-fetch or refit. No layer is
+  // selected by default, so this shows only ids explicitly switched on
+  // rather than hiding ids explicitly switched off.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const hiddenIds = Object.entries(visibility)
-      .filter(([, visible]) => !visible)
+    const visibleIds = Object.entries(visibility)
+      .filter(([, visible]) => visible)
       .map(([id]) => Number(id));
-    const filter: FilterSpecification | null = hiddenIds.length
-      ? ["!", ["in", ["get", "id"], ["literal", hiddenIds]]]
-      : null;
+    const filter: FilterSpecification = ["in", ["get", "id"], ["literal", visibleIds]];
     for (const layerId of ["polygons-fill", "polygons-outline", "lines-casing", "lines", "points"]) {
       if (map.getLayer(layerId)) map.setFilter(layerId, filter);
     }
@@ -352,13 +427,21 @@ export default function Map({
       <div ref={containerRef} className="size-full" />
       <MapControls
         mapRef={mapRef}
-        fitBounds={() => {
-          const map = mapRef.current;
-          const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
-          if (map && bounds) map.fitBounds(bounds, { padding: 40 });
-        }}
-        onToggleLayers={onToggleLayers}
+        resetView={() => mapRef.current?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM })}
       />
+
+      {!mapLoaded && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
+          <Loader2 className="size-8 animate-spin text-primary" strokeWidth={1.75} />
+        </div>
+      )}
+
+      {mapLoaded && loadingOverlays.size > 0 && (
+        <div className="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm text-foreground shadow-sm ring-1 ring-foreground/10">
+          <Loader2 className="size-4 animate-spin text-primary" strokeWidth={1.75} />
+          Loading layer…
+        </div>
+      )}
     </div>
   );
 }

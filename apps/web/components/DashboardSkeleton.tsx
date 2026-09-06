@@ -1,7 +1,7 @@
 export function DashboardSkeleton() {
   return (
     <div className="flex h-screen animate-pulse overflow-hidden">
-      <div className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar xl:block" />
+      <div className="hidden w-[18%] shrink-0 border-r border-sidebar-border bg-sidebar xl:block" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="h-14.25 shrink-0 border-b border-border bg-card" />
         <div className="flex min-h-0 flex-1">
