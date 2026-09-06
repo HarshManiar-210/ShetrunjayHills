@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import {
   Map as MapIcon,
   Layers,
   ListTree,
   TreePine,
   Menu as MenuIcon,
-  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -23,7 +23,6 @@ import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
 import { getYearColor, type ForestCoverYear, type ForestCoverSource } from "@/lib/forest-cover-mock";
-import { cn } from "@/lib/utils";
 import type { ThemeOverlay } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
@@ -39,7 +38,6 @@ export function MapDashboard() {
   const [retryTick, setRetryTick] = useState(0);
   const [visibility, setVisibility] = useState<Record<number, boolean>>({});
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
   const [forestCoverYear, setForestCoverYear] = useState<ForestCoverYear | null>(null);
@@ -95,79 +93,42 @@ export function MapDashboard() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <Header
-        user={auth.user}
-        onMenuClick={() => setMobileSheet("menu")}
-        onLoginClick={auth.openLogin}
-        onLogoutClick={auth.logout}
-      />
+      <Header onMenuClick={() => setMobileSheet("menu")} />
 
-      <div className="relative min-h-0 flex-1">
-        <Map
-          data={layers ?? EMPTY}
-          visibility={visibility}
-          onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
-          themeOverlay={themeOverlay}
-        />
-
-        {sidebarCollapsed ? (
-          <div className="absolute top-4 left-4 z-20 hidden xl:block">
-            <Button
-              variant="secondary"
-              size="icon"
-              className="rounded-full shadow-sm ring-1 ring-foreground/10"
-              aria-label="Expand sidebar"
-              onClick={() => setSidebarCollapsed(false)}
-            >
-              <PanelLeftOpen />
-            </Button>
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "absolute top-4 left-4 z-20 hidden w-72 max-h-[calc(100%-2rem)] flex-col divide-y divide-border overflow-y-auto scrollbar-thin rounded-xl bg-card shadow-sm ring-1 ring-foreground/10 xl:flex",
-            )}
-          >
-            <Sidebar
-              variant="combined"
-              user={auth.user}
-              onLoginClick={auth.openLogin}
-              onLogoutClick={auth.logout}
-              onCollapse={() => setSidebarCollapsed(true)}
-            />
-            <ThemeFilterPanel
-              selectedTheme={selectedTheme}
-              onSelectTheme={setSelectedTheme}
-              bare
-            />
-            <LayerPanel
-              layers={layers?.features ?? null}
-              loading={loading}
-              error={error}
-              visibility={visibility}
-              onToggle={toggleVisibility}
-              onRetry={() => setRetryTick((t) => t + 1)}
-              bare
-            />
-          </div>
-        )}
-
-        {selectedTheme === "forest_cover" && (
-          <ForestCoverPanel
-            year={forestCoverYear}
-            onYearChange={setForestCoverYear}
-            source={forestCoverSource}
-            onSourceChange={setForestCoverSource}
-            layerOn={forestCoverLayerOn}
-            onLayerOnChange={setForestCoverLayerOn}
-            className="absolute top-4 right-4 hidden w-72 xl:flex"
+      <div className="flex min-h-0 flex-1">
+        {/* 27/73 split-screen: sidebar internals are rebuilt incrementally, left empty for now. */}
+        <aside className="hidden w-[27%] shrink-0 flex-col border-r border-border bg-sidebar xl:flex">
+          <OverlayScrollbarsComponent
+            className="h-full"
+            options={{ scrollbars: { theme: "os-theme-dark", autoHide: "leave" } }}
           />
-        )}
+        </aside>
 
-        <LegendCard
-          layers={visibleLayers}
-          className="absolute right-4 bottom-4 hidden w-64 xl:flex"
-        />
+        <div className="relative min-w-0 flex-1">
+          <Map
+            data={layers ?? EMPTY}
+            visibility={visibility}
+            onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
+            themeOverlay={themeOverlay}
+          />
+
+          {selectedTheme === "forest_cover" && (
+            <ForestCoverPanel
+              year={forestCoverYear}
+              onYearChange={setForestCoverYear}
+              source={forestCoverSource}
+              onSourceChange={setForestCoverSource}
+              layerOn={forestCoverLayerOn}
+              onLayerOnChange={setForestCoverLayerOn}
+              className="absolute top-4 right-4 hidden w-72 xl:flex"
+            />
+          )}
+
+          <LegendCard
+            layers={visibleLayers}
+            className="absolute right-4 bottom-4 hidden w-64 xl:flex"
+          />
+        </div>
       </div>
 
       <nav className="flex items-center justify-around border-t border-border bg-card py-1 md:hidden">
@@ -216,15 +177,7 @@ export function MapDashboard() {
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
         <SheetContent side="left" className="w-72 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <Sidebar
-            user={auth.user}
-            variant="embedded"
-            onLoginClick={() => {
-              setMobileSheet(null);
-              auth.openLogin();
-            }}
-            onLogoutClick={auth.logout}
-          />
+          <Sidebar user={auth.user} variant="embedded" />
         </SheetContent>
       </Sheet>
 

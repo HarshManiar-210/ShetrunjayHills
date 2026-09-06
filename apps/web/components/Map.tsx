@@ -12,8 +12,7 @@ const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
 const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
 
-const BACKGROUND_LIGHT = "#EDEDE8";
-const BACKGROUND_DARK = "#0E100F";
+const BACKGROUND = "#EDEDE8";
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -23,12 +22,7 @@ export interface ThemeOverlay {
   visible: boolean;
 }
 
-const ATTRIBUTION_LIGHT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-const ATTRIBUTION_DARK = `${ATTRIBUTION_LIGHT} &copy; <a href="https://carto.com/attributions">CARTO</a>`;
-
-function isDark(): boolean {
-  return document.documentElement.classList.contains("dark");
-}
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 // MapLibre's built-in attribution control is a native <details>/<summary>
 // element that opens itself on first paint no matter what options it's
@@ -74,58 +68,30 @@ class CompactAttribution implements IControl {
   }
 }
 
-// Raster basemap: OpenStreetMap tiles for light, CARTO Dark Matter for dark
-// — an actual dark map style, not a CSS/paint colour trick over one raster
-// source (hue-rotate over light tiles reads as grey, not dark).
 function mapStyle() {
-  const dark = isDark();
   return {
     version: 8 as const,
     sources: {
-      "basemap-light": {
+      basemap: {
         type: "raster" as const,
         tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
         tileSize: 256,
-        attribution: ATTRIBUTION_LIGHT,
-      },
-      "basemap-dark": {
-        type: "raster" as const,
-        tiles: ["https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: ATTRIBUTION_DARK,
+        attribution: ATTRIBUTION,
       },
     },
     layers: [
       {
         id: "background",
         type: "background" as const,
-        paint: { "background-color": dark ? BACKGROUND_DARK : BACKGROUND_LIGHT },
+        paint: { "background-color": BACKGROUND },
       },
       {
-        id: "basemap-light",
+        id: "basemap",
         type: "raster" as const,
-        source: "basemap-light",
-        layout: { visibility: (dark ? "none" : "visible") as "none" | "visible" },
-      },
-      {
-        id: "basemap-dark",
-        type: "raster" as const,
-        source: "basemap-dark",
-        layout: { visibility: (dark ? "visible" : "none") as "none" | "visible" },
+        source: "basemap",
       },
     ],
   };
-}
-
-function applyBasemapTheme(map: MapLibreMap, dark: boolean, attribution: CompactAttribution) {
-  const bg = dark ? BACKGROUND_DARK : BACKGROUND_LIGHT;
-  map.setPaintProperty("background", "background-color", bg);
-  map.setLayoutProperty("basemap-light", "visibility", dark ? "none" : "visible");
-  map.setLayoutProperty("basemap-dark", "visibility", dark ? "visible" : "none");
-  if (map.getLayer("lines-casing")) {
-    map.setPaintProperty("lines-casing", "line-color", bg);
-  }
-  attribution.setHTML(dark ? ATTRIBUTION_DARK : ATTRIBUTION_LIGHT);
 }
 
 function byGeometryType(
@@ -169,13 +135,13 @@ function addLayers(
   });
 
   // casing under stroke: a wider surface-colour line beneath the layer
-  // colour keeps every line legible on both themes (design system §2).
+  // colour keeps every line legible against the basemap (design system §2).
   map.addLayer({
     id: "lines-casing",
     type: "line",
     source: "lines",
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": isDark() ? BACKGROUND_DARK : BACKGROUND_LIGHT, "line-width": 5 },
+    paint: { "line-color": BACKGROUND, "line-width": 5 },
   });
   map.addLayer({
     id: "lines",
@@ -193,7 +159,7 @@ function addLayers(
       "circle-color": ["get", "color"],
       "circle-radius": 6,
       "circle-stroke-width": 2,
-      "circle-stroke-color": isDark() ? BACKGROUND_DARK : BACKGROUND_LIGHT,
+      "circle-stroke-color": BACKGROUND,
     },
   });
 
@@ -278,7 +244,7 @@ export default function Map({
     });
     mapRef.current = map;
 
-    const attribution = new CompactAttribution(isDark() ? ATTRIBUTION_DARK : ATTRIBUTION_LIGHT);
+    const attribution = new CompactAttribution(ATTRIBUTION);
     map.addControl(attribution, "bottom-right");
 
     map.on("load", () => {
@@ -286,14 +252,7 @@ export default function Map({
       onReady?.(map);
     });
 
-    const observer = new MutationObserver(() => {
-      if (!map.isStyleLoaded()) return;
-      applyBasemapTheme(map, isDark(), attribution);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-
     return () => {
-      observer.disconnect();
       map.remove();
       mapRef.current = null;
     };

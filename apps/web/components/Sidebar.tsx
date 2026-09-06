@@ -8,8 +8,6 @@ import {
   LayoutDashboard,
   Layers,
   Users,
-  LogOut,
-  LogIn,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -25,13 +23,9 @@ const NAV_ITEMS = [
 
 function SidebarContent({
   user,
-  onLoginClick,
-  onLogoutClick,
   onCollapse,
 }: {
   user: AuthUser | null;
-  onLoginClick: () => void;
-  onLogoutClick: () => void;
   onCollapse?: () => void;
 }) {
   const pathname = usePathname();
@@ -40,14 +34,9 @@ function SidebarContent({
     <>
       <div className="flex items-center gap-2 p-4">
         <Mountain className="size-6 shrink-0 text-primary" strokeWidth={1.75} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold leading-tight">
-            Shetrunjay Hills
-          </p>
-          <p className="truncate text-xs leading-tight text-muted-foreground">
-            Web GIS Dashboard
-          </p>
-        </div>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-tight">
+          Shetrunjay Hills
+        </p>
         {onCollapse && (
           <Button
             variant="ghost"
@@ -91,45 +80,17 @@ function SidebarContent({
           </Link>
         )}
       </nav>
-
-      <div className="border-t border-sidebar-border p-2">
-        {user ? (
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2.5 px-3 text-destructive hover:text-destructive"
-            onClick={onLogoutClick}
-          >
-            <LogOut className="size-4" strokeWidth={1.75} />
-            Logout
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2.5 px-3"
-            onClick={onLoginClick}
-          >
-            <LogIn className="size-4" strokeWidth={1.75} />
-            Login
-          </Button>
-        )}
-      </div>
     </>
   );
 }
 
 export function Sidebar({
   user,
-  onLoginClick,
-  onLogoutClick,
   variant = "floating",
-  onCollapse,
   className,
 }: {
   user: AuthUser | null;
-  onLoginClick: () => void;
-  onLogoutClick: () => void;
-  variant?: "floating" | "embedded" | "combined";
-  onCollapse?: () => void;
+  variant?: "floating" | "embedded";
   className?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -137,27 +98,7 @@ export function Sidebar({
   if (variant === "embedded") {
     return (
       <div className={cn("flex h-full flex-col bg-sidebar", className)}>
-        <SidebarContent
-          user={user}
-          onLoginClick={onLoginClick}
-          onLogoutClick={onLogoutClick}
-        />
-      </div>
-    );
-  }
-
-  // Content-only, no shadow/positioning/self-managed collapse — used as the
-  // top section of MapDashboard's combined sidebar+themes+layers panel,
-  // where the parent owns the single collapse toggle for the whole thing.
-  if (variant === "combined") {
-    return (
-      <div className={cn("flex shrink-0 flex-col", className)}>
-        <SidebarContent
-          user={user}
-          onLoginClick={onLoginClick}
-          onLogoutClick={onLogoutClick}
-          onCollapse={onCollapse}
-        />
+        <SidebarContent user={user} />
       </div>
     );
   }
@@ -185,12 +126,7 @@ export function Sidebar({
         className,
       )}
     >
-      <SidebarContent
-        user={user}
-        onLoginClick={onLoginClick}
-        onLogoutClick={onLogoutClick}
-        onCollapse={() => setCollapsed(true)}
-      />
+      <SidebarContent user={user} onCollapse={() => setCollapsed(true)} />
     </div>
   );
 }
