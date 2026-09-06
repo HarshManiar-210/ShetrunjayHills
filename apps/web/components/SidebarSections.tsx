@@ -1,5 +1,4 @@
 import {
-  TreePine,
   Trees,
   Sprout,
   Puzzle,
@@ -27,6 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Item = { label: string; icon: LucideIcon };
 type SectionItem = { label: string; icon?: LucideIcon; children?: Item[]; key?: string };
@@ -35,13 +35,12 @@ type SectionItem = { label: string; icon?: LucideIcon; children?: Item[]; key?: 
 // (see lib/static-overlays.ts for what each item.key actually renders).
 // Exported so MapDashboard can enforce "only one open at a time" (accordion)
 // without hardcoding the section names a second time.
-export const TOGGLE_SECTIONS = new Set(["Base Layers", "Watershed Analysis"]);
+export const TOGGLE_SECTIONS = new Set(["Base Layers", "Watershed Analysis", "Forest Cover"]);
 
 const SECTIONS: { label: string; items?: SectionItem[] }[] = [
   {
     label: "Theme",
     items: [
-      { label: "Forest Cover", icon: TreePine },
       { label: "Forest Type", icon: Trees },
       { label: "Vegetation Change", icon: Sprout },
       { label: "Forest Fragmentation", icon: Puzzle },
@@ -52,6 +51,12 @@ const SECTIONS: { label: string; items?: SectionItem[] }[] = [
       { label: "Tree Species Classification", icon: Tags },
       { label: "Tree Height Classification", icon: Ruler },
     ],
+  },
+  {
+    // Its sub-section is a single year dropdown (see ForestCoverYearControl)
+    // rather than per-item switches — only one year's raster shows at a
+    // time — so it carries no `items` list of its own.
+    label: "Forest Cover",
   },
   {
     label: "Watershed Analysis",
@@ -189,18 +194,69 @@ function ToggleItemRow({
   );
 }
 
+// Forest Cover only ever shows one year's raster at a time, so its
+// sub-section is a single dropdown rather than per-item switches like
+// Watershed Analysis / Base Layers.
+function ForestCoverYearControl({
+  years,
+  year,
+  enabled,
+  onChange,
+  onDisabledClick,
+}: {
+  years: number[];
+  year: number | null;
+  enabled: boolean;
+  onChange: (year: number) => void;
+  onDisabledClick: () => void;
+}) {
+  return (
+    <div className="px-3 py-1.5">
+      <span className="mb-1 block text-xs text-muted-foreground/80">Year</span>
+      {enabled ? (
+        <Select value={year != null ? String(year) : undefined} onValueChange={(v) => onChange(Number(v))}>
+          <SelectTrigger className="h-8 w-full text-sm" aria-label="Select forest cover year">
+            <SelectValue placeholder="Select a year" />
+          </SelectTrigger>
+          <SelectContent>
+            {years.map((y) => (
+              <SelectItem key={y} value={String(y)}>
+                {y}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <button
+          type="button"
+          onClick={onDisabledClick}
+          className="flex h-8 w-full cursor-not-allowed items-center rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground/60"
+        >
+          {year ?? "Select a year"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SidebarSections({
   sectionOn = {},
   onToggleSection,
   sectionVisibility = {},
   onToggleSectionItem,
   onDisabledClick,
+  forestCoverYears = [],
+  forestCoverYear = null,
+  onForestCoverYearChange,
 }: {
   sectionOn?: Record<string, boolean>;
   onToggleSection?: (section: string, on: boolean) => void;
   sectionVisibility?: Record<string, Record<string, boolean>>;
   onToggleSectionItem?: (section: string, key: string) => void;
   onDisabledClick?: (section: string) => void;
+  forestCoverYears?: number[];
+  forestCoverYear?: number | null;
+  onForestCoverYearChange?: (year: number) => void;
 } = {}) {
   return (
     <div className="flex flex-col gap-2 p-4">
@@ -225,8 +281,17 @@ export function SidebarSections({
                 )
               }
             />
-            {isToggleSection
-              ? section.items?.map((item) => (
+            {isToggleSection ? (
+              section.label === "Forest Cover" ? (
+                <ForestCoverYearControl
+                  years={forestCoverYears}
+                  year={forestCoverYear}
+                  enabled={on}
+                  onChange={(year) => onForestCoverYearChange?.(year)}
+                  onDisabledClick={() => onDisabledClick?.(section.label)}
+                />
+              ) : (
+                section.items?.map((item) => (
                   <ToggleItemRow
                     key={item.label}
                     item={item}
@@ -241,20 +306,21 @@ export function SidebarSections({
                     }}
                   />
                 ))
-              : section.items?.map(({ label, icon: Icon, children }) =>
-                  children ? (
-                    <div key={label}>
-                      <p className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">
-                        {label}
-                      </p>
-                      {children.map((child) => (
-                        <SidebarItemRow key={child.label} {...child} className="pl-6" />
-                      ))}
-                    </div>
-                  ) : (
-                    Icon && <SidebarItemRow key={label} label={label} icon={Icon} />
-                  ),
-                )}
+              )
+            ) : (
+              section.items?.map(({ label, icon: Icon, children }) =>
+                children ? (
+                  <div key={label}>
+                    <p className="px-3 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">{label}</p>
+                    {children.map((child) => (
+                      <SidebarItemRow key={child.label} {...child} className="pl-6" />
+                    ))}
+                  </div>
+                ) : (
+                  Icon && <SidebarItemRow key={label} label={label} icon={Icon} />
+                ),
+              )
+            )}
           </div>
         );
       })}

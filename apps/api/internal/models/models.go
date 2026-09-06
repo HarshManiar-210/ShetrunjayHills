@@ -21,12 +21,18 @@ type Layer struct {
 // FilePath is resolved against DATA_ROOT server-side and never serialized to
 // the client; the client fetches the asset itself through OverlayData by Key.
 type StaticOverlay struct {
-	ID        int    `json:"id"`
-	Key       string `json:"key"`
-	Label     string `json:"label"`
-	Section   string `json:"section"`
-	AssetType string `json:"asset_type"`
-	Kind      string `json:"kind,omitempty"`
-	Color     string `json:"color,omitempty"`
-	FilePath  string `json:"-"`
+	ID        int      `json:"id"`
+	Key       string   `json:"key"`
+	Label     string   `json:"label"`
+	Section   string   `json:"section"`
+	AssetType string   `json:"asset_type"`
+	Kind      string   `json:"kind,omitempty"`
+	Color     string   `json:"color,omitempty"`
+	FilePath  string   `json:"-"`
+	// MinLon/MinLat/MaxLon/MaxLat (SW/NE corners) place a raster overlay on
+	// the map; nil for vector rows, which carry their own geometry instead.
+	MinLon *float64 `json:"min_lon,omitempty"`
+	MinLat *float64 `json:"min_lat,omitempty"`
+	MaxLon *float64 `json:"max_lon,omitempty"`
+	MaxLat *float64 `json:"max_lat,omitempty"`
 }

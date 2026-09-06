@@ -30,8 +30,8 @@ const INITIAL_ZOOM = 11;
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 // Forest Cover's real per-year raster (from the `static_overlays` DB row,
-// served through the API — see lib/overlays-api.ts), draped over the extent
-// of a reference vector geometry since the imagery has no embedded geo tags.
+// served through the API — see lib/overlays-api.ts), placed at that row's
+// own extent since the imagery has no embedded geo tags.
 export interface ForestCoverOverlay {
   url: string;
   bounds: LngLatBoundsLike;
