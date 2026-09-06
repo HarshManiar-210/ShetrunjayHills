@@ -23,39 +23,44 @@ export function MapControls({
   }
 
   return (
-    <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-sm ring-1 ring-foreground/10">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Zoom in"
-        onClick={() => mapRef.current?.zoomIn()}
-      >
-        <Plus />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Zoom out"
-        onClick={() => mapRef.current?.zoomOut()}
-      >
-        <Minus />
-      </Button>
-      <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={fitBounds}>
-        <House />
-      </Button>
-      <Button variant="ghost" size="icon-sm" aria-label="Locate me" onClick={locate}>
-        <LocateFixed />
-      </Button>
-      {onToggleLayers && (
+    <>
+      <div className="absolute top-4 right-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-sm ring-1 ring-foreground/10">
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Toggle layers panel"
-          onClick={onToggleLayers}
+          aria-label="Zoom in"
+          onClick={() => mapRef.current?.zoomIn()}
         >
-          <Layers />
+          <Plus />
         </Button>
-      )}
-    </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Zoom out"
+          onClick={() => mapRef.current?.zoomOut()}
+        >
+          <Minus />
+        </Button>
+      </div>
+
+      <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-sm ring-1 ring-foreground/10">
+        <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={fitBounds}>
+          <House />
+        </Button>
+        <Button variant="ghost" size="icon-sm" aria-label="Locate me" onClick={locate}>
+          <LocateFixed />
+        </Button>
+        {onToggleLayers && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Toggle layers panel"
+            onClick={onToggleLayers}
+          >
+            <Layers />
+          </Button>
+        )}
+      </div>
+    </>
   );
 }

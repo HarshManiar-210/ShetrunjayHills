@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/Sidebar";
+import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import { LayerPanel } from "@/components/LayerPanel";
@@ -96,21 +97,27 @@ export function MapDashboard() {
       <Header onMenuClick={() => setMobileSheet("menu")} />
 
       <div className="flex min-h-0 flex-1">
-        {/* 27/73 split-screen: sidebar internals are rebuilt incrementally, left empty for now. */}
-        <aside className="hidden w-[27%] shrink-0 flex-col border-r border-border bg-sidebar xl:flex">
+        <aside className="hidden w-[18%] shrink-0 flex-col border-r border-border bg-sidebar xl:flex">
           <OverlayScrollbarsComponent
-            className="h-full"
+            className="min-h-0 flex-1"
             options={{ scrollbars: { theme: "os-theme-dark", autoHide: "leave" } }}
-          />
+          >
+            <SidebarSections />
+          </OverlayScrollbarsComponent>
+          <p className="shrink-0 border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
+            © Shetrunjay Hills {new Date().getFullYear()}
+          </p>
         </aside>
 
-        <div className="relative min-w-0 flex-1">
-          <Map
-            data={layers ?? EMPTY}
-            visibility={visibility}
-            onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
-            themeOverlay={themeOverlay}
-          />
+        <div className="relative min-w-0 flex-1 p-4">
+          <div className="relative size-full overflow-hidden rounded-2xl border border-border">
+            <Map
+              data={layers ?? EMPTY}
+              visibility={visibility}
+              onToggleLayers={() => setMobileSheet((s) => (s === "layers" ? null : "layers"))}
+              themeOverlay={themeOverlay}
+            />
+          </div>
 
           {selectedTheme === "forest_cover" && (
             <ForestCoverPanel
