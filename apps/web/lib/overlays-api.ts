@@ -11,6 +11,10 @@ export interface OverlayMeta {
   asset_type: "vector" | "raster";
   kind?: "line" | "fill";
   color?: string;
+  min_lon?: number;
+  min_lat?: number;
+  max_lon?: number;
+  max_lat?: number;
 }
 
 export async function fetchOverlays(): Promise<OverlayMeta[]> {
