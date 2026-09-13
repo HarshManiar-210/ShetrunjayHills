@@ -7,6 +7,7 @@ import {
   SquareDashed,
   MapPin,
   Map as MapIcon,
+  Puzzle,
   type LucideIcon,
 } from "lucide-react";
 import type { OverlayMeta } from "@/lib/overlays-api";
@@ -101,6 +102,7 @@ const SECTION_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }>
   LULC: { accent: "land", icon: LandPlot },
   "Forest Boundary": { accent: "canopy", icon: Trees },
   "Cadastral Map": { accent: "carbon", icon: MapIcon },
+  Fragmentation: { accent: "change", icon: Puzzle },
 };
 
 const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {

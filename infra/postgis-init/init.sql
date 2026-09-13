@@ -224,3 +224,14 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
     ('lulc_2018', '2018', 'LULC', 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('lulc_2025', '2025', 'LULC', 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
     ('lulc_2026', '2026', 'LULC', 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- Fragmentation: same per-year-raster shape as Forest Cover (see
+-- legend-config.ts's Patch/Edge/Perforated/Core class palette).
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('fragmentation_1980', '1980', 'Fragmentation', 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('fragmentation_1989', '1989', 'Fragmentation', 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_1998', '1998', 'Fragmentation', 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2008', '2008', 'Fragmentation', 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2018', '2018', 'Fragmentation', 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2025', '2025', 'Fragmentation', 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
+    ('fragmentation_2026', '2026', 'Fragmentation', 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
