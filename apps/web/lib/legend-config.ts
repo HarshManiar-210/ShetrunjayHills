@@ -2,9 +2,9 @@
 //
 // Vector layers don't need an entry here — their swatch color comes from
 // layerColor(id) in lib/layer-style.ts, keyed off the layer's registry id.
-// Photographic rasters (Orthomosaic, FCC — see LayerRegistryEntry.isPhotographic
-// in lib/gis-registry.ts) don't need one either: there's no discrete class
-// to key a swatch off, just band composition.
+// Photographic rasters (Orthomosaic, FCC) have no discrete class to key a
+// swatch off, just band composition — their entries below are the generic
+// R/G/B channel key, not a class list.
 
 export interface LegendClass {
   value: number | string;
@@ -294,6 +294,30 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: "W", label: "West (247.5°–292.5°)", color: "#fb7e21" },
       { value: "NW", label: "North West (292.5°–337.5°)", color: "#d02f05" },
     ],
+  },
+  // Not a class list — the generic R/G/B channel key for a photographic
+  // raster (true-color composite: each channel is literally that band).
+  orthomosaic: {
+    layerId: "orthomosaic",
+    classes: [
+      { value: "R", label: "Red Band", color: "#FF0000" },
+      { value: "G", label: "Green Band", color: "#00FF00" },
+      { value: "B", label: "Blue Band", color: "#0000FF" },
+    ],
+  },
+  // Same R/G/B channel key as Orthomosaic, but a *false*-color composite —
+  // which sensor band is mapped to which channel varies by year (e.g. red
+  // shows Near Infrared reflectance most years, but the literal Red band in
+  // 1980); that per-year mapping isn't modeled anywhere in this app, so it
+  // isn't shown here.
+  fcc: {
+    layerId: "fcc",
+    classes: [
+      { value: "R", label: "Red Band", color: "#FF0000" },
+      { value: "G", label: "Green Band", color: "#00FF00" },
+      { value: "B", label: "Blue Band", color: "#0000FF" },
+    ],
+    note: "Band-to-channel mapping varies by year — see init.sql's FCC comment.",
   },
 };
 

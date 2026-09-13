@@ -272,10 +272,16 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
--- above, so no legend-config.ts entry — already anticipated in its top
--- comment. Each year's actual band assignment (which sensor bands were
--- mapped to R/G/B) varies by year per the delivery, but isn't modeled
--- anywhere in this schema; not carried here.
+-- above — legend-config.ts's `fcc` entry carries the generic R/G/B channel
+-- key, not a class list. Per-year sensor-band-to-channel mapping (from the
+-- delivery, R/G/B in listed order) isn't modeled as data anywhere in this
+-- schema, so it's recorded here only, not shown in the UI:
+--   1980:        R = Band 5 (Red)   G = Band 6 (NIR)   B = Band 6 (NIR)
+--   1989-2008:   R = Band 4 (NIR)   G = Band 3 (Red)   B = Band 2 (Green)
+--   2018-2026:   R = Band 5 (NIR)   G = Band 4 (Red)   B = Band 3 (Green)
+-- 1989 on matches the standard FCC convention (NIR→R, Red→G, Green→B);
+-- 1980 doesn't (literal Red→R, NIR→G and B) — as delivered, not a
+-- transcription error. 1980's G and B both "Band 6: Near Infrared" likewise.
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('fcc_1980', '1980', 'FCC', 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
     ('fcc_1989', '1989', 'FCC', 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
