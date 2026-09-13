@@ -181,14 +181,15 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
     ('forestBoundary', 'Forest Boundary',    'Forest Boundary',    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1),
     ('cadastralMap',   'Cadastral Map',      'Cadastral Map',      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1);
 
--- Tree Inventory: per-tree survey attributes. Tree Height is delivered (a
--- thinned copy of the ~857k-point source — see vector-data/tree-height.geojson
--- vs. the -thinned file actually served here); Tree Species hasn't arrived
--- yet, so it's seeded 'pending' — kind/color/file_path stay unset until a
--- follow-up row update supplies real data, no code change required either way.
+-- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
+-- client's full 856,700-point survey, served as-is (client wants the real
+-- data shown, not a thinned stand-in — a slow first load is accepted).
+-- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
+-- file_path stay unset until a follow-up row update supplies real data, no
+-- code change required either way.
 INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
-    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height-thinned.geojson', 1, 'available'),
-    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                        2, 'pending');
+    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available'),
+    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                2, 'pending');
 
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
