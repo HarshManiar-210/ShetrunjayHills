@@ -13,7 +13,12 @@ export function PageShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <Header onMenuClick={() => setMenuOpen(true)} />
+      <Header
+        user={auth.user}
+        onMenuClick={() => setMenuOpen(true)}
+        onLoginClick={auth.openLogin}
+        onLogoutClick={auth.logout}
+      />
 
       <div className="relative min-h-0 flex-1 overflow-y-auto">
         <div className="absolute top-4 left-4 z-20 max-h-[calc(100%-2rem)]">

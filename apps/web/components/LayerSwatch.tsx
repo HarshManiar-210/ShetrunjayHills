@@ -1,12 +1,7 @@
-import { layerColor } from "@/lib/layer-style";
+export type SwatchGeometryKind = "point" | "line" | "polygon";
 
-const POINT_TYPES = new Set(["Point", "MultiPoint"]);
-
-export function LayerSwatch({ feature }: { feature: GeoJSON.Feature & { properties: { id: number } } }) {
-  const color = layerColor(feature.properties.id);
-  const isPoint = POINT_TYPES.has(feature.geometry.type);
-
-  if (isPoint) {
+export function LayerSwatch({ color, geometryKind }: { color: string; geometryKind: SwatchGeometryKind }) {
+  if (geometryKind === "point") {
     return (
       <span
         className="size-2.5 shrink-0 rounded-full"

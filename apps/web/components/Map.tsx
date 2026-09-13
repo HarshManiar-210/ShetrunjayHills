@@ -4,16 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
   LngLatBounds,
+  Popup,
   type FilterSpecification,
   type GeoJSONSource,
   type ImageSource,
   type IControl,
   type LngLatBoundsLike,
+  type MapGeoJSONFeature,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
-import { layerColor } from "@/lib/layer-style";
 import { MapControls } from "@/components/MapControls";
 import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
@@ -26,6 +27,14 @@ const BACKGROUND = "#EDEDE8";
 
 const INITIAL_CENTER: [number, number] = [71.7800412, 21.4718707]; // Shetrunjay Hill Range, near Palitana
 const INITIAL_ZOOM = 11;
+
+// Stroke widths. A flow overlay MUST be exactly as wide as the base layer it
+// animates over: narrower leaves a sliver of layer colour down each side of
+// every gap, wider paints over the neighbouring geometry. As constants the
+// pairing is structural, so thinning a line cannot silently break its dashes.
+const LINE_WIDTH = 1;
+const LINE_CASING_WIDTH = 2;
+const OUTLINE_WIDTH = 0.75;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -40,6 +49,41 @@ export interface ForestCoverOverlay {
 
 const RASTER_OVERLAY_SOURCE = "forest-cover-raster";
 const RASTER_OVERLAY_LAYER = "forest-cover-raster-layer";
+
+// Marching-ants dash frames for the reference-layer flow animation.
+// line-dasharray takes no expression, so it can't vary per feature and can't
+// be tweened — the only way to animate it is to swap the whole array each
+// frame, which is why this is a hand-rolled loop rather than a MapLibre
+// transition.
+//
+// The sequence is the standard 14-frame one: the dash grows from the start of
+// the pattern to its end, then the gap does the same, which lands back on the
+// opening frame — so it cycles forever with no visible seam.
+const DASH_SEQUENCE: number[][] = [
+  [0, 4, 3],
+  [0.5, 4, 2.5],
+  [1, 4, 2],
+  [1.5, 4, 1.5],
+  [2, 4, 1],
+  [2.5, 4, 0.5],
+  [3, 4, 0],
+  [0, 0.5, 3, 3.5],
+  [0, 1, 3, 3],
+  [0, 1.5, 3, 2.5],
+  [0, 2, 3, 2],
+  [0, 2.5, 3, 1.5],
+  [0, 3, 3, 1],
+  [0, 3.5, 3, 0.5],
+];
+
+/** ms per frame — 14 frames, so the loop takes a shade under a second. */
+const DASH_STEP_MS = 65;
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia?.(REDUCED_MOTION_QUERY).matches ?? false;
+}
 
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
@@ -72,10 +116,6 @@ class CompactAttribution implements IControl {
     this.inner.innerHTML = html;
 
     this.container.append(button, this.inner);
-  }
-
-  setHTML(html: string) {
-    this.inner.innerHTML = html;
   }
 
   onAdd(): HTMLElement {
@@ -119,15 +159,41 @@ function byGeometryType(
 ): GeoJSON.FeatureCollection {
   return {
     type: "FeatureCollection",
-    features: data.features
-      .filter((f) => types.has(f.geometry.type))
-      // colour rides along per feature so paint reads ["get", "color"] —
-      // no layer name/id branch in the paint expression itself.
-      .map((f) => ({
-        ...f,
-        properties: { ...f.properties, color: layerColor(f.properties.id) },
-      })),
+    // colour rides along per feature (stamped in lib/layers-api.ts) so paint
+    // reads ["get", "color"] — no layer name/id branch in the paint
+    // expression itself.
+    features: data.features.filter((f) => types.has(f.geometry.type)),
   };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+// Click popup: the layer's name. The API serves geometry only, so there are no
+// attribute fields to list beneath it yet.
+function attachPopups(map: MapLibreMap): Popup {
+  const layerIds = ["polygons-fill", "lines", "points"];
+  const popup = new Popup({ closeButton: true, closeOnClick: true, maxWidth: "260px" });
+
+  map.on("click", layerIds, (e) => {
+    const feature = e.features?.[0] as MapGeoJSONFeature | undefined;
+    if (!feature) return;
+    const props = (feature.properties ?? {}) as Record<string, string | number>;
+    const name = typeof props.name === "string" ? escapeHtml(props.name) : "";
+    popup.setLngLat(e.lngLat).setHTML(`<div class="text-sm font-medium">${name}</div>`).addTo(map);
+  });
+
+  for (const id of layerIds) {
+    map.on("mouseenter", id, () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", id, () => {
+      map.getCanvas().style.cursor = "";
+    });
+  }
+
+  return popup;
 }
 
 // Unfiltered MapLibre layers draw every feature, which would make a freshly
@@ -158,7 +224,7 @@ function addLayers(
     type: "line",
     source: "polygons",
     filter: NO_FEATURES_FILTER,
-    paint: { "line-color": ["get", "color"], "line-width": 2 },
+    paint: { "line-color": ["get", "color"], "line-width": OUTLINE_WIDTH },
   });
 
   // casing under stroke: a wider surface-colour line beneath the layer
@@ -169,7 +235,7 @@ function addLayers(
     source: "lines",
     filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": BACKGROUND, "line-width": 5 },
+    paint: { "line-color": BACKGROUND, "line-width": LINE_CASING_WIDTH },
   });
   map.addLayer({
     id: "lines",
@@ -177,7 +243,7 @@ function addLayers(
     source: "lines",
     filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": ["get", "color"], "line-width": 3 },
+    paint: { "line-color": ["get", "color"], "line-width": LINE_WIDTH },
   });
 
   map.addLayer({
@@ -194,23 +260,53 @@ function addLayers(
   });
 }
 
+/**
+ * Every flow layer on the map, in the order they were added. These are the
+ * surface-coloured dashes that travel along the reference geometry the layer
+ * beneath already drew in its own colour, so what animates reads as moving
+ * gaps in that line rather than a second line of its own.
+ */
+function flowLayerIds(): string[] {
+  return Object.values(STATIC_OVERLAY_SOURCES).map(({ key }) => `overlay-${key}-flow`);
+}
+
 // Static overlays (Base Layers + Watershed Analysis sections): added once,
 // hidden, and toggled purely via layout visibility — the same lazy pattern
-// as the theme overlay above, which avoids the add/remove churn that causes
+// as the raster overlay above, which avoids the add/remove churn that causes
 // "missing layer" errors when a switch is flipped rapidly.
 function addOverlaySources(map: MapLibreMap) {
-  for (const { key, kind } of Object.values(STATIC_OVERLAY_SOURCES)) {
+  for (const { key, kind, color } of Object.values(STATIC_OVERLAY_SOURCES)) {
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
     map.addSource(sourceId, { type: "geojson", data: EMPTY_FC });
-    const color = STATIC_OVERLAY_SOURCES[key].color;
+
     if (kind === "line") {
+      map.addLayer({
+        id: `${sourceId}-casing`,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": BACKGROUND, "line-width": LINE_CASING_WIDTH },
+      });
       map.addLayer({
         id: `${sourceId}-line`,
         type: "line",
         source: sourceId,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": color, "line-width": 2 },
+        paint: { "line-color": color, "line-width": LINE_WIDTH },
+      });
+      map.addLayer({
+        id: `${sourceId}-flow`,
+        type: "line",
+        source: sourceId,
+        // Butt caps, not round: a round cap on every dash bleeds the dashes
+        // into each other and the flow stops reading as movement.
+        layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+        paint: {
+          "line-color": BACKGROUND,
+          "line-width": LINE_WIDTH,
+          "line-dasharray": DASH_SEQUENCE[0],
+        },
       });
     } else {
       map.addLayer({
@@ -225,14 +321,56 @@ function addOverlaySources(map: MapLibreMap) {
         type: "line",
         source: sourceId,
         layout: { visibility: "none" },
-        paint: { "line-color": color, "line-width": 1.5 },
+        paint: { "line-color": color, "line-width": OUTLINE_WIDTH },
+      });
+      map.addLayer({
+        id: `${sourceId}-flow`,
+        type: "line",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: {
+          "line-color": BACKGROUND,
+          "line-width": OUTLINE_WIDTH,
+          "line-dasharray": DASH_SEQUENCE[0],
+        },
       });
     }
   }
 }
 
 function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
-  return kind === "line" ? [`${sourceId}-line`] : [`${sourceId}-fill`, `${sourceId}-outline`];
+  return kind === "line"
+    ? [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`]
+    : [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
+}
+
+/**
+ * Drives the looping dash animation on the flow layers, and returns a stop
+ * function. Time-based rather than frame-counted, so the loop runs at the same
+ * speed on any display refresh rate, and the paint property is only touched
+ * when the frame index actually changes — at 65ms a step that is roughly every
+ * fourth animation frame on a 60Hz screen.
+ */
+function startDashAnimation(map: MapLibreMap): () => void {
+  const layerIds = flowLayerIds();
+  let frame = 0;
+  let lastStep = -1;
+
+  function tick(timestamp: number) {
+    const step = Math.floor(timestamp / DASH_STEP_MS) % DASH_SEQUENCE.length;
+    if (step !== lastStep) {
+      lastStep = step;
+      for (const layerId of layerIds) {
+        if (map.getLayer(layerId)) {
+          map.setPaintProperty(layerId, "line-dasharray", DASH_SEQUENCE[step]);
+        }
+      }
+    }
+    frame = requestAnimationFrame(tick);
+  }
+
+  frame = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(frame);
 }
 
 function render(map: MapLibreMap, data: LayerCollection, fitOnce: { done: boolean }) {
@@ -278,9 +416,15 @@ export default function Map({
   const mapRef = useRef<MapLibreMap | null>(null);
   const dataRef = useRef(data);
   const fitOnceRef = useRef({ done: false });
+  const popupRef = useRef<Popup | null>(null);
   const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
   const [mapLoaded, setMapLoaded] = useState(false);
   const [loadingOverlays, setLoadingOverlays] = useState<Set<string>>(new Set());
+  // Seeded from the reduced-motion media query and then kept in sync with it,
+  // so turning the OS setting on stops the loop without a reload. Safe to read
+  // during the initial render: this component is only ever loaded client-side
+  // (dynamic(..., { ssr: false }) in MapDashboard).
+  const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
 
   useEffect(() => {
     dataRef.current = data;
@@ -300,14 +444,14 @@ export default function Map({
     mapRef.current = map;
 
     const attribution = new CompactAttribution(ATTRIBUTION);
-    // bottom-left, not bottom-right: the Legend card docks bottom-right and
-    // collapses to just its header — sharing a corner with the attribution
-    // control would stack the two buttons on top of each other.
-    map.addControl(attribution, "bottom-left");
+    // bottom-right: the map controls dock bottom-left, so sharing that corner
+    // would stack the attribution button on top of them.
+    map.addControl(attribution, "bottom-right");
 
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
       addOverlaySources(map);
+      popupRef.current = attachPopups(map);
       setMapLoaded(true);
       onReady?.(map);
     });
@@ -417,7 +561,31 @@ export default function Map({
     for (const layerId of ["polygons-fill", "polygons-outline", "lines-casing", "lines", "points"]) {
       if (map.getLayer(layerId)) map.setFilter(layerId, filter);
     }
+    // An open attribute popup is a DOM overlay, not a styled layer, so
+    // filtering the feature out can't hide it — switching a layer off would
+    // otherwise leave its popup floating over nothing.
+    popupRef.current?.remove();
   }, [visibility]);
+
+  useEffect(() => {
+    const media = window.matchMedia?.(REDUCED_MOTION_QUERY);
+    if (!media) return;
+    const update = () => setReducedMotion(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  // The dash loop runs only while a reference layer is actually on screen — an
+  // rAF loop repainting the map behind nothing would be pure waste. Honouring
+  // prefers-reduced-motion leaves the dashes in place but static, so the layers
+  // still look the same, just without the movement.
+  const overlaysOnCount = Object.values(overlays ?? {}).filter(Boolean).length;
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || overlaysOnCount === 0 || reducedMotion) return;
+    return startDashAnimation(map);
+  }, [mapLoaded, overlaysOnCount, reducedMotion]);
 
   return (
     <div className="absolute inset-0">
@@ -427,7 +595,12 @@ export default function Map({
       <div ref={containerRef} className="size-full" />
       <MapControls
         mapRef={mapRef}
-        resetView={() => mapRef.current?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM })}
+        fitBounds={() => {
+          const map = mapRef.current;
+          const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
+          if (map && bounds) map.fitBounds(bounds, { padding: 40 });
+          else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
+        }}
       />
 
       {!mapLoaded && (
@@ -437,7 +610,7 @@ export default function Map({
       )}
 
       {mapLoaded && loadingOverlays.size > 0 && (
-        <div className="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm text-foreground shadow-sm ring-1 ring-foreground/10">
+        <div className="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm text-foreground shadow-e2 ring-1 ring-foreground/10">
           <Loader2 className="size-4 animate-spin text-primary" strokeWidth={1.75} />
           Loading layer…
         </div>

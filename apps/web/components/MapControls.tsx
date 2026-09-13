@@ -5,15 +5,22 @@ import { Plus, Minus, House } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Map as MapLibreMap } from "maplibre-gl";
 
+// Zoom in, zoom out and reset-to-extent only. "Locate me" pointed a
+// geolocation prompt at a study area a user is almost never standing in, and
+// the layers button duplicated the header's menu toggle, which is on screen
+// at every breakpoint the map controls are.
 export function MapControls({
   mapRef,
-  resetView,
+  fitBounds,
 }: {
   mapRef: RefObject<MapLibreMap | null>;
-  resetView: () => void;
+  fitBounds: () => void;
 }) {
   return (
-    <div className="absolute top-4 right-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-sm ring-1 ring-foreground/10">
+    <div
+      data-tour="map-controls"
+      className="absolute bottom-4 left-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-e2 ring-1 ring-foreground/10"
+    >
       <Button
         variant="ghost"
         size="icon-sm"
@@ -30,7 +37,7 @@ export function MapControls({
       >
         <Minus />
       </Button>
-      <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={resetView}>
+      <Button variant="ghost" size="icon-sm" aria-label="Reset view" onClick={fitBounds}>
         <House />
       </Button>
     </div>

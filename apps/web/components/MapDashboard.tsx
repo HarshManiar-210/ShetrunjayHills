@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -13,105 +12,51 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { SidebarSections, TOGGLE_SECTIONS } from "@/components/SidebarSections";
+import { Sidebar } from "@/components/Sidebar";
+import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
-import { LayerPanel } from "@/components/LayerPanel";
-import { LegendCard } from "@/components/LegendCard";
+import { MapInfoPanel } from "@/components/MapInfoPanel";
+import { LayerSearch } from "@/components/LayerSearch";
+import {
+  Walkthrough,
+  shouldAutoRunWalkthrough,
+  markWalkthroughSeen,
+} from "@/components/Walkthrough";
 import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
-import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
 import { fetchOverlays, overlayDataUrl, type OverlayMeta } from "@/lib/overlays-api";
+import { buildSections, layerIdOf, type SectionDef } from "@/lib/sections";
+import type { LegendOverlay } from "@/components/LegendCard";
+import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { ForestCoverOverlay } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
-type MobileSheet = "menu" | "layers" | "legend" | null;
+type MobileSheet = "menu" | "legend" | null;
 
 export function MapDashboard() {
   const auth = useAuthState();
   const [layers, setLayers] = useState<LayerCollection | null>(null);
+  const [overlayMeta, setOverlayMeta] = useState<OverlayMeta[]>([]);
   const [error, setError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
-  const [visibility, setVisibility] = useState<Record<number, boolean>>({});
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
+  const [tourOpen, setTourOpen] = useState(false);
 
-  const [forestCoverOverlays, setForestCoverOverlays] = useState<OverlayMeta[]>([]);
-  const [forestCoverYear, setForestCoverYear] = useState<number | null>(null);
-
-  // Available years, and each year's map extent, come from the
-  // `static_overlays` DB rows (Forest Cover section, one row per raster
-  // year) rather than a hardcoded list — adding a year is a seed insert, not
-  // a frontend change.
-  useEffect(() => {
-    let cancelled = false;
-    fetchOverlays()
-      .then((overlays) => {
-        if (cancelled) return;
-        const rasters = overlays.filter((o) => o.section === "Forest Cover" && o.asset_type === "raster");
-        setForestCoverOverlays(rasters);
-      })
-      .catch(() => setForestCoverOverlays([]));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const forestCoverYears = forestCoverOverlays
-    .map((o) => Number(o.label))
-    .filter((y) => !Number.isNaN(y))
-    .sort((a, b) => a - b);
-
-  // Master-toggle sections (Base Layers, Watershed Analysis, Forest Cover):
-  // each has its own on/off switch that gates its own set of static overlay
-  // layers, keyed by section label so they never interfere with each other.
-  const [sectionOn, setSectionOn] = useState<Record<string, boolean>>({});
+  // Accordion: at most one section is on at a time, and only that section's
+  // switched-on layers draw. Each section keeps its own item state so
+  // reopening it restores what was on, rather than resurrecting switches that
+  // look checked while their section is off.
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [sectionVisibility, setSectionVisibility] = useState<Record<string, Record<string, boolean>>>({});
+  const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   const [lockedPromptSection, setLockedPromptSection] = useState<string | null>(null);
 
-  // Accordion: only one toggle section (Base Layers / Watershed Analysis /
-  // Forest Cover) can be on at a time. Turning one on replaces the whole
-  // sectionOn map rather than merging, so switching sections also clears the
-  // other's item visibility — otherwise its switches would stay "checked"
-  // while greyed out.
-  function toggleSection(section: string, on: boolean) {
-    setSectionOn(on ? { [section]: true } : {});
-    setSectionVisibility((v) => (on ? { [section]: v[section] ?? {} } : { ...v, [section]: {} }));
-  }
-
-  function toggleSectionItem(section: string, key: string) {
-    setSectionVisibility((v) => ({
-      ...v,
-      [section]: { ...v[section], [key]: !v[section]?.[key] },
-    }));
-  }
-
-  const overlays = Object.entries(sectionOn).reduce<Record<string, boolean>>((acc, [section, on]) => {
-    if (on) Object.assign(acc, sectionVisibility[section]);
-    return acc;
-  }, {});
-
-  // Legend only ever shows the currently-open toggle section (accordion above
-  // guarantees at most one), and only the items actually switched on within it.
-  const activeToggleSection = Object.keys(sectionOn).find(
-    (s) => sectionOn[s] && TOGGLE_SECTIONS.has(s),
-  );
-  const sectionLegendItems = activeToggleSection
-    ? Object.entries(sectionVisibility[activeToggleSection] ?? {})
-        .filter(([, on]) => on)
-        .map(([key]) => STATIC_OVERLAY_SOURCES[key])
-        .filter((o): o is NonNullable<typeof o> => Boolean(o))
-    : [];
-  const sectionLegend =
-    activeToggleSection && sectionLegendItems.length > 0
-      ? { title: activeToggleSection, items: sectionLegendItems }
-      : null;
-
   const token = getToken();
-  const loading = layers === null && !error;
 
   // Refetch whenever the token or retry count changes — with no token the
   // API resolves the request to its public role rather than rejecting it,
@@ -137,70 +82,182 @@ export function MapDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, retryTick]);
 
-  // No layer is selected by default — a fetched layer only draws once its
-  // switch is explicitly turned on.
-  function toggleVisibility(id: number) {
-    setVisibility((v) => ({ ...v, [id]: !(v[id] ?? false) }));
+  // Sections, their order and each row's colour all come from the
+  // `static_overlays` rows — adding a layer or a section stays a seed insert.
+  useEffect(() => {
+    let cancelled = false;
+    fetchOverlays()
+      .then((meta) => {
+        if (!cancelled) setOverlayMeta(meta);
+      })
+      .catch(() => setOverlayMeta([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [retryTick]);
+
+  // First visit runs the walkthrough on its own. The delay lets the lazily
+  // loaded map and the sidebar mount, so the first spotlighted target is
+  // already measurable when the overlay appears.
+  useEffect(() => {
+    if (!shouldAutoRunWalkthrough()) return;
+    const timer = setTimeout(() => setTourOpen(true), 900);
+    return () => clearTimeout(timer);
+  }, []);
+
+  function closeTour() {
+    setTourOpen(false);
+    markWalkthroughSeen();
   }
 
-  const allLayers = (layers ?? EMPTY).features;
-  // Legend mirrors what's actually switched on, not everything the role can
-  // see — no layer is selected by default, so an unselected layer shouldn't
-  // show up in the legend either.
-  const legendLayers = allLayers.filter((f) => visibility[f.properties.id]);
+  const sections = buildSections(overlayMeta, layers);
 
-  // Forest Cover: its own sidebar toggle section (like Watershed Analysis /
-  // Base Layers) gates visibility; the year dropdown within it picks which
-  // static_overlays row's raster shows. Each year's raster is placed at its
-  // own row's extent (min_lon/min_lat/max_lon/max_lat), not a shared
-  // reference layer's bounding box.
-  const forestCoverOn = Boolean(sectionOn["Forest Cover"]);
-  const activeForestCoverOverlay = forestCoverOverlays.find((o) => Number(o.label) === forestCoverYear);
-  const forestCoverOverlay: ForestCoverOverlay | null =
-    forestCoverOn &&
-    activeForestCoverOverlay &&
-    activeForestCoverOverlay.min_lon != null &&
-    activeForestCoverOverlay.min_lat != null &&
-    activeForestCoverOverlay.max_lon != null &&
-    activeForestCoverOverlay.max_lat != null
-      ? {
-          url: overlayDataUrl(activeForestCoverOverlay.key),
-          bounds: [
-            [activeForestCoverOverlay.min_lon, activeForestCoverOverlay.min_lat],
-            [activeForestCoverOverlay.max_lon, activeForestCoverOverlay.max_lat],
-          ],
-          visible: true,
-        }
-      : null;
+  // No layer is visible by default — one only draws once its section is on and
+  // its own switch is turned on.
+  const activeKeys = (activeSection && sectionVisibility[activeSection]) || {};
+
+  function toggleSection(section: string, on: boolean) {
+    setActiveSection(on ? section : null);
+    setSectionVisibility((v) => (on ? { ...v, [section]: v[section] ?? {} } : { ...v, [section]: {} }));
+  }
+
+  function toggleItem(key: string) {
+    if (!activeSection) return;
+    setSectionVisibility((v) => {
+      const current = v[activeSection] ?? {};
+      return { ...v, [activeSection]: { ...current, [key]: !current[key] } };
+    });
+  }
+
+  // Search result picked: unlike the switches, this has to take the layer from
+  // "not even in the open section" to visible in one step — open its section
+  // (which, being an accordion, closes whichever was open) and switch it on.
+  // Always on, never a toggle: someone who searched for a layer wants to see
+  // it, not to turn off the one they just found.
+  function revealLayer(section: string, key: string | null) {
+    setActiveSection(section);
+    if (key !== null) {
+      setSectionVisibility((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [key]: true } }));
+    }
+    setMobileSheet(null);
+  }
+
+  function changeRasterYear(sectionId: string, year: number) {
+    setRasterYear((y) => ({ ...y, [sectionId]: year }));
+  }
+
+  // The open section's switched-on rows, split back into the two things the
+  // map takes: overlay keys, and ids of the permissioned `layers` rows.
+  const overlays: Record<string, boolean> = {};
+  const visibility: Record<number, boolean> = {};
+  for (const [key, on] of Object.entries(activeKeys)) {
+    if (!on) continue;
+    const layerId = layerIdOf(key);
+    if (layerId === null) overlays[key] = true;
+    else visibility[layerId] = true;
+  }
+
+  const visibleFeatures = (layers ?? EMPTY).features.filter((f) => visibility[f.properties.id]);
+
+  const openSection: SectionDef | undefined = sections.find((s) => s.label === activeSection);
+
+  // A raster section is "on" simply by being the open one — it has a single
+  // layer, so the section switch is the layer switch.
+  const rasterSection = openSection?.mode === "layer" ? openSection : undefined;
+  const selectedYear = rasterSection
+    ? (rasterYear[rasterSection.id] ?? rasterSection.years.at(-1)?.year ?? null)
+    : null;
+  const selectedRaster = rasterSection?.years.find((y) => y.year === selectedYear);
+
+  const forestCoverOverlay: ForestCoverOverlay | null = selectedRaster
+    ? { url: overlayDataUrl(selectedRaster.key), bounds: selectedRaster.bounds, visible: true }
+    : null;
+
+  const legendRasterLayers = rasterSection ? [{ id: rasterSection.id, name: rasterSection.label }] : [];
+
+  const statsRasterLayers: StatsRasterLayer[] = rasterSection
+    ? [
+        {
+          id: rasterSection.id,
+          name: rasterSection.label,
+          year: selectedYear,
+          years: rasterSection.years.map((y) => y.year),
+        },
+      ]
+    : [];
+
+  // Static overlays carry a colour but no geometry in React state, so the
+  // legend takes their swatches straight off the section definition.
+  const legendOverlays: LegendOverlay[] = (openSection?.items ?? [])
+    .filter((item) => overlays[item.key])
+    .map(({ key, label, color, geometryKind }) => ({ key, label, color, geometryKind }));
+
+  const sidebarSections = (
+    <>
+      {error && (
+        <div className="flex flex-col items-start gap-2 px-4 py-3">
+          <p className="text-sm text-destructive">Could not load layers.</p>
+          <Button size="sm" variant="outline" onClick={() => setRetryTick((t) => t + 1)}>
+            Retry
+          </Button>
+        </div>
+      )}
+      <SidebarSections
+        sections={sections}
+        activeSection={activeSection}
+        onToggleSection={toggleSection}
+        visibility={activeKeys}
+        onToggleItem={toggleItem}
+        rasterYear={rasterYear}
+        onRasterYearChange={changeRasterYear}
+        onDisabledClick={setLockedPromptSection}
+      />
+    </>
+  );
+
+  const infoPanel = (className: string) => (
+    <MapInfoPanel
+      layers={visibleFeatures}
+      overlays={legendOverlays}
+      rasterLayers={legendRasterLayers}
+      statsRasterLayers={statsRasterLayers}
+      className={className}
+    />
+  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <Header onMenuClick={() => setMobileSheet("menu")} />
+      <Header
+        user={auth.user}
+        onMenuClick={() => setMobileSheet("menu")}
+        onLoginClick={auth.openLogin}
+        onLogoutClick={auth.logout}
+        onHelpClick={() => setTourOpen(true)}
+        search={
+          <LayerSearch
+            sections={sections}
+            visibility={activeKeys}
+            activeSection={activeSection}
+            onSelect={revealLayer}
+          />
+        }
+      />
 
       <div className="flex min-h-0 flex-1">
+        {/* Header mirrors this width for its brand block, so the search bar
+            above lines up with the map column — keep the two in step. */}
         <aside className="hidden w-[18%] shrink-0 flex-col border-r border-border bg-sidebar xl:flex">
-          <OverlayScrollbarsComponent
-            className="min-h-0 flex-1"
-            options={{ scrollbars: { theme: "os-theme-dark", autoHide: "leave" } }}
-          >
-            <SidebarSections
-              sectionOn={sectionOn}
-              onToggleSection={toggleSection}
-              sectionVisibility={sectionVisibility}
-              onToggleSectionItem={toggleSectionItem}
-              onDisabledClick={setLockedPromptSection}
-              forestCoverYears={forestCoverYears}
-              forestCoverYear={forestCoverYear}
-              onForestCoverYearChange={setForestCoverYear}
-            />
-          </OverlayScrollbarsComponent>
-          <p className="shrink-0 border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">
+            <Sidebar variant="combined" user={auth.user} />
+            <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
+          </div>
+          <p className="shrink-0 border-t border-border/60 bg-panel-deep px-4 py-2.5 text-center text-[11px] tracking-wide text-muted-foreground">
             © Shetrunjay Hills {new Date().getFullYear()}
           </p>
         </aside>
 
         <div className="relative min-w-0 flex-1 p-4">
-          <div className="relative size-full overflow-hidden rounded-2xl border border-border">
+          <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
             <Map
               data={layers ?? EMPTY}
               visibility={visibility}
@@ -209,11 +266,7 @@ export function MapDashboard() {
             />
           </div>
 
-          <LegendCard
-            layers={legendLayers}
-            sectionLegend={sectionLegend}
-            className="absolute right-4 bottom-4 hidden w-64 xl:flex"
-          />
+          {infoPanel("absolute right-4 bottom-4 hidden max-h-[calc(100%-2rem)] w-72 xl:flex")}
         </div>
       </div>
 
@@ -237,39 +290,17 @@ export function MapDashboard() {
       </nav>
 
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
-        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 scrollbar-thin">
+        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 pt-12 scrollbar-thin">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SidebarSections
-            sectionOn={sectionOn}
-            onToggleSection={toggleSection}
-            sectionVisibility={sectionVisibility}
-            onToggleSectionItem={toggleSectionItem}
-            onDisabledClick={setLockedPromptSection}
-            forestCoverYears={forestCoverYears}
-            forestCoverYear={forestCoverYear}
-            onForestCoverYearChange={setForestCoverYear}
-          />
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={mobileSheet === "layers"} onOpenChange={(o) => setMobileSheet(o ? "layers" : null)}>
-        <SheetContent side="bottom" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto scrollbar-thin">
-          <SheetTitle className="sr-only">Layers</SheetTitle>
-          <LayerPanel
-            layers={layers?.features ?? null}
-            loading={loading}
-            error={error}
-            visibility={visibility}
-            onToggle={toggleVisibility}
-            onRetry={() => setRetryTick((t) => t + 1)}
-          />
+          <Sidebar variant="combined" user={auth.user} />
+          <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
         </SheetContent>
       </Sheet>
 
       <Sheet open={mobileSheet === "legend"} onOpenChange={(o) => setMobileSheet(o ? "legend" : null)}>
         <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto scrollbar-thin">
-          <SheetTitle className="sr-only">Legend</SheetTitle>
-          <LegendCard layers={legendLayers} sectionLegend={sectionLegend} className="flex" />
+          <SheetTitle className="sr-only">Legend and statistics</SheetTitle>
+          {infoPanel("flex ring-0 shadow-none")}
         </SheetContent>
       </Sheet>
 
@@ -289,6 +320,10 @@ export function MapDashboard() {
           </DialogHeader>
         </DialogContent>
       </Dialog>
+
+      {/* Mounted only while running: the tour always starts at step 1, so
+          replaying it from the header needs no reset of its own. */}
+      {tourOpen && <Walkthrough onClose={closeTour} />}
     </div>
   );
 }
