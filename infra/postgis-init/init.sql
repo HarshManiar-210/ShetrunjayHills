@@ -284,3 +284,19 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
     ('fcc_2018', '2018', 'FCC', 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
     ('fcc_2025', '2025', 'FCC', 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
     ('fcc_2026', '2026', 'FCC', 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
+
+-- Dyke/Geology/Geomorphology/Greenwash/Lineament: five newly delivered
+-- geology-themed vector layers, each its own one-layer section (same flat
+-- pattern as Forest Boundary/Cadastral Map above) - no handler or component
+-- code needed.
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
+    ('dyke',          'Dyke',          'Dyke',          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1),
+    ('geology',       'Geology',       'Geology',       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1),
+    ('geomorphology', 'Geomorphology', 'Geomorphology', 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1),
+    ('greenwash',     'Greenwash',     'Greenwash',     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1),
+    ('lineament',     'Lineament',     'Lineament',     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1);
+
+-- Toposheet: single reference raster, same one-raster-section pattern as
+-- Ortho/DSM/etc above.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('toposheet', 'Toposheet', 'Toposheet', 'raster', 'raster-data/toposheet.png', 1, 71.728494, 21.451980, 71.821804, 21.511973);

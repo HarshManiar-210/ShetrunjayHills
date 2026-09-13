@@ -20,6 +20,12 @@ import {
   TrendingUp,
   Compass,
   Aperture,
+  Ruler,
+  Gem,
+  Layers3,
+  Sprout,
+  Zap,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import type { OverlayMeta } from "@/lib/overlays-api";
@@ -136,6 +142,12 @@ const SECTION_STYLE: Record<
   Slope: { accent: "land", icon: TrendingUp },
   Aspect: { accent: "land", icon: Compass },
   "LULC-Drone": { accent: "land", icon: LandPlot },
+  Dyke: { accent: "land", icon: Ruler },
+  Geology: { accent: "carbon", icon: Gem },
+  Geomorphology: { accent: "land", icon: Layers3 },
+  Greenwash: { accent: "canopy", icon: Sprout },
+  Lineament: { accent: "land", icon: Zap },
+  Toposheet: { accent: "imagery", icon: ScrollText },
 };
 
 /**
