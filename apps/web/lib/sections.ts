@@ -52,9 +52,23 @@ export interface SectionItem {
 }
 
 export interface RasterYear {
+  /** Sort/selection identity — not always the same text as `label` (e.g. a transition range). */
   year: number;
+  /** What the dropdown shows — a bare year for Forest Cover, a "start → end" range for a transition theme. */
+  label: string;
   key: string;
   bounds: [[number, number], [number, number]];
+}
+
+// Most per-year raster labels are the bare year itself ("1989"). A theme
+// whose label is a range ("1980 → 1989") isn't itself a sort key, so fall
+// back to the trailing year baked into the row's key (see init.sql's
+// vegetation_change_* keys) for ordering and default-year selection.
+function yearOf(o: OverlayMeta): number {
+  const direct = Number(o.label);
+  if (!Number.isNaN(direct)) return direct;
+  const trailing = o.key.match(/(\d{4})$/);
+  return trailing ? Number(trailing[1]) : NaN;
 }
 
 export interface SectionDef {
@@ -148,7 +162,8 @@ export function buildSections(
     if (rasters.length > 0) {
       const years = rasters
         .map((o) => ({
-          year: Number(o.label),
+          year: yearOf(o),
+          label: o.label,
           key: o.key,
           bounds: [
             [o.min_lon!, o.min_lat!],
