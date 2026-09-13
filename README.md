@@ -120,6 +120,10 @@ Gotchas and non-obvious decisions worth knowing before touching the correspondin
   `["==", ["geometry-type"], "Polygon"]` filters silently matched nothing.
 - The map view fits to the data's bounds (computed client-side) rather than a hardcoded
   center/zoom.
+- The Stats panel's per-class breakdown is switched off for every raster theme (Forest Cover,
+  Vegetation Change, LULC) for now — no real zonal-stats data has been delivered yet. Gated by
+  `NO_STATS` in `apps/web/lib/stats-mock.ts`; the sidebar, legend, and map raster overlay for
+  each theme are unaffected.
 
 **Docker**
 
