@@ -50,14 +50,14 @@ export interface StatsRasterLayer {
 // Which legend class a theme's trend line tracks — the class the theme is
 // actually "about", rather than whichever happens to be declared first.
 const TREND_CLASS_INDEX: Record<string, number> = {
-  "forest-cover": 0, // Very Dense Forest
   "green-cover": 1, // Forest (class 0 is Non-Forest)
   lulc: 2, // Dense Vegetation
 };
 
-// Vegetation Change's 25-way transition matrix isn't a "share of area per
-// class" story the way the others are — kept out of the Stats panel by request.
-const NO_STATS = new Set(["vegetation-change"]);
+// Forest Cover and Vegetation Change are kept out of the Stats panel by
+// request (no zonal-stats block for either, though their sections/legend/map
+// still work as normal).
+const NO_STATS = new Set(["forest-cover", "vegetation-change"]);
 
 // FNV-1a — any stable string→number hash works; this one is short and has no
 // dependencies. Used only to make the filler reproducible, never for security.
