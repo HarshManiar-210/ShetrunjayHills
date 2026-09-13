@@ -339,12 +339,16 @@ export function SidebarSections({
             ) : section.items.length > 1 ? (
               section.items.map((item) =>
                 item.pending ? (
-                  <PendingItemRow key={item.key} label={item.label} icon={iconForGeometry(item.geometryKind)} />
+                  <PendingItemRow
+                    key={item.key}
+                    label={item.label}
+                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
+                  />
                 ) : (
                   <ToggleItemRow
                     key={item.key}
                     label={item.label}
-                    icon={iconForGeometry(item.geometryKind)}
+                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
                     color={item.color}
                     enabled={on}
                     checked={Boolean(visibility[item.key])}

@@ -9,6 +9,10 @@ import {
   Map as MapIcon,
   Puzzle,
   Dam,
+  Waypoints,
+  Flame,
+  Target,
+  MapPinned,
   type LucideIcon,
 } from "lucide-react";
 import type { OverlayMeta } from "@/lib/overlays-api";
@@ -53,6 +57,8 @@ export interface SectionItem {
   geometryKind: SwatchGeometryKind;
   /** No data yet — render as a disabled placeholder, not a working switch. */
   pending?: boolean;
+  /** Presentation only — see ITEM_STYLE below. Falls back to iconForGeometry when unset. */
+  icon?: LucideIcon;
 }
 
 export interface RasterYear {
@@ -105,6 +111,21 @@ const SECTION_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }>
   "Cadastral Map": { accent: "carbon", icon: MapIcon },
   Fragmentation: { accent: "change", icon: Puzzle },
   SMC: { accent: "water", icon: Dam },
+};
+
+/**
+ * Presentation only — a per-item icon override, keyed by overlay `key`, for
+ * a multi-item section whose rows would otherwise all render the same
+ * geometry-shape icon (e.g. SMC's four fill layers). An item not listed here
+ * still renders, on iconForGeometry's shape-based fallback; no behaviour is
+ * gated on the key.
+ */
+const ITEM_STYLE: Record<string, LucideIcon> = {
+  causeway: Waypoints,
+  checkDam: Dam,
+  fireline: Flame,
+  potentialSmc: Target,
+  vantalawadi: MapPinned,
 };
 
 const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
@@ -187,6 +208,7 @@ export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
         color: o.color ?? DEFAULT_OVERLAY_COLOR,
         geometryKind: o.kind === "line" ? "line" : o.kind === "point" ? "point" : "polygon",
         pending: o.status === "pending",
+        icon: ITEM_STYLE[o.key],
       })),
     });
   }

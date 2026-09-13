@@ -14,7 +14,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
-import { boundsOfFeature } from "@/lib/geo";
+import { boundsOfFeature, boundsOfCollection } from "@/lib/geo";
 import { MapControls } from "@/components/MapControls";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
@@ -565,6 +565,18 @@ export default function Map({
           .then((geojson: GeoJSON.FeatureCollection) => {
             overlayCacheRef.current[def.key] = geojson;
             map.getSource<GeoJSONSource>(sourceId)?.setData(geojson);
+            // First time this layer's data arrives, fly to it — some
+            // overlays (e.g. SMC's metre-scale structures) are otherwise
+            // invisible at the default view, with nothing to navigate the
+            // user there. Only ever zooms IN, never out: a layer whose own
+            // extent is wider than the current view (e.g. Zone Boundaries'
+            // district-wide polygon) must not yank the user out to it.
+            const bounds = boundsOfCollection(geojson);
+            const fitOptions = { padding: 60, maxZoom: 17 };
+            const camera = bounds && map.cameraForBounds(bounds, fitOptions);
+            if (bounds && camera?.zoom != null && camera.zoom > map.getZoom()) {
+              map.fitBounds(bounds, fitOptions);
+            }
           })
           .catch(() => {
             delete overlayCacheRef.current[def.key];
