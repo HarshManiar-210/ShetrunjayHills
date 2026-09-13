@@ -180,3 +180,17 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
     ('forest_cover_2018', '2018', 'Forest Cover', 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('forest_cover_2025', '2025', 'Forest Cover', 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
     ('forest_cover_2026', '2026', 'Forest Cover', 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- Vegetation Change: same per-year-raster shape as Forest Cover, but each
+-- image is a from→to transition (see legend-config.ts's 25-class VDF/MDF/
+-- OF/SCRUB/NF matrix), so the label is a "start → end" range rather than a
+-- single year. sort_order (and the key's trailing year) is the transition's
+-- end year, which sections.ts falls back to for ordering/selection since the
+-- label itself isn't a bare number here.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('vegetation_change_1980_1989', '1980 → 1989', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.727577, 21.452491, 71.822678, 21.511575),
+    ('vegetation_change_1989_1998', '1989 → 1998', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_1998_2008', '1998 → 2008', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_2008_2018', '2008 → 2018', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_2018_2025', '2018 → 2025', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_2025_2026', '2025 → 2026', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
