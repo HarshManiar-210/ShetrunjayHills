@@ -235,3 +235,16 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
     ('fragmentation_2018', '2018', 'Fragmentation', 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('fragmentation_2025', '2025', 'Fragmentation', 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
     ('fragmentation_2026', '2026', 'Fragmentation', 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- SMC (Soil Moisture Conservation): watershed conservation structures, same
+-- flat vector-section pattern as Forest Boundary/Cadastral Map. Mati Pala
+-- hasn't arrived yet, so it's seeded 'pending' like Tree Species above.
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
+    ('causeway',      'Causeway',      'SMC', 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1),
+    ('checkDam',      'Check Dam',     'SMC', 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2),
+    ('fireline',      'Fireline',      'SMC', 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3),
+    ('potentialSmc',  'Potential SMC', 'SMC', 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4),
+    ('vantalawadi',   'Vantalawadi',   'SMC', 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5);
+
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
+    ('matiPala', 'Mati Pala', 'SMC', 'vector', NULL, NULL, '', 6, 'pending');

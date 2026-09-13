@@ -8,6 +8,7 @@ import {
   MapPin,
   Map as MapIcon,
   Puzzle,
+  Dam,
   type LucideIcon,
 } from "lucide-react";
 import type { OverlayMeta } from "@/lib/overlays-api";
@@ -103,6 +104,7 @@ const SECTION_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }>
   "Forest Boundary": { accent: "canopy", icon: Trees },
   "Cadastral Map": { accent: "carbon", icon: MapIcon },
   Fragmentation: { accent: "change", icon: Puzzle },
+  SMC: { accent: "water", icon: Dam },
 };
 
 const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
