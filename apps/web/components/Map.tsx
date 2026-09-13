@@ -355,6 +355,19 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
   }
 }
 
+// Only ever zooms IN, never out: a layer whose own extent is wider than the
+// current view (e.g. Zone Boundaries' district-wide polygon) must not yank
+// the user out to it.
+function flyToIfCloser(map: MapLibreMap, geojson: GeoJSON.FeatureCollection) {
+  const bounds = boundsOfCollection(geojson);
+  if (!bounds) return;
+  const fitOptions = { padding: 60, maxZoom: 17 };
+  const camera = map.cameraForBounds(bounds, fitOptions);
+  if (camera?.zoom != null && camera.zoom > map.getZoom()) {
+    map.fitBounds(bounds, fitOptions);
+  }
+}
+
 function overlayLayerIds(kind: "line" | "fill" | "point", sourceId: string) {
   if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
   if (kind === "point") return [`${sourceId}-circle`];
@@ -442,6 +455,11 @@ export default function Map({
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
   const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
+  // Keys currently visible, so a fresh off→on transition can be told apart
+  // from "still on from last render" — the latter must not re-fly the camera
+  // every time some *other* overlay's switch flips (this effect reruns on
+  // any overlays change).
+  const shownKeysRef = useRef<Set<string>>(new Set());
   const [mapLoaded, setMapLoaded] = useState(false);
   const [loadingOverlays, setLoadingOverlays] = useState<Set<string>>(new Set());
   // Seeded from the reduced-motion media query and then kept in sync with it,
@@ -544,7 +562,10 @@ export default function Map({
   }, [overlayDefs]);
 
   // static overlays: fetch each file at most once, then just flip
-  // layout visibility — cheap and immune to rapid on/off clicking.
+  // layout visibility — cheap and immune to rapid on/off clicking. Flies to
+  // the layer's own data on every off→on transition (not just the first
+  // ever fetch) — see flyToIfCloser — so switching a layer back on always
+  // takes you back to where it actually is.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !overlays) return;
@@ -556,6 +577,7 @@ export default function Map({
 
       const visible = Boolean(overlays[def.key]);
       const cached = overlayCacheRef.current[def.key];
+      const justShown = visible && !shownKeysRef.current.has(def.key);
 
       if (visible && !cached) {
         overlayCacheRef.current[def.key] = "loading";
@@ -565,18 +587,7 @@ export default function Map({
           .then((geojson: GeoJSON.FeatureCollection) => {
             overlayCacheRef.current[def.key] = geojson;
             map.getSource<GeoJSONSource>(sourceId)?.setData(geojson);
-            // First time this layer's data arrives, fly to it — some
-            // overlays (e.g. SMC's metre-scale structures) are otherwise
-            // invisible at the default view, with nothing to navigate the
-            // user there. Only ever zooms IN, never out: a layer whose own
-            // extent is wider than the current view (e.g. Zone Boundaries'
-            // district-wide polygon) must not yank the user out to it.
-            const bounds = boundsOfCollection(geojson);
-            const fitOptions = { padding: 60, maxZoom: 17 };
-            const camera = bounds && map.cameraForBounds(bounds, fitOptions);
-            if (bounds && camera?.zoom != null && camera.zoom > map.getZoom()) {
-              map.fitBounds(bounds, fitOptions);
-            }
+            flyToIfCloser(map, geojson);
           })
           .catch(() => {
             delete overlayCacheRef.current[def.key];
@@ -590,7 +601,11 @@ export default function Map({
           });
       } else if (visible && cached && cached !== "loading") {
         source.setData(cached);
+        if (justShown) flyToIfCloser(map, cached);
       }
+
+      if (visible) shownKeysRef.current.add(def.key);
+      else shownKeysRef.current.delete(def.key);
 
       for (const layerId of overlayLayerIds(def.kind, sourceId)) {
         if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
