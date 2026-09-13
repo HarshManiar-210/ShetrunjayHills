@@ -194,3 +194,14 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
     ('vegetation_change_2008_2018', '2008 → 2018', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('vegetation_change_2018_2025', '2018 → 2025', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.727566, 21.452156, 71.822770, 21.511847),
     ('vegetation_change_2025_2026', '2025 → 2026', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- LULC: same per-year-raster shape as Forest Cover (see legend-config.ts's
+-- Barren/Builtup/Dense Vegetation/Scrub/Waterbody classes).
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('lulc_1980', '1980', 'LULC', 'raster', 'raster-data/lulc/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('lulc_1989', '1989', 'LULC', 'raster', 'raster-data/lulc/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_1998', '1998', 'LULC', 'raster', 'raster-data/lulc/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_2008', '2008', 'LULC', 'raster', 'raster-data/lulc/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_2018', '2018', 'LULC', 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_2025', '2025', 'LULC', 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
+    ('lulc_2026', '2026', 'LULC', 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
