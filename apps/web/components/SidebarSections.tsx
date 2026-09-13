@@ -321,7 +321,9 @@ export function SidebarSections({
                   onDisabledClick={() => onDisabledClick(section.label)}
                 />
               ) : null
-            ) : section.items.length > 0 ? (
+              // A single-item section has nothing to choose between, so the
+              // section switch above is the only control it needs.
+            ) : section.items.length > 1 ? (
               section.items.map((item) => (
                 <ToggleItemRow
                   key={item.key}

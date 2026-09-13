@@ -16,7 +16,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
 import { MapControls } from "@/components/MapControls";
-import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
+import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 
 const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
@@ -266,16 +266,18 @@ function addLayers(
  * beneath already drew in its own colour, so what animates reads as moving
  * gaps in that line rather than a second line of its own.
  */
-function flowLayerIds(): string[] {
-  return Object.values(STATIC_OVERLAY_SOURCES).map(({ key }) => `overlay-${key}-flow`);
+function flowLayerIds(defs: OverlayDef[]): string[] {
+  return defs.map(({ key }) => `overlay-${key}-flow`);
 }
 
 // Static overlays (Base Layers + Watershed Analysis sections): added once,
 // hidden, and toggled purely via layout visibility — the same lazy pattern
 // as the raster overlay above, which avoids the add/remove churn that causes
-// "missing layer" errors when a switch is flipped rapidly.
-function addOverlaySources(map: MapLibreMap) {
-  for (const { key, kind, color } of Object.values(STATIC_OVERLAY_SOURCES)) {
+// "missing layer" errors when a switch is flipped rapidly. Safe to call
+// repeatedly with a growing def list (e.g. once the overlay-metadata fetch
+// lands after the map has already loaded) — an existing source is skipped.
+function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
+  for (const { key, kind, color } of defs) {
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
     map.addSource(sourceId, { type: "geojson", data: EMPTY_FC });
@@ -351,8 +353,8 @@ function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
  * when the frame index actually changes — at 65ms a step that is roughly every
  * fourth animation frame on a 60Hz screen.
  */
-function startDashAnimation(map: MapLibreMap): () => void {
-  const layerIds = flowLayerIds();
+function startDashAnimation(map: MapLibreMap, defs: OverlayDef[]): () => void {
+  const layerIds = flowLayerIds(defs);
   let frame = 0;
   let lastStep = -1;
 
@@ -405,16 +407,23 @@ export default function Map({
   onReady,
   forestCoverOverlay,
   overlays,
+  overlayDefs = [],
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
   onReady?: (map: MapLibreMap) => void;
   forestCoverOverlay?: ForestCoverOverlay | null;
   overlays?: Record<string, boolean>;
+  /** Vector static-overlay defs (key/color/kind), derived from the API's overlay metadata. */
+  overlayDefs?: OverlayDef[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const dataRef = useRef(data);
+  // Read inside the mount effect's "load" handler, which only ever runs with
+  // the overlayDefs captured at mount time otherwise — the metadata fetch
+  // that populates this typically resolves after that.
+  const overlayDefsRef = useRef(overlayDefs);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
   const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
@@ -429,6 +438,10 @@ export default function Map({
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+
+  useEffect(() => {
+    overlayDefsRef.current = overlayDefs;
+  }, [overlayDefs]);
 
   // map lifecycle: create once, tear down on unmount
   useEffect(() => {
@@ -450,7 +463,7 @@ export default function Map({
 
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
-      addOverlaySources(map);
+      addOverlaySources(map, overlayDefsRef.current);
       popupRef.current = attachPopups(map);
       setMapLoaded(true);
       onReady?.(map);
@@ -505,13 +518,23 @@ export default function Map({
     });
   }, [forestCoverOverlay]);
 
+  // The overlay-metadata fetch (MapDashboard's fetchOverlays) typically lands
+  // after the map's own "load" event, so a def arriving later than mount
+  // still needs its source/layers created — addOverlaySources no-ops for any
+  // key already present.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    addOverlaySources(map, overlayDefs);
+  }, [overlayDefs]);
+
   // static overlays: fetch each file at most once, then just flip
   // layout visibility — cheap and immune to rapid on/off clicking.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !overlays) return;
 
-    for (const def of Object.values(STATIC_OVERLAY_SOURCES)) {
+    for (const def of overlayDefs) {
       const sourceId = `overlay-${def.key}`;
       const source = map.getSource<GeoJSONSource>(sourceId);
       if (!source) continue;
@@ -546,7 +569,7 @@ export default function Map({
         if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     }
-  }, [overlays]);
+  }, [overlays, overlayDefs]);
 
   // visibility toggles: filter, never re-fetch or refit. No layer is
   // selected by default, so this shows only ids explicitly switched on
@@ -584,8 +607,8 @@ export default function Map({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || overlaysOnCount === 0 || reducedMotion) return;
-    return startDashAnimation(map);
-  }, [mapLoaded, overlaysOnCount, reducedMotion]);
+    return startDashAnimation(map, overlayDefs);
+  }, [mapLoaded, overlaysOnCount, reducedMotion, overlayDefs]);
 
   return (
     <div className="absolute inset-0">
