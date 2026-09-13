@@ -49,6 +49,8 @@ export interface SectionItem {
   label: string;
   color: string;
   geometryKind: SwatchGeometryKind;
+  /** No data yet — render as a disabled placeholder, not a working switch. */
+  pending?: boolean;
 }
 
 export interface RasterYear {
@@ -179,7 +181,8 @@ export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
         key: o.key,
         label: o.label,
         color: o.color ?? DEFAULT_OVERLAY_COLOR,
-        geometryKind: o.kind === "line" ? "line" : "polygon",
+        geometryKind: o.kind === "line" ? "line" : o.kind === "point" ? "point" : "polygon",
+        pending: o.status === "pending",
       })),
     });
   }

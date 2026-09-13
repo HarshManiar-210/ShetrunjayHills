@@ -90,6 +90,8 @@ func TestOverlayData(t *testing.T) {
 		wantStatus int
 	}{
 		{"unknown key", fakeOverlayFilePathGetter{err: pgx.ErrNoRows}, http.StatusNotFound},
+		// A 'pending' static_overlays row (no data yet) has an empty file_path.
+		{"pending overlay has no file yet", fakeOverlayFilePathGetter{path: ""}, http.StatusNotFound},
 		{"repo error", fakeOverlayFilePathGetter{err: errors.New("db down")}, http.StatusInternalServerError},
 		{"serves file", fakeOverlayFilePathGetter{path: "vector-data/Roads.geojson"}, http.StatusOK},
 		// A row whose path tries to climb out of dataRoot resolves back under

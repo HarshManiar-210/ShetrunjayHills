@@ -9,8 +9,10 @@ export interface OverlayMeta {
   label: string;
   section: string;
   asset_type: "vector" | "raster";
-  kind?: "line" | "fill";
+  kind?: "line" | "fill" | "point";
   color?: string;
+  /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
+  status: "available" | "pending";
   min_lon?: number;
   min_lat?: number;
   max_lon?: number;

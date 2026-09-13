@@ -310,6 +310,21 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
           "line-dasharray": DASH_SEQUENCE[0],
         },
       });
+    } else if (kind === "point") {
+      // No casing/flow here — the dash animation is a line-only effect, and
+      // startDashAnimation already no-ops on a layer id that doesn't exist.
+      map.addLayer({
+        id: `${sourceId}-circle`,
+        type: "circle",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: {
+          "circle-color": color,
+          "circle-radius": 2.5,
+          "circle-stroke-width": 0.5,
+          "circle-stroke-color": BACKGROUND,
+        },
+      });
     } else {
       map.addLayer({
         id: `${sourceId}-fill`,
@@ -340,10 +355,10 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
   }
 }
 
-function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
-  return kind === "line"
-    ? [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`]
-    : [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
+function overlayLayerIds(kind: "line" | "fill" | "point", sourceId: string) {
+  if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
+  if (kind === "point") return [`${sourceId}-circle`];
+  return [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
 }
 
 /**

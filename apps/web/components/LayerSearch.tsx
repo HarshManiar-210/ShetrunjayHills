@@ -27,6 +27,8 @@ function buildIndex(sections: SectionDef[]): SearchEntry[] {
       continue;
     }
     for (const item of section.items) {
+      // A pending item has no data to reveal — not searchable.
+      if (item.pending) continue;
       index.push({ section: section.label, label: item.label, key: item.key });
     }
   }

@@ -46,16 +46,23 @@ CREATE TABLE role_layer_permissions (
 -- min_lon/min_lat/max_lon/max_lat (SW/NE corners, EPSG:4326) place a raster
 -- overlay on the map — the source imagery has no embedded geo tags of its
 -- own. NULL for vector rows, which carry their own geometry instead.
+-- status lets a row announce a layer whose data hasn't been delivered yet
+-- (e.g. Tree Species, alongside Tree Height in the same section) without a
+-- frontend code change: 'pending' rows carry no kind/color/file_path and the
+-- sidebar renders them as a disabled placeholder rather than a working
+-- switch. Flip to 'available' and fill in kind/color/file_path once the data
+-- arrives — no other row needs to change.
 CREATE TABLE static_overlays (
     id         SERIAL PRIMARY KEY,
     key        TEXT NOT NULL UNIQUE,
     label      TEXT NOT NULL,
     section    TEXT NOT NULL,
     asset_type TEXT NOT NULL CHECK (asset_type IN ('vector', 'raster')),
-    kind       TEXT CHECK (kind IN ('line', 'fill')),
+    kind       TEXT CHECK (kind IN ('line', 'fill', 'point')),
     color      TEXT,
     file_path  TEXT NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
+    status     TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'pending')),
     min_lon    DOUBLE PRECISION,
     min_lat    DOUBLE PRECISION,
     max_lon    DOUBLE PRECISION,
@@ -173,6 +180,15 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
     ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5),
     ('forestBoundary', 'Forest Boundary',    'Forest Boundary',    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1),
     ('cadastralMap',   'Cadastral Map',      'Cadastral Map',      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1);
+
+-- Tree Inventory: per-tree survey attributes. Tree Height is delivered (a
+-- thinned copy of the ~857k-point source — see vector-data/tree-height.geojson
+-- vs. the -thinned file actually served here); Tree Species hasn't arrived
+-- yet, so it's seeded 'pending' — kind/color/file_path stay unset until a
+-- follow-up row update supplies real data, no code change required either way.
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
+    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height-thinned.geojson', 1, 'available'),
+    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                        2, 'pending');
 
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),

@@ -29,6 +29,9 @@ type StaticOverlay struct {
 	Kind      string   `json:"kind,omitempty"`
 	Color     string   `json:"color,omitempty"`
 	FilePath  string   `json:"-"`
+	// Status is 'available' or 'pending' — a pending row announces a layer
+	// whose data hasn't been delivered yet (no kind/color/file_path).
+	Status string `json:"status"`
 	// MinLon/MinLat/MaxLon/MaxLat (SW/NE corners) place a raster overlay on
 	// the map; nil for vector rows, which carry their own geometry instead.
 	MinLon *float64 `json:"min_lon,omitempty"`

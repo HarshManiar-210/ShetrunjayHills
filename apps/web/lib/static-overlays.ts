@@ -12,11 +12,14 @@ export interface OverlayDef {
   label: string;
   url: string;
   color: string;
-  kind: "line" | "fill";
+  kind: "line" | "fill" | "point";
 }
 
 export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
   return meta
-    .filter((o): o is OverlayMeta & { kind: "line" | "fill" } => o.kind === "line" || o.kind === "fill")
+    .filter(
+      (o): o is OverlayMeta & { kind: "line" | "fill" | "point" } =>
+        o.kind === "line" || o.kind === "fill" || o.kind === "point",
+    )
     .map((o) => ({ key: o.key, label: o.label, url: overlayDataUrl(o.key), color: o.color ?? "#6B7280", kind: o.kind }));
 }
