@@ -110,7 +110,7 @@ export function MapDashboard() {
     markWalkthroughSeen();
   }
 
-  const sections = buildSections(overlayMeta, layers);
+  const sections = buildSections(overlayMeta);
 
   // No layer is visible by default — one only draws once its section is on and
   // its own switch is turned on.
