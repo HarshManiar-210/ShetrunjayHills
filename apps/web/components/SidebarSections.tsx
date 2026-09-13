@@ -1,7 +1,7 @@
 import { Layers, type LucideIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { iconForGeometry, type SectionAccent, type SectionDef } from "@/lib/sections";
+import { iconForGeometry, type RasterYear, type SectionAccent, type SectionDef } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
 /**
@@ -233,12 +233,13 @@ function YearControl({
   onDisabledClick,
 }: {
   label: string;
-  years: number[];
+  years: RasterYear[];
   year: number | null;
   enabled: boolean;
   onChange: (year: number) => void;
   onDisabledClick: () => void;
 }) {
+  const current = years.find((y) => y.year === year);
   return (
     <div className="px-1.5 py-1">
       <span className="mb-1 block text-xs text-muted-foreground/80">Year</span>
@@ -249,8 +250,8 @@ function YearControl({
           </SelectTrigger>
           <SelectContent>
             {years.map((y) => (
-              <SelectItem key={y} value={String(y)}>
-                {y}
+              <SelectItem key={y.year} value={String(y.year)}>
+                {y.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -261,7 +262,7 @@ function YearControl({
           onClick={onDisabledClick}
           className="flex h-8 w-full cursor-not-allowed items-center rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground/60"
         >
-          {year ?? "Select a year"}
+          {current?.label ?? "Select a year"}
         </button>
       )}
     </div>
@@ -306,7 +307,7 @@ export function SidebarSections({
       <div className="flex flex-col gap-2.5 p-3">
         {sections.map((section, i) => {
           const on = activeSection === section.label;
-          const years = section.years.map((y) => y.year);
+          const years = section.years;
 
           const body =
             section.mode === "layer" ? (
@@ -314,7 +315,7 @@ export function SidebarSections({
                 <YearControl
                   label={section.label}
                   years={years}
-                  year={rasterYear[section.id] ?? years.at(-1) ?? null}
+                  year={rasterYear[section.id] ?? years.at(-1)?.year ?? null}
                   enabled={on}
                   onChange={(year) => onRasterYearChange(section.id, year)}
                   onDisabledClick={() => onDisabledClick(section.label)}
