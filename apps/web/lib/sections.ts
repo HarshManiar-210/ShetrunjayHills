@@ -96,6 +96,7 @@ const SECTION_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }>
   "Watershed Analysis": { accent: "water", icon: Droplets },
   "Base Layers": { accent: "infra", icon: Layers },
   LULC: { accent: "land", icon: LandPlot },
+  "Forest Boundary": { accent: "canopy", icon: Trees },
 };
 
 const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
