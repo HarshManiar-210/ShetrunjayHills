@@ -2,21 +2,23 @@ import {
   Trees,
   Droplets,
   Layers,
-  LandPlot,
   Route,
   SquareDashed,
   MapPin,
   type LucideIcon,
 } from "lucide-react";
 import type { OverlayMeta } from "@/lib/overlays-api";
-import type { LayerCollection } from "@/lib/layers-api";
 import type { SwatchGeometryKind } from "@/components/LayerSwatch";
 
 /**
  * The sidebar's sections, derived entirely from what the API returns — the
- * `section` column on `static_overlays` plus the role-filtered `layers` rows.
- * Adding a layer or a whole section stays a seed insert, never an edit here
- * (CLAUDE.md's core invariant).
+ * `section` column on `static_overlays`. Adding a layer or a whole section
+ * stays a seed insert, never an edit here (CLAUDE.md's core invariant).
+ *
+ * The role-permissioned `layers` rows (roads, boundaries, species points,
+ * …) aren't surfaced as a sidebar section — layerIdOf below is unreachable
+ * dead-code protection kept only because MapDashboard's key-splitting logic
+ * still checks for a `layer:` prefix that nothing currently produces.
  */
 
 /** Subject colour for a section, resolved to the --sec-* tokens in globals.css. */
@@ -34,10 +36,6 @@ export type SectionAccent =
 /** Toggle keys for the permissioned `layers` rows are prefixed to keep them
  *  apart from overlay keys in one flat per-section visibility map. */
 const LAYER_PREFIX = "layer:";
-
-export function layerKey(id: number): string {
-  return `${LAYER_PREFIX}${id}`;
-}
 
 export function layerIdOf(key: string): number | null {
   return key.startsWith(LAYER_PREFIX) ? Number(key.slice(LAYER_PREFIX.length)) : null;
@@ -103,14 +101,6 @@ const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
   icon: Layers,
 };
 
-/** The role-permissioned `layers` rows get their own section. */
-export const SURVEY_SECTION = "Survey Layers";
-
-const SURVEY_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
-  accent: "land",
-  icon: LandPlot,
-};
-
 const DEFAULT_OVERLAY_COLOR = "#6B7280";
 
 export function slugify(label: string): string {
@@ -140,10 +130,7 @@ function hasExtent(o: OverlayMeta): boolean {
  * `layers` rows as one more. Section order follows the API's own
  * `ORDER BY section, sort_order`, so re-ordering the sidebar is a seed change.
  */
-export function buildSections(
-  overlays: OverlayMeta[],
-  layers: LayerCollection | null,
-): SectionDef[] {
+export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
   const bySection = new Map<string, OverlayMeta[]>();
   for (const overlay of overlays) {
     const rows = bySection.get(overlay.section) ?? [];
@@ -189,32 +176,6 @@ export function buildSections(
         color: o.color ?? DEFAULT_OVERLAY_COLOR,
         geometryKind: o.kind === "line" ? "line" : "polygon",
       })),
-    });
-  }
-
-  // One row per permissioned layer, named and coloured exactly as the map
-  // draws it. Deduped by layer id, since a layer may arrive as several
-  // features. Absent for a role the API returns no layers for.
-  const seen = new Map<number, SectionItem>();
-  for (const f of layers?.features ?? []) {
-    if (seen.has(f.properties.id)) continue;
-    seen.set(f.properties.id, {
-      key: layerKey(f.properties.id),
-      label: f.properties.name,
-      color: f.properties.color,
-      geometryKind: geometryKindOf(f.geometry.type),
-    });
-  }
-  const layerItems = [...seen.values()];
-
-  if (layerItems.length > 0) {
-    sections.push({
-      label: SURVEY_SECTION,
-      id: slugify(SURVEY_SECTION),
-      ...SURVEY_STYLE,
-      mode: "multi",
-      years: [],
-      items: layerItems,
     });
   }
 
