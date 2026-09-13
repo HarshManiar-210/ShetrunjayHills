@@ -1,78 +1,133 @@
 "use client";
 
-import { useState } from "react";
-import { ListTree, ChevronDown } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardAction, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { LayerSwatch } from "@/components/LayerSwatch";
+import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
+import { legendFor } from "@/lib/legend-config";
+import { geometryKindOf } from "@/lib/sections";
 import type { LayerFeature } from "@/lib/layers-api";
-import type { OverlayDef } from "@/lib/static-overlays";
 
-function OverlaySwatch({ kind, color }: { kind: OverlayDef["kind"]; color: string }) {
-  if (kind === "fill") {
-    return <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />;
+// Many features can share one layer, so the legend lists one row per layer,
+// not per feature.
+function uniqueLayers(features: LayerFeature[]): LayerFeature[] {
+  const seen = new Map<number, LayerFeature>();
+  for (const feature of features) {
+    if (!seen.has(feature.properties.id)) seen.set(feature.properties.id, feature);
   }
-  return <span className="h-0.5 w-4 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />;
+  return [...seen.values()];
 }
 
-export function LegendCard({
+// Above this many classes a single column gets too tall for the card.
+const TWO_COLUMN_THRESHOLD = 8;
+
+function isLong(legend: { classes: unknown[] }): boolean {
+  return legend.classes.length > TWO_COLUMN_THRESHOLD;
+}
+
+export interface LegendRasterLayer {
+  id: string;
+  name: string;
+  isPhotographic?: boolean;
+}
+
+/** A switched-on static overlay — it has a colour but no loaded geometry here. */
+export interface LegendOverlay {
+  key: string;
+  label: string;
+  color: string;
+  geometryKind: SwatchGeometryKind;
+}
+
+/**
+ * Legend body — swatch rows for the switched-on vector layers and overlays,
+ * then a class list per switched-on raster section. Card chrome (header, tabs,
+ * collapse) lives in components/MapInfoPanel.tsx, which is the only place this
+ * renders.
+ */
+export function LegendContent({
   layers,
-  sectionLegend,
+  overlays = [],
+  rasterLayers = [],
   className,
 }: {
   layers: LayerFeature[];
-  sectionLegend?: { title: string; items: OverlayDef[] } | null;
+  overlays?: LegendOverlay[];
+  rasterLayers?: LegendRasterLayer[];
   className?: string;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const rows = uniqueLayers(layers);
 
-  if (layers.length === 0 && !sectionLegend) return null;
+  if (rows.length === 0 && overlays.length === 0 && rasterLayers.length === 0) {
+    return (
+      <p className={cn("text-xs text-muted-foreground", className)}>
+        No layers switched on yet — turn one on to see its legend.
+      </p>
+    );
+  }
 
   return (
-    <Card className={className} size="sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ListTree className="size-4 text-muted-foreground" strokeWidth={1.75} />
-          Legend
-        </CardTitle>
-        <CardAction>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={collapsed ? "Expand legend" : "Collapse legend"}
-            onClick={() => setCollapsed((c) => !c)}
-          >
-            <ChevronDown className={cn("transition-transform", collapsed && "-rotate-90")} />
-          </Button>
-        </CardAction>
-      </CardHeader>
-      {!collapsed && (
-        <CardContent className="flex max-h-40 flex-col gap-1.5 overflow-y-auto scrollbar-thin">
-          {layers.map((feature) => (
-            <div key={feature.properties.id} className="flex items-center gap-3 text-sm">
-              <LayerSwatch feature={feature} />
-              <span className="capitalize">{feature.properties.name.replace(/_/g, " ")}</span>
+    <div className={cn("flex flex-col gap-3", className)}>
+      {(rows.length > 0 || overlays.length > 0) && (
+        <div className="flex flex-col gap-1.5">
+          {rows.map((feature) => (
+            <div key={feature.properties.id} className="flex items-center gap-2 text-sm">
+              <LayerSwatch
+                color={feature.properties.color}
+                geometryKind={geometryKindOf(feature.geometry.type)}
+              />
+              <span>{feature.properties.name}</span>
             </div>
           ))}
-          {sectionLegend && (
-            <div className={layers.length > 0 ? "mt-1.5 border-t border-border pt-1.5 " : undefined}>
-              <p className="px-0 pb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                {sectionLegend.title}
-              </p>
-
-              <div className="space-y-2">
-                {sectionLegend.items.map((item) => (
-                  <div key={item.key} className="flex items-center gap-3 text-sm">
-                    <OverlaySwatch kind={item.kind} color={item.color} />
-                    <span>{item.label}</span>
-                  </div>
-                ))}
-              </div>
+          {overlays.map((overlay) => (
+            <div key={overlay.key} className="flex items-center gap-2 text-sm">
+              <LayerSwatch color={overlay.color} geometryKind={overlay.geometryKind} />
+              <span>{overlay.label}</span>
             </div>
-          )}
-        </CardContent>
+          ))}
+        </div>
       )}
-    </Card>
+
+      {rasterLayers.map((raster) => {
+        const legend = legendFor(raster.id);
+        return (
+          <div key={raster.id} className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">{raster.name}</span>
+            {raster.isPhotographic ? (
+              <span className="text-xs text-muted-foreground/70 italic">
+                Photographic image — no class legend
+              </span>
+            ) : (
+              legend && (
+                <div className="flex flex-col gap-1">
+                  {/* Long class lists go two-up with their compact labels, so
+                      the legend still fits without scrolling. */}
+                  <div
+                    className={cn(
+                      "gap-x-2 gap-y-1",
+                      isLong(legend) ? "grid grid-cols-2" : "flex flex-col",
+                    )}
+                  >
+                    {legend.classes.map((cls) => (
+                      <div key={cls.value} className="flex items-center gap-1.5 text-xs">
+                        <span
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: cls.color }}
+                          aria-hidden
+                        />
+                        <span className="truncate" title={cls.label}>
+                          {isLong(legend) ? (cls.shortLabel ?? cls.label) : cls.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {legend.note && (
+                    <span className="text-[10px] text-muted-foreground/70 italic">{legend.note}</span>
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

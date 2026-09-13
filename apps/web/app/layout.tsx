@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import "overlayscrollbars/overlayscrollbars.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const inter = Inter({
+const geistSans = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
 });
@@ -27,8 +26,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      {/*
+        Dark mode is disabled for now. This used to carry a bootstrap script
+        that set the `dark` class from localStorage or the OS colour-scheme
+        preference before first paint. Without it the app always renders
+        light, regardless of system settings. To re-enable: restore the
+        script here and uncomment <ThemeToggle /> in components/Header.tsx —
+        the `.dark` styles in globals.css and the map's dark basemap are
+        both still in place and will start working again.
+      */}
       <body className="min-h-full flex flex-col">
         <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
       </body>
