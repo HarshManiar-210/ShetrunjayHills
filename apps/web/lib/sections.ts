@@ -2,6 +2,7 @@ import {
   Trees,
   Droplets,
   Layers,
+  LandPlot,
   Route,
   SquareDashed,
   MapPin,
@@ -94,6 +95,7 @@ const SECTION_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }>
   "Forest Cover": { accent: "forest", icon: Trees },
   "Watershed Analysis": { accent: "water", icon: Droplets },
   "Base Layers": { accent: "infra", icon: Layers },
+  LULC: { accent: "land", icon: LandPlot },
 };
 
 const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
