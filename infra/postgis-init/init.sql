@@ -256,7 +256,7 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
 -- band composition, not discrete classes); DSM/DTM/CHM/Slope/Aspect's
 -- legends were already seeded in legend-config.ts ahead of this delivery.
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('ortho', 'Ortho', 'Ortho', 'raster', 'raster-data/ortho.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
+    ('orthomosaic', 'orthomosaic', 'orthomosaic', 'raster', 'raster-data/orthomosaic.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
     ('dsm',   'DSM',   'DSM',   'raster', 'raster-data/DSM.png',   1, 71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282),
     ('dtm',   'DTM',   'DTM',   'raster', 'raster-data/DTM.png',   1, 71.727678,           21.452812,           71.823913,           21.512044),
     ('slope', 'Slope', 'Slope', 'raster', 'raster-data/Slope.png', 1, 71.727678,           21.452812,           71.823913,           21.512044),
@@ -269,3 +269,18 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
 -- no other row or code change needed.
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, status) VALUES
     ('lulcDrone', 'LULC-Drone', 'LULC-Drone', 'raster', '', 1, 'pending');
+
+-- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
+-- Photographic (RGB band composition, not discrete classes) like Orthomosaic
+-- above, so no legend-config.ts entry — already anticipated in its top
+-- comment. Each year's actual band assignment (which sensor bands were
+-- mapped to R/G/B) varies by year per the delivery, but isn't modeled
+-- anywhere in this schema; not carried here.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('fcc_1980', '1980', 'FCC', 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
+    ('fcc_1989', '1989', 'FCC', 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_1998', '1998', 'FCC', 'raster', 'raster-data/FCC/1998.png', 1998, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2008', '2008', 'FCC', 'raster', 'raster-data/FCC/2008.png', 2008, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2018', '2018', 'FCC', 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2025', '2025', 'FCC', 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2026', '2026', 'FCC', 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);

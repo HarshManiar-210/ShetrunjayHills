@@ -162,3 +162,8 @@ go.work.sum
 infra/postgis-data/
 
 *.DS_Store
+
+# Full-resolution drone rasters (189–599MB each — over GitHub's 100MB push
+# limit and the WebGL texture-size ceiling). Downsampled copies at
+# apps/raster-data/*.png are what's actually served; these are the backup.
+apps/raster-data/originals/

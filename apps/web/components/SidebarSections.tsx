@@ -324,7 +324,7 @@ export function SidebarSections({
 
           const body =
             section.mode === "layer" ? (
-              // A single-image raster (Ortho, DSM, …) has nothing to choose
+              // A single-image raster (Orthomosaic, DSM, …) has nothing to choose
               // between either — same bare on/off switch as a single-item
               // vector section, no dropdown.
               years.length > 1 ? (
