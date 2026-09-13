@@ -6,6 +6,10 @@
 // "fix" them to look more realistic — replace this module once real zonal
 // stats arrive.
 //
+// Per current request, the per-class breakdown is switched off for every
+// raster theme for now (see NO_STATS below) — this module stays in place,
+// ready to re-enable per theme once real stats are delivered.
+//
 // Two things here are NOT filler:
 //   - STUDY_AREA_HA, the surveyed hill area from PalitanaStudyArea.geojson.
 //   - Vector feature counts, which the panel derives from the actually loaded
@@ -51,13 +55,14 @@ export interface StatsRasterLayer {
 // actually "about", rather than whichever happens to be declared first.
 const TREND_CLASS_INDEX: Record<string, number> = {
   "green-cover": 1, // Forest (class 0 is Non-Forest)
-  lulc: 2, // Dense Vegetation
 };
 
-// Forest Cover and Vegetation Change are kept out of the Stats panel by
-// request (no zonal-stats block for either, though their sections/legend/map
-// still work as normal).
-const NO_STATS = new Set(["forest-cover", "vegetation-change"]);
+// No real zonal-stats data has been delivered for any raster theme yet, so
+// the Stats panel's per-class breakdown is switched off across the board for
+// now — sidebar/legend/map are unaffected. Add a theme's id here as it's
+// wired up; when real data finally arrives, drop this gate rather than
+// deleting it theme-by-theme.
+const NO_STATS = new Set(["forest-cover", "vegetation-change", "lulc"]);
 
 // FNV-1a — any stable string→number hash works; this one is short and has no
 // dependencies. Used only to make the filler reproducible, never for security.
