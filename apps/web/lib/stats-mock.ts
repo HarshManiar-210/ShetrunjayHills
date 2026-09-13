@@ -55,6 +55,10 @@ const TREND_CLASS_INDEX: Record<string, number> = {
   lulc: 2, // Dense Vegetation
 };
 
+// Vegetation Change's 25-way transition matrix isn't a "share of area per
+// class" story the way the others are — kept out of the Stats panel by request.
+const NO_STATS = new Set(["vegetation-change"]);
+
 // FNV-1a — any stable string→number hash works; this one is short and has no
 // dependencies. Used only to make the filler reproducible, never for security.
 function hash(seed: string): number {
@@ -86,7 +90,7 @@ function classShares(layerId: string, year: number | null, count: number): numbe
  * discrete classes to count.
  */
 export function rasterStats(layer: StatsRasterLayer): RasterLayerStats | null {
-  if (layer.isPhotographic) return null;
+  if (layer.isPhotographic || NO_STATS.has(layer.id)) return null;
   const legend = legendFor(layer.id);
   if (!legend || legend.classes.length === 0) return null;
 
