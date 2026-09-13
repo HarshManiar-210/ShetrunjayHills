@@ -248,3 +248,24 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
 
 INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
     ('matiPala', 'Mati Pala', 'SMC', 'vector', NULL, NULL, '', 6, 'pending');
+
+-- Single-image drone themes: each is its own one-raster section (single
+-- on/off switch, no year dropdown — see sections.ts's yearOf index fallback
+-- and SidebarSections.tsx's years.length > 1 check), same flat pattern as
+-- Forest Boundary/Cadastral Map above. Ortho needs no legend entry (RGB
+-- band composition, not discrete classes); DSM/DTM/CHM/Slope/Aspect's
+-- legends were already seeded in legend-config.ts ahead of this delivery.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('ortho', 'Ortho', 'Ortho', 'raster', 'raster-data/ortho.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
+    ('dsm',   'DSM',   'DSM',   'raster', 'raster-data/DSM.png',   1, 71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282),
+    ('dtm',   'DTM',   'DTM',   'raster', 'raster-data/DTM.png',   1, 71.727678,           21.452812,           71.823913,           21.512044),
+    ('slope', 'Slope', 'Slope', 'raster', 'raster-data/Slope.png', 1, 71.727678,           21.452812,           71.823913,           21.512044),
+    ('aspect', 'Aspect', 'Aspect', 'raster', 'raster-data/Aspect.png', 1, 71.727678,        21.452812,           71.823913,           21.512044),
+    ('chm',   'CHM',   'CHM',   'raster', 'raster-data/CHM.png',   1, 71.727066,           21.452069,           71.823365,           21.512053);
+
+-- LULC-Drone: legend and extent were delivered, but the actual raster image
+-- wasn't among the new files — seeded 'pending' like Mati Pala/Tree Species
+-- above. Flip to 'available' and fill in file_path/extent once it arrives,
+-- no other row or code change needed.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, status) VALUES
+    ('lulcDrone', 'LULC-Drone', 'LULC-Drone', 'raster', '', 1, 'pending');

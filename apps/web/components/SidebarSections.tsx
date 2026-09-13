@@ -324,7 +324,10 @@ export function SidebarSections({
 
           const body =
             section.mode === "layer" ? (
-              years.length > 0 ? (
+              // A single-image raster (Ortho, DSM, …) has nothing to choose
+              // between either — same bare on/off switch as a single-item
+              // vector section, no dropdown.
+              years.length > 1 ? (
                 <YearControl
                   label={section.label}
                   years={years}

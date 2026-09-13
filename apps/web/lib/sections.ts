@@ -13,6 +13,12 @@ import {
   Flame,
   Target,
   MapPinned,
+  Image,
+  Mountain,
+  MountainSnow,
+  TreePine,
+  TrendingUp,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import type { OverlayMeta } from "@/lib/overlays-api";
@@ -73,12 +79,17 @@ export interface RasterYear {
 // Most per-year raster labels are the bare year itself ("1989"). A theme
 // whose label is a range ("1980 → 1989") isn't itself a sort key, so fall
 // back to the trailing year baked into the row's key (see init.sql's
-// vegetation_change_* keys) for ordering and default-year selection.
-function yearOf(o: OverlayMeta): number {
+// vegetation_change_* keys) for ordering and default-year selection. A
+// single-image theme (Ortho, DSM, CHM, …) has no year at all — its one row
+// falls back to its position among its section's rasters, which is a valid
+// (if arbitrary) sort/select key precisely because there's nothing else in
+// that section to compare it against.
+function yearOf(o: OverlayMeta, indexFallback = NaN): number {
   const direct = Number(o.label);
   if (!Number.isNaN(direct)) return direct;
   const trailing = o.key.match(/(\d{4})$/);
-  return trailing ? Number(trailing[1]) : NaN;
+  if (trailing) return Number(trailing[1]);
+  return indexFallback;
 }
 
 export interface SectionDef {
@@ -111,6 +122,13 @@ const SECTION_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }>
   "Cadastral Map": { accent: "carbon", icon: MapIcon },
   Fragmentation: { accent: "change", icon: Puzzle },
   SMC: { accent: "water", icon: Dam },
+  Ortho: { accent: "imagery", icon: Image },
+  DSM: { accent: "land", icon: Mountain },
+  DTM: { accent: "land", icon: MountainSnow },
+  CHM: { accent: "canopy", icon: TreePine },
+  Slope: { accent: "land", icon: TrendingUp },
+  Aspect: { accent: "land", icon: Compass },
+  "LULC-Drone": { accent: "land", icon: LandPlot },
 };
 
 /**
@@ -180,8 +198,8 @@ export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
     // one year's imagery can usefully show at a time.
     if (rasters.length > 0) {
       const years = rasters
-        .map((o) => ({
-          year: yearOf(o),
+        .map((o, i) => ({
+          year: yearOf(o, i),
           label: o.label,
           key: o.key,
           bounds: [
