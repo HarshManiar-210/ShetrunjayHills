@@ -14,9 +14,9 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
-import { boundsOfFeature } from "@/lib/geo";
+import { boundsOfFeature, boundsOfCollection } from "@/lib/geo";
 import { MapControls } from "@/components/MapControls";
-import { STATIC_OVERLAY_SOURCES } from "@/lib/static-overlays";
+import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 
 const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
@@ -266,16 +266,18 @@ function addLayers(
  * beneath already drew in its own colour, so what animates reads as moving
  * gaps in that line rather than a second line of its own.
  */
-function flowLayerIds(): string[] {
-  return Object.values(STATIC_OVERLAY_SOURCES).map(({ key }) => `overlay-${key}-flow`);
+function flowLayerIds(defs: OverlayDef[]): string[] {
+  return defs.map(({ key }) => `overlay-${key}-flow`);
 }
 
 // Static overlays (Base Layers + Watershed Analysis sections): added once,
 // hidden, and toggled purely via layout visibility — the same lazy pattern
 // as the raster overlay above, which avoids the add/remove churn that causes
-// "missing layer" errors when a switch is flipped rapidly.
-function addOverlaySources(map: MapLibreMap) {
-  for (const { key, kind, color } of Object.values(STATIC_OVERLAY_SOURCES)) {
+// "missing layer" errors when a switch is flipped rapidly. Safe to call
+// repeatedly with a growing def list (e.g. once the overlay-metadata fetch
+// lands after the map has already loaded) — an existing source is skipped.
+function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
+  for (const { key, kind, color } of defs) {
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
     map.addSource(sourceId, { type: "geojson", data: EMPTY_FC });
@@ -308,6 +310,21 @@ function addOverlaySources(map: MapLibreMap) {
           "line-dasharray": DASH_SEQUENCE[0],
         },
       });
+    } else if (kind === "point") {
+      // No casing/flow here — the dash animation is a line-only effect, and
+      // startDashAnimation already no-ops on a layer id that doesn't exist.
+      map.addLayer({
+        id: `${sourceId}-circle`,
+        type: "circle",
+        source: sourceId,
+        layout: { visibility: "none" },
+        paint: {
+          "circle-color": color,
+          "circle-radius": 2.5,
+          "circle-stroke-width": 0.5,
+          "circle-stroke-color": BACKGROUND,
+        },
+      });
     } else {
       map.addLayer({
         id: `${sourceId}-fill`,
@@ -338,10 +355,23 @@ function addOverlaySources(map: MapLibreMap) {
   }
 }
 
-function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
-  return kind === "line"
-    ? [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`]
-    : [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
+// Only ever zooms IN, never out: a layer whose own extent is wider than the
+// current view (e.g. Zone Boundaries' district-wide polygon) must not yank
+// the user out to it.
+function flyToIfCloser(map: MapLibreMap, geojson: GeoJSON.FeatureCollection) {
+  const bounds = boundsOfCollection(geojson);
+  if (!bounds) return;
+  const fitOptions = { padding: 60, maxZoom: 17 };
+  const camera = map.cameraForBounds(bounds, fitOptions);
+  if (camera?.zoom != null && camera.zoom > map.getZoom()) {
+    map.fitBounds(bounds, fitOptions);
+  }
+}
+
+function overlayLayerIds(kind: "line" | "fill" | "point", sourceId: string) {
+  if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
+  if (kind === "point") return [`${sourceId}-circle`];
+  return [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
 }
 
 /**
@@ -351,8 +381,8 @@ function overlayLayerIds(kind: "line" | "fill", sourceId: string) {
  * when the frame index actually changes — at 65ms a step that is roughly every
  * fourth animation frame on a 60Hz screen.
  */
-function startDashAnimation(map: MapLibreMap): () => void {
-  const layerIds = flowLayerIds();
+function startDashAnimation(map: MapLibreMap, defs: OverlayDef[]): () => void {
+  const layerIds = flowLayerIds(defs);
   let frame = 0;
   let lastStep = -1;
 
@@ -405,19 +435,31 @@ export default function Map({
   onReady,
   forestCoverOverlay,
   overlays,
+  overlayDefs = [],
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
   onReady?: (map: MapLibreMap) => void;
   forestCoverOverlay?: ForestCoverOverlay | null;
   overlays?: Record<string, boolean>;
+  /** Vector static-overlay defs (key/color/kind), derived from the API's overlay metadata. */
+  overlayDefs?: OverlayDef[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const dataRef = useRef(data);
+  // Read inside the mount effect's "load" handler, which only ever runs with
+  // the overlayDefs captured at mount time otherwise — the metadata fetch
+  // that populates this typically resolves after that.
+  const overlayDefsRef = useRef(overlayDefs);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
   const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
+  // Keys currently visible, so a fresh off→on transition can be told apart
+  // from "still on from last render" — the latter must not re-fly the camera
+  // every time some *other* overlay's switch flips (this effect reruns on
+  // any overlays change).
+  const shownKeysRef = useRef<Set<string>>(new Set());
   const [mapLoaded, setMapLoaded] = useState(false);
   const [loadingOverlays, setLoadingOverlays] = useState<Set<string>>(new Set());
   // Seeded from the reduced-motion media query and then kept in sync with it,
@@ -429,6 +471,10 @@ export default function Map({
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
+
+  useEffect(() => {
+    overlayDefsRef.current = overlayDefs;
+  }, [overlayDefs]);
 
   // map lifecycle: create once, tear down on unmount
   useEffect(() => {
@@ -450,7 +496,7 @@ export default function Map({
 
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
-      addOverlaySources(map);
+      addOverlaySources(map, overlayDefsRef.current);
       popupRef.current = attachPopups(map);
       setMapLoaded(true);
       onReady?.(map);
@@ -505,19 +551,33 @@ export default function Map({
     });
   }, [forestCoverOverlay]);
 
+  // The overlay-metadata fetch (MapDashboard's fetchOverlays) typically lands
+  // after the map's own "load" event, so a def arriving later than mount
+  // still needs its source/layers created — addOverlaySources no-ops for any
+  // key already present.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    addOverlaySources(map, overlayDefs);
+  }, [overlayDefs]);
+
   // static overlays: fetch each file at most once, then just flip
-  // layout visibility — cheap and immune to rapid on/off clicking.
+  // layout visibility — cheap and immune to rapid on/off clicking. Flies to
+  // the layer's own data on every off→on transition (not just the first
+  // ever fetch) — see flyToIfCloser — so switching a layer back on always
+  // takes you back to where it actually is.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded() || !overlays) return;
 
-    for (const def of Object.values(STATIC_OVERLAY_SOURCES)) {
+    for (const def of overlayDefs) {
       const sourceId = `overlay-${def.key}`;
       const source = map.getSource<GeoJSONSource>(sourceId);
       if (!source) continue;
 
       const visible = Boolean(overlays[def.key]);
       const cached = overlayCacheRef.current[def.key];
+      const justShown = visible && !shownKeysRef.current.has(def.key);
 
       if (visible && !cached) {
         overlayCacheRef.current[def.key] = "loading";
@@ -527,6 +587,7 @@ export default function Map({
           .then((geojson: GeoJSON.FeatureCollection) => {
             overlayCacheRef.current[def.key] = geojson;
             map.getSource<GeoJSONSource>(sourceId)?.setData(geojson);
+            flyToIfCloser(map, geojson);
           })
           .catch(() => {
             delete overlayCacheRef.current[def.key];
@@ -540,13 +601,17 @@ export default function Map({
           });
       } else if (visible && cached && cached !== "loading") {
         source.setData(cached);
+        if (justShown) flyToIfCloser(map, cached);
       }
+
+      if (visible) shownKeysRef.current.add(def.key);
+      else shownKeysRef.current.delete(def.key);
 
       for (const layerId of overlayLayerIds(def.kind, sourceId)) {
         if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     }
-  }, [overlays]);
+  }, [overlays, overlayDefs]);
 
   // visibility toggles: filter, never re-fetch or refit. No layer is
   // selected by default, so this shows only ids explicitly switched on
@@ -584,8 +649,8 @@ export default function Map({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || overlaysOnCount === 0 || reducedMotion) return;
-    return startDashAnimation(map);
-  }, [mapLoaded, overlaysOnCount, reducedMotion]);
+    return startDashAnimation(map, overlayDefs);
+  }, [mapLoaded, overlaysOnCount, reducedMotion, overlayDefs]);
 
   return (
     <div className="absolute inset-0">

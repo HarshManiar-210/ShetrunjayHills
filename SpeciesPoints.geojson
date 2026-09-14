@@ -1,8 +1,3 @@
-{
-"type": "FeatureCollection",
-"name": "SpeciesPoints",
-"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-"features": [
-{"type":"Feature","properties":{"id":1,"Remark":"Neem-28ft"},"geometry":{"type":"Point","coordinates":[71.790891854452909,21.462321513061536]}}
-]
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:b4581ff2aedb52dd705bfa6cb4667dea1c9d6aac721ad827aa65e1e0758003bc
+size 304

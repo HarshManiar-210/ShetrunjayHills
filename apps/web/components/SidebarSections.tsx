@@ -222,6 +222,19 @@ function ToggleItemRow({
   );
 }
 
+// No data yet — not a switch at all, just a label announcing what's coming.
+function PendingItemRow({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground/60">
+      <Icon className="size-4 text-muted-foreground/50" strokeWidth={1.75} />
+      <span className="flex-1">{label}</span>
+      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+        Pending
+      </span>
+    </div>
+  );
+}
+
 // Multi-year rasters show one year at a time, so the year is a dropdown rather
 // than another set of switches.
 function YearControl({
@@ -311,7 +324,10 @@ export function SidebarSections({
 
           const body =
             section.mode === "layer" ? (
-              years.length > 0 ? (
+              // A single-image raster (Orthomosaic, DSM, …) has nothing to choose
+              // between either — same bare on/off switch as a single-item
+              // vector section, no dropdown.
+              years.length > 1 ? (
                 <YearControl
                   label={section.label}
                   years={years}
@@ -321,21 +337,31 @@ export function SidebarSections({
                   onDisabledClick={() => onDisabledClick(section.label)}
                 />
               ) : null
-            ) : section.items.length > 0 ? (
-              section.items.map((item) => (
-                <ToggleItemRow
-                  key={item.key}
-                  label={item.label}
-                  icon={iconForGeometry(item.geometryKind)}
-                  color={item.color}
-                  enabled={on}
-                  checked={Boolean(visibility[item.key])}
-                  onActivate={() => {
-                    if (!on) onDisabledClick(section.label);
-                    else onToggleItem(item.key);
-                  }}
-                />
-              ))
+              // A single-item section has nothing to choose between, so the
+              // section switch above is the only control it needs.
+            ) : section.items.length > 1 ? (
+              section.items.map((item) =>
+                item.pending ? (
+                  <PendingItemRow
+                    key={item.key}
+                    label={item.label}
+                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
+                  />
+                ) : (
+                  <ToggleItemRow
+                    key={item.key}
+                    label={item.label}
+                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
+                    color={item.color}
+                    enabled={on}
+                    checked={Boolean(visibility[item.key])}
+                    onActivate={() => {
+                      if (!on) onDisabledClick(section.label);
+                      else onToggleItem(item.key);
+                    }}
+                  />
+                ),
+              )
             ) : null;
 
           return (

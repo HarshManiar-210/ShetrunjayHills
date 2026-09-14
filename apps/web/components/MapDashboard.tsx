@@ -27,6 +27,7 @@ import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
 import { fetchOverlays, overlayDataUrl, type OverlayMeta } from "@/lib/overlays-api";
+import { vectorOverlayDefs } from "@/lib/static-overlays";
 import { buildSections, layerIdOf, type SectionDef } from "@/lib/sections";
 import type { LegendOverlay } from "@/components/LegendCard";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
@@ -111,6 +112,7 @@ export function MapDashboard() {
   }
 
   const sections = buildSections(overlayMeta);
+  const overlayDefs = vectorOverlayDefs(overlayMeta);
 
   // No layer is visible by default — one only draws once its section is on and
   // its own switch is turned on.
@@ -118,7 +120,17 @@ export function MapDashboard() {
 
   function toggleSection(section: string, on: boolean) {
     setActiveSection(on ? section : null);
-    setSectionVisibility((v) => (on ? { ...v, [section]: v[section] ?? {} } : { ...v, [section]: {} }));
+    setSectionVisibility((v) => {
+      if (!on) return { ...v, [section]: {} };
+      const def = sections.find((s) => s.label === section);
+      // A section with exactly one item has nothing to choose between — the
+      // section switch itself is the layer switch, so skip the sub-toggle.
+      const initial =
+        def && def.mode === "multi" && def.items.length === 1
+          ? { [def.items[0].key]: true }
+          : (v[section] ?? {});
+      return { ...v, [section]: initial };
+    });
   }
 
   function toggleItem(key: string) {
@@ -263,6 +275,7 @@ export function MapDashboard() {
               visibility={visibility}
               forestCoverOverlay={forestCoverOverlay}
               overlays={overlays}
+              overlayDefs={overlayDefs}
             />
           </div>
 

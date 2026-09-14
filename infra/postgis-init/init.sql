@@ -46,16 +46,23 @@ CREATE TABLE role_layer_permissions (
 -- min_lon/min_lat/max_lon/max_lat (SW/NE corners, EPSG:4326) place a raster
 -- overlay on the map — the source imagery has no embedded geo tags of its
 -- own. NULL for vector rows, which carry their own geometry instead.
+-- status lets a row announce a layer whose data hasn't been delivered yet
+-- (e.g. Tree Species, alongside Tree Height in the same section) without a
+-- frontend code change: 'pending' rows carry no kind/color/file_path and the
+-- sidebar renders them as a disabled placeholder rather than a working
+-- switch. Flip to 'available' and fill in kind/color/file_path once the data
+-- arrives — no other row needs to change.
 CREATE TABLE static_overlays (
     id         SERIAL PRIMARY KEY,
     key        TEXT NOT NULL UNIQUE,
     label      TEXT NOT NULL,
     section    TEXT NOT NULL,
     asset_type TEXT NOT NULL CHECK (asset_type IN ('vector', 'raster')),
-    kind       TEXT CHECK (kind IN ('line', 'fill')),
+    kind       TEXT CHECK (kind IN ('line', 'fill', 'point')),
     color      TEXT,
     file_path  TEXT NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
+    status     TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'pending')),
     min_lon    DOUBLE PRECISION,
     min_lat    DOUBLE PRECISION,
     max_lon    DOUBLE PRECISION,
@@ -170,7 +177,19 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
     ('rivers',         'Rivers',             'Base Layers',        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2),
     ('villages',       'Village Boundaries', 'Base Layers',        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3),
     ('zoneBoundaries', 'Zone Boundaries',    'Base Layers',        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4),
-    ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5);
+    ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5),
+    ('forestBoundary', 'Forest Boundary',    'Forest Boundary',    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1),
+    ('cadastralMap',   'Cadastral Map',      'Cadastral Map',      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1);
+
+-- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
+-- client's full 856,700-point survey, served as-is (client wants the real
+-- data shown, not a thinned stand-in — a slow first load is accepted).
+-- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
+-- file_path stay unset until a follow-up row update supplies real data, no
+-- code change required either way.
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
+    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available'),
+    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                2, 'pending');
 
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
@@ -205,3 +224,85 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
     ('lulc_2018', '2018', 'LULC', 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('lulc_2025', '2025', 'LULC', 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
     ('lulc_2026', '2026', 'LULC', 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- Fragmentation: same per-year-raster shape as Forest Cover (see
+-- legend-config.ts's Patch/Edge/Perforated/Core class palette).
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('fragmentation_1980', '1980', 'Fragmentation', 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('fragmentation_1989', '1989', 'Fragmentation', 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_1998', '1998', 'Fragmentation', 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2008', '2008', 'Fragmentation', 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2018', '2018', 'Fragmentation', 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2025', '2025', 'Fragmentation', 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
+    ('fragmentation_2026', '2026', 'Fragmentation', 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- SMC (Soil Moisture Conservation): watershed conservation structures, same
+-- flat vector-section pattern as Forest Boundary/Cadastral Map. Mati Pala
+-- hasn't arrived yet, so it's seeded 'pending' like Tree Species above.
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
+    ('causeway',      'Causeway',      'SMC', 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1),
+    ('checkDam',      'Check Dam',     'SMC', 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2),
+    ('fireline',      'Fireline',      'SMC', 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3),
+    ('potentialSmc',  'Potential SMC', 'SMC', 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4),
+    ('vantalawadi',   'Vantalawadi',   'SMC', 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5);
+
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
+    ('matiPala', 'Mati Pala', 'SMC', 'vector', NULL, NULL, '', 6, 'pending');
+
+-- Single-image drone themes: each is its own one-raster section (single
+-- on/off switch, no year dropdown — see sections.ts's yearOf index fallback
+-- and SidebarSections.tsx's years.length > 1 check), same flat pattern as
+-- Forest Boundary/Cadastral Map above. Ortho needs no legend entry (RGB
+-- band composition, not discrete classes); DSM/DTM/CHM/Slope/Aspect's
+-- legends were already seeded in legend-config.ts ahead of this delivery.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('orthomosaic', 'orthomosaic', 'orthomosaic', 'raster', 'raster-data/orthomosaic.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
+    ('dsm',   'DSM',   'DSM',   'raster', 'raster-data/DSM.png',   1, 71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282),
+    ('dtm',   'DTM',   'DTM',   'raster', 'raster-data/DTM.png',   1, 71.727678,           21.452812,           71.823913,           21.512044),
+    ('slope', 'Slope', 'Slope', 'raster', 'raster-data/Slope.png', 1, 71.727678,           21.452812,           71.823913,           21.512044),
+    ('aspect', 'Aspect', 'Aspect', 'raster', 'raster-data/Aspect.png', 1, 71.727678,        21.452812,           71.823913,           21.512044),
+    ('chm',   'CHM',   'CHM',   'raster', 'raster-data/CHM.png',   1, 71.727066,           21.452069,           71.823365,           21.512053);
+
+-- LULC-Drone: legend and extent were delivered, but the actual raster image
+-- wasn't among the new files — seeded 'pending' like Mati Pala/Tree Species
+-- above. Flip to 'available' and fill in file_path/extent once it arrives,
+-- no other row or code change needed.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, status) VALUES
+    ('lulcDrone', 'LULC-Drone', 'LULC-Drone', 'raster', '', 1, 'pending');
+
+-- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
+-- Photographic (RGB band composition, not discrete classes) like Orthomosaic
+-- above — legend-config.ts's `fcc` entry carries the generic R/G/B channel
+-- key, not a class list. Per-year sensor-band-to-channel mapping (from the
+-- delivery, R/G/B in listed order) isn't modeled as data anywhere in this
+-- schema, so it's recorded here only, not shown in the UI:
+--   1980:        R = Band 5 (Red)   G = Band 6 (NIR)   B = Band 6 (NIR)
+--   1989-2008:   R = Band 4 (NIR)   G = Band 3 (Red)   B = Band 2 (Green)
+--   2018-2026:   R = Band 5 (NIR)   G = Band 4 (Red)   B = Band 3 (Green)
+-- 1989 on matches the standard FCC convention (NIR→R, Red→G, Green→B);
+-- 1980 doesn't (literal Red→R, NIR→G and B) — as delivered, not a
+-- transcription error. 1980's G and B both "Band 6: Near Infrared" likewise.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('fcc_1980', '1980', 'FCC', 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
+    ('fcc_1989', '1989', 'FCC', 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_1998', '1998', 'FCC', 'raster', 'raster-data/FCC/1998.png', 1998, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2008', '2008', 'FCC', 'raster', 'raster-data/FCC/2008.png', 2008, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2018', '2018', 'FCC', 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2025', '2025', 'FCC', 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2026', '2026', 'FCC', 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
+
+-- Dyke/Geology/Geomorphology/Greenwash/Lineament: five newly delivered
+-- geology-themed vector layers, each its own one-layer section (same flat
+-- pattern as Forest Boundary/Cadastral Map above) - no handler or component
+-- code needed.
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
+    ('dyke',          'Dyke',          'Dyke',          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1),
+    ('geology',       'Geology',       'Geology',       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1),
+    ('geomorphology', 'Geomorphology', 'Geomorphology', 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1),
+    ('greenwash',     'Greenwash',     'Greenwash',     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1),
+    ('lineament',     'Lineament',     'Lineament',     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1);
+
+-- Toposheet: single reference raster, same one-raster-section pattern as
+-- Ortho/DSM/etc above.
+INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('toposheet', 'Toposheet', 'Toposheet', 'raster', 'raster-data/toposheet.png', 1, 71.728494, 21.451980, 71.821804, 21.511973);

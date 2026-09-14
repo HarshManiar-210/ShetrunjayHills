@@ -56,6 +56,13 @@ func OverlayData(repo overlayFilePathGetter, dataRoot string) http.HandlerFunc {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		// A 'pending' row (see static_overlays.status) has no file yet — an
+		// empty relPath would otherwise resolve to dataRoot itself, and
+		// http.ServeFile serves a directory listing rather than 404ing.
+		if relPath == "" {
+			http.Error(w, "overlay not found", http.StatusNotFound)
+			return
+		}
 
 		// relPath is DB-controlled, not user input, but forcing it to be
 		// absolute-then-cleaned before joining means a "../../etc/passwd" row
