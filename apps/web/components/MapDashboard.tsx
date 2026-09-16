@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,10 @@ import type { ForestCoverOverlay } from "@/components/Map";
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
+
+// Shared rather than a fresh `{}`, so a section with nothing switched on
+// doesn't hand the sidebar and the map a new object on every render.
+const EMPTY_KEYS: Record<string, boolean> = {};
 
 type MobileSheet = "menu" | "legend" | null;
 
@@ -111,67 +115,92 @@ export function MapDashboard() {
     markWalkthroughSeen();
   }
 
-  const sections = buildSections(overlayMeta);
-  const overlayDefs = vectorOverlayDefs(overlayMeta);
+  // The sidebar's whole shape is derived from one fetch, so it is recomputed
+  // only when that fetch lands. Identity matters as much as the work does:
+  // `overlayDefs` is a Map prop, and a fresh array every render would re-run
+  // the effects that add sources and drive the dash animation.
+  const sections = useMemo(() => buildSections(overlayMeta), [overlayMeta]);
+  const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
 
   // No layer is visible by default — one only draws once its section is on and
   // its own switch is turned on.
-  const activeKeys = (activeSection && sectionVisibility[activeSection]) || {};
+  const activeKeys = useMemo(
+    () => (activeSection && sectionVisibility[activeSection]) || EMPTY_KEYS,
+    [activeSection, sectionVisibility],
+  );
 
-  function toggleSection(section: string, on: boolean) {
-    setActiveSection(on ? section : null);
-    setSectionVisibility((v) => {
-      if (!on) return { ...v, [section]: {} };
-      const def = sections.find((s) => s.label === section);
-      // A section with exactly one item has nothing to choose between — the
-      // section switch itself is the layer switch, so skip the sub-toggle.
-      const initial =
-        def && def.mode === "multi" && def.items.length === 1
-          ? { [def.items[0].key]: true }
-          : (v[section] ?? {});
-      return { ...v, [section]: initial };
-    });
-  }
+  const toggleSection = useCallback(
+    (section: string, on: boolean) => {
+      setActiveSection(on ? section : null);
+      setSectionVisibility((v) => {
+        if (!on) return { ...v, [section]: {} };
+        const def = sections.find((s) => s.label === section);
+        // A section with exactly one item has nothing to choose between — the
+        // section switch itself is the layer switch, so skip the sub-toggle.
+        const initial =
+          def && def.mode === "multi" && def.items.length === 1
+            ? { [def.items[0].key]: true }
+            : (v[section] ?? {});
+        return { ...v, [section]: initial };
+      });
+    },
+    [sections],
+  );
 
-  function toggleItem(key: string) {
-    if (!activeSection) return;
-    setSectionVisibility((v) => {
-      const current = v[activeSection] ?? {};
-      return { ...v, [activeSection]: { ...current, [key]: !current[key] } };
-    });
-  }
+  const toggleItem = useCallback(
+    (key: string) => {
+      if (!activeSection) return;
+      setSectionVisibility((v) => {
+        const current = v[activeSection] ?? {};
+        return { ...v, [activeSection]: { ...current, [key]: !current[key] } };
+      });
+    },
+    [activeSection],
+  );
 
   // Search result picked: unlike the switches, this has to take the layer from
   // "not even in the open section" to visible in one step — open its section
   // (which, being an accordion, closes whichever was open) and switch it on.
   // Always on, never a toggle: someone who searched for a layer wants to see
   // it, not to turn off the one they just found.
-  function revealLayer(section: string, key: string | null) {
+  const revealLayer = useCallback((section: string, key: string | null) => {
     setActiveSection(section);
     if (key !== null) {
       setSectionVisibility((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [key]: true } }));
     }
     setMobileSheet(null);
-  }
+  }, []);
 
-  function changeRasterYear(sectionId: string, year: number) {
+  const changeRasterYear = useCallback((sectionId: string, year: number) => {
     setRasterYear((y) => ({ ...y, [sectionId]: year }));
-  }
+  }, []);
 
   // The open section's switched-on rows, split back into the two things the
-  // map takes: overlay keys, and ids of the permissioned `layers` rows.
-  const overlays: Record<string, boolean> = {};
-  const visibility: Record<number, boolean> = {};
-  for (const [key, on] of Object.entries(activeKeys)) {
-    if (!on) continue;
-    const layerId = layerIdOf(key);
-    if (layerId === null) overlays[key] = true;
-    else visibility[layerId] = true;
-  }
+  // map takes: overlay keys, and ids of the permissioned `layers` rows. Both
+  // are Map props, so they are rebuilt only when the switches actually change
+  // — a new object every render would re-run the map's source and filter
+  // effects for nothing.
+  const { overlays, visibility } = useMemo(() => {
+    const overlayKeys: Record<string, boolean> = {};
+    const layerIds: Record<number, boolean> = {};
+    for (const [key, on] of Object.entries(activeKeys)) {
+      if (!on) continue;
+      const layerId = layerIdOf(key);
+      if (layerId === null) overlayKeys[key] = true;
+      else layerIds[layerId] = true;
+    }
+    return { overlays: overlayKeys, visibility: layerIds };
+  }, [activeKeys]);
 
-  const visibleFeatures = (layers ?? EMPTY).features.filter((f) => visibility[f.properties.id]);
+  const visibleFeatures = useMemo(
+    () => (layers ?? EMPTY).features.filter((f) => visibility[f.properties.id]),
+    [layers, visibility],
+  );
 
-  const openSection: SectionDef | undefined = sections.find((s) => s.label === activeSection);
+  const openSection: SectionDef | undefined = useMemo(
+    () => sections.find((s) => s.label === activeSection),
+    [sections, activeSection],
+  );
 
   // A raster section is "on" simply by being the open one — it has a single
   // layer, so the section switch is the layer switch.
@@ -181,28 +210,43 @@ export function MapDashboard() {
     : null;
   const selectedRaster = rasterSection?.years.find((y) => y.year === selectedYear);
 
-  const forestCoverOverlay: ForestCoverOverlay | null = selectedRaster
-    ? { url: overlayDataUrl(selectedRaster.key), bounds: selectedRaster.bounds, visible: true }
-    : null;
+  const forestCoverOverlay: ForestCoverOverlay | null = useMemo(
+    () =>
+      selectedRaster
+        ? { url: overlayDataUrl(selectedRaster.key), bounds: selectedRaster.bounds, visible: true }
+        : null,
+    [selectedRaster],
+  );
 
-  const legendRasterLayers = rasterSection ? [{ id: rasterSection.id, name: rasterSection.label }] : [];
+  const legendRasterLayers = useMemo(
+    () => (rasterSection ? [{ id: rasterSection.id, name: rasterSection.label }] : []),
+    [rasterSection],
+  );
 
-  const statsRasterLayers: StatsRasterLayer[] = rasterSection
-    ? [
-        {
-          id: rasterSection.id,
-          name: rasterSection.label,
-          year: selectedYear,
-          years: rasterSection.years.map((y) => y.year),
-        },
-      ]
-    : [];
+  const statsRasterLayers: StatsRasterLayer[] = useMemo(
+    () =>
+      rasterSection
+        ? [
+            {
+              id: rasterSection.id,
+              name: rasterSection.label,
+              year: selectedYear,
+              years: rasterSection.years.map((y) => y.year),
+            },
+          ]
+        : [],
+    [rasterSection, selectedYear],
+  );
 
   // Static overlays carry a colour but no geometry in React state, so the
   // legend takes their swatches straight off the section definition.
-  const legendOverlays: LegendOverlay[] = (openSection?.items ?? [])
-    .filter((item) => overlays[item.key])
-    .map(({ key, label, color, geometryKind }) => ({ key, label, color, geometryKind }));
+  const legendOverlays: LegendOverlay[] = useMemo(
+    () =>
+      (openSection?.items ?? [])
+        .filter((item) => overlays[item.key])
+        .map(({ key, label, color, geometryKind }) => ({ key, label, color, geometryKind })),
+    [openSection, overlays],
+  );
 
   const sidebarSections = (
     <>

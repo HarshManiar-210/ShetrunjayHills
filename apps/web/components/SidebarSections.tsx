@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Layers, type LucideIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -282,7 +283,7 @@ function YearControl({
   );
 }
 
-export function SidebarSections({
+function SidebarSectionsImpl({
   sections,
   activeSection,
   onToggleSection,
@@ -391,3 +392,8 @@ export function SidebarSections({
     </div>
   );
 }
+
+// Memoised because the dashboard re-renders on state this column has nothing
+// to do with — opening the mobile sheet, running the walkthrough, the
+// locked-section dialog — and its props are all stable across those.
+export const SidebarSections = memo(SidebarSectionsImpl);
