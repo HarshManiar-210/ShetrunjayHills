@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"compress/gzip"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,4 +111,124 @@ func TestCORS(t *testing.T) {
 			t.Error("preflight reached the next handler; it should short-circuit")
 		}
 	})
+}
+
+// jsonBody is a handler that writes `body` as JSON — the shape of every
+// compressible response this API actually serves.
+func jsonBody(body string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/geo+json")
+		w.Write([]byte(body))
+	})
+}
+
+func TestGzipCompressesJSON(t *testing.T) {
+	// Repetitive like real GeoJSON, so a failure to compress is unambiguous.
+	body := strings.Repeat(`{"type":"Feature","properties":{},"geometry":null},`, 200)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/overlays/roads/data", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+
+	Gzip(jsonBody(body)).ServeHTTP(rec, req)
+
+	res := rec.Result()
+	if got := res.Header.Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("Content-Encoding = %q, want gzip", got)
+	}
+	if got := res.Header.Get("Vary"); got != "Accept-Encoding" {
+		t.Errorf("Vary = %q, want Accept-Encoding", got)
+	}
+	// A stale Content-Length describing the *uncompressed* body would
+	// truncate the response at the client.
+	if got := res.Header.Get("Content-Length"); got != "" {
+		t.Errorf("Content-Length = %q on an encoded body, want it dropped", got)
+	}
+
+	if rec.Body.Len() >= len(body) {
+		t.Errorf("encoded body is %d bytes, not smaller than the %d-byte original", rec.Body.Len(), len(body))
+	}
+
+	zr, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatalf("body is not a gzip stream: %v", err)
+	}
+	got, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("read gzip body: %v", err)
+	}
+	if string(got) != body {
+		t.Error("decompressed body does not round-trip to the original")
+	}
+}
+
+func TestGzipPassesThrough(t *testing.T) {
+	body := strings.Repeat("x", 4096)
+
+	tests := []struct {
+		name        string
+		acceptEnc   string
+		rangeHeader string
+		contentType string
+	}{
+		// A client that never offered gzip must not be sent it.
+		{name: "no accept-encoding", contentType: "application/geo+json"},
+		{name: "gzip refused", acceptEnc: "gzip;q=0", contentType: "application/geo+json"},
+		// PNG rasters are already compressed — gzip would only cost CPU.
+		{name: "already-compressed type", acceptEnc: "gzip", contentType: "image/png"},
+		// Encoding a body invalidates the byte offsets a range request asked for.
+		{name: "range request", acceptEnc: "gzip", rangeHeader: "bytes=0-99", contentType: "application/geo+json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/overlays/ortho/data", nil)
+			if tt.acceptEnc != "" {
+				req.Header.Set("Accept-Encoding", tt.acceptEnc)
+			}
+			if tt.rangeHeader != "" {
+				req.Header.Set("Range", tt.rangeHeader)
+			}
+			rec := httptest.NewRecorder()
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				w.Write([]byte(body))
+			})
+			Gzip(next).ServeHTTP(rec, req)
+
+			res := rec.Result()
+			if got := res.Header.Get("Content-Encoding"); got != "" {
+				t.Errorf("Content-Encoding = %q, want none", got)
+			}
+			if rec.Body.String() != body {
+				t.Error("body was altered on a pass-through response")
+			}
+			// Set even when nothing was compressed: a cache must not hand an
+			// uncompressed hit to a client that did ask for gzip.
+			if got := res.Header.Get("Vary"); got != "Accept-Encoding" {
+				t.Errorf("Vary = %q, want Accept-Encoding", got)
+			}
+		})
+	}
+}
+
+func TestGzipLeavesBodylessResponsesAlone(t *testing.T) {
+	// A 304 has no body to encode, and ServeFile answers a repeat request for
+	// an unchanged overlay file with exactly this.
+	req := httptest.NewRequest(http.MethodGet, "/api/overlays/roads/data", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+
+	Gzip(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/geo+json")
+		w.WriteHeader(http.StatusNotModified)
+	})).ServeHTTP(rec, req)
+
+	if got := rec.Result().Header.Get("Content-Encoding"); got != "" {
+		t.Errorf("Content-Encoding = %q on a 304, want none", got)
+	}
+	if rec.Body.Len() != 0 {
+		t.Errorf("304 carried a %d-byte body", rec.Body.Len())
+	}
 }
