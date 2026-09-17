@@ -20,17 +20,3 @@ export function boundsOfFeature(feature: GeoJSON.Feature): LngLatBoundsLike | nu
   return hasPoint ? bounds : null;
 }
 
-export function boundsOfCollection(collection: GeoJSON.FeatureCollection): LngLatBoundsLike | null {
-  const bounds = new LngLatBounds();
-  let hasPoint = false;
-
-  for (const feature of collection.features) {
-    const featureBounds = boundsOfFeature(feature);
-    if (featureBounds) {
-      bounds.extend(LngLatBounds.convert(featureBounds));
-      hasPoint = true;
-    }
-  }
-
-  return hasPoint ? bounds : null;
-}

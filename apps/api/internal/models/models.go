@@ -33,7 +33,9 @@ type StaticOverlay struct {
 	// whose data hasn't been delivered yet (no kind/color/file_path).
 	Status string `json:"status"`
 	// MinLon/MinLat/MaxLon/MaxLat (SW/NE corners) place a raster overlay on
-	// the map; nil for vector rows, which carry their own geometry instead.
+	// the map, and give a vector overlay's extent so the frontend can frame a
+	// layer without first downloading its geometry. nil on a 'pending' row,
+	// which has no file to describe.
 	MinLon *float64 `json:"min_lon,omitempty"`
 	MinLat *float64 `json:"min_lat,omitempty"`
 	MaxLon *float64 `json:"max_lon,omitempty"`

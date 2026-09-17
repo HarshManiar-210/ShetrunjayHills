@@ -70,6 +70,10 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(handlers.CORS(corsOrigin))
+	// Ahead of every route: the overlay GeoJSON files are the bulk of what
+	// this API serves and compress several times over, so the download is
+	// what a layer switch mostly waits on.
+	r.Use(handlers.Gzip)
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
 

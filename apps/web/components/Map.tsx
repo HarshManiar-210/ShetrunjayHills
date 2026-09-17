@@ -14,7 +14,7 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
-import { boundsOfFeature, boundsOfCollection } from "@/lib/geo";
+import { boundsOfFeature } from "@/lib/geo";
 import { MapControls } from "@/components/MapControls";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
@@ -358,8 +358,11 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
 // Only ever zooms IN, never out: a layer whose own extent is wider than the
 // current view (e.g. Zone Boundaries' district-wide polygon) must not yank
 // the user out to it.
-function flyToIfCloser(map: MapLibreMap, geojson: GeoJSON.FeatureCollection) {
-  const bounds = boundsOfCollection(geojson);
+//
+// The extent comes from the layer's `static_overlays` row rather than from
+// its geometry, so framing a layer costs nothing and doesn't have to wait on
+// — or even look at — the file itself.
+function flyToIfCloser(map: MapLibreMap, bounds: LngLatBoundsLike | undefined) {
   if (!bounds) return;
   const fitOptions = { padding: 60, maxZoom: 17 };
   const camera = map.cameraForBounds(bounds, fitOptions);
@@ -454,7 +457,10 @@ export default function Map({
   const overlayDefsRef = useRef(overlayDefs);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
-  const overlayCacheRef = useRef<Record<string, GeoJSON.FeatureCollection | "loading">>({});
+  // Keys whose file has been handed to MapLibre. The geometry itself lives in
+  // the worker from then on, so there is nothing to cache here beyond the
+  // fact that we already asked for it.
+  const loadedKeysRef = useRef<Set<string>>(new Set());
   // Keys currently visible, so a fresh off→on transition can be told apart
   // from "still on from last render" — the latter must not re-fly the camera
   // every time some *other* overlay's switch flips (this effect reruns on
@@ -512,15 +518,15 @@ export default function Map({
   // data updates: push into the already-running map without recreating it
   useEffect(() => {
     const map = mapRef.current;
-    if (map && map.isStyleLoaded()) render(map, data, fitOnceRef.current);
-  }, [data]);
+    if (map && mapLoaded) render(map, data, fitOnceRef.current);
+  }, [data, mapLoaded]);
 
   // Forest Cover raster: an image source needs a real image up front (unlike
   // a geojson source there's no "empty" state), so it's added/removed
   // wholesale rather than kept around hidden like the other overlays.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
 
     if (!forestCoverOverlay?.visible) {
       if (map.getLayer(RASTER_OVERLAY_LAYER)) map.removeLayer(RASTER_OVERLAY_LAYER);
@@ -549,7 +555,7 @@ export default function Map({
       source: RASTER_OVERLAY_SOURCE,
       paint: { "raster-opacity": 0.75 },
     });
-  }, [forestCoverOverlay]);
+  }, [forestCoverOverlay, mapLoaded]);
 
   // The overlay-metadata fetch (MapDashboard's fetchOverlays) typically lands
   // after the map's own "load" event, so a def arriving later than mount
@@ -557,18 +563,24 @@ export default function Map({
   // key already present.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
     addOverlaySources(map, overlayDefs);
-  }, [overlayDefs]);
+  }, [overlayDefs, mapLoaded]);
 
-  // static overlays: fetch each file at most once, then just flip
-  // layout visibility — cheap and immune to rapid on/off clicking. Flies to
-  // the layer's own data on every off→on transition (not just the first
-  // ever fetch) — see flyToIfCloser — so switching a layer back on always
-  // takes you back to where it actually is.
+  // static overlays: each file is handed to MapLibre once, as a URL rather
+  // than as parsed GeoJSON. That hands the fetch, the JSON parse and the
+  // tile indexing to MapLibre's own worker, so none of it runs on the main
+  // thread — which for files this size (Streams and Watersheds are tens of
+  // megabytes, the tree survey far more) is the difference between a switch
+  // that responds and a tab that locks up until the parse finishes.
+  //
+  // After that first load a switch is pure layout visibility: cheap, and
+  // immune to rapid on/off clicking. Flies to the layer's extent on every
+  // off→on transition (not just the first) — see flyToIfCloser — so
+  // switching a layer back on always takes you back to where it actually is.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || !overlays) return;
+    if (!map || !mapLoaded || !overlays) return;
 
     for (const def of overlayDefs) {
       const sourceId = `overlay-${def.key}`;
@@ -576,21 +588,19 @@ export default function Map({
       if (!source) continue;
 
       const visible = Boolean(overlays[def.key]);
-      const cached = overlayCacheRef.current[def.key];
       const justShown = visible && !shownKeysRef.current.has(def.key);
 
-      if (visible && !cached) {
-        overlayCacheRef.current[def.key] = "loading";
+      if (visible && !loadedKeysRef.current.has(def.key)) {
+        // Marked before the load rather than after, so a re-render mid-load
+        // doesn't start the same fetch a second time.
+        loadedKeysRef.current.add(def.key);
         setLoadingOverlays((s) => new Set(s).add(def.key));
-        fetch(def.url)
-          .then((res) => res.json())
-          .then((geojson: GeoJSON.FeatureCollection) => {
-            overlayCacheRef.current[def.key] = geojson;
-            map.getSource<GeoJSONSource>(sourceId)?.setData(geojson);
-            flyToIfCloser(map, geojson);
-          })
+        source
+          .setData(def.url, true)
           .catch(() => {
-            delete overlayCacheRef.current[def.key];
+            // Forget it, so flipping the switch off and on retries rather
+            // than leaving the layer permanently empty.
+            loadedKeysRef.current.delete(def.key);
           })
           .finally(() => {
             setLoadingOverlays((s) => {
@@ -599,10 +609,11 @@ export default function Map({
               return next;
             });
           });
-      } else if (visible && cached && cached !== "loading") {
-        source.setData(cached);
-        if (justShown) flyToIfCloser(map, cached);
       }
+
+      // Framed from the seeded extent, so the camera moves the instant the
+      // switch is flipped rather than after the geometry has arrived.
+      if (justShown) flyToIfCloser(map, def.bounds);
 
       if (visible) shownKeysRef.current.add(def.key);
       else shownKeysRef.current.delete(def.key);
@@ -611,14 +622,14 @@ export default function Map({
         if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     }
-  }, [overlays, overlayDefs]);
+  }, [overlays, overlayDefs, mapLoaded]);
 
   // visibility toggles: filter, never re-fetch or refit. No layer is
   // selected by default, so this shows only ids explicitly switched on
   // rather than hiding ids explicitly switched off.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !mapLoaded) return;
     const visibleIds = Object.entries(visibility)
       .filter(([, visible]) => visible)
       .map(([id]) => Number(id));
@@ -630,7 +641,7 @@ export default function Map({
     // filtering the feature out can't hide it — switching a layer off would
     // otherwise leave its popup floating over nothing.
     popupRef.current?.remove();
-  }, [visibility]);
+  }, [visibility, mapLoaded]);
 
   useEffect(() => {
     const media = window.matchMedia?.(REDUCED_MOTION_QUERY);

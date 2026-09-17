@@ -63,6 +63,11 @@ CREATE TABLE static_overlays (
     file_path  TEXT NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     status     TEXT NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'pending')),
+    -- SW/NE corners. For a raster row this is where the image is placed on the
+    -- map. For a vector row it is the extent of the geometry in file_path,
+    -- which is what lets the frontend frame a layer it has switched on without
+    -- first downloading and parsing the file to find out where it is. NULL on
+    -- a 'pending' row, which has no file to describe.
     min_lon    DOUBLE PRECISION,
     min_lat    DOUBLE PRECISION,
     max_lon    DOUBLE PRECISION,
@@ -170,16 +175,16 @@ WHERE
 -- apps/vector-data and apps/raster-data.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
-    ('streams',        'Streams',            'Watershed Analysis', 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           1),
-    ('watershed',      'Watershed',          'Watershed Analysis', 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2),
-    ('roads',          'Roads',              'Base Layers',        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1),
-    ('rivers',         'Rivers',             'Base Layers',        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2),
-    ('villages',       'Village Boundaries', 'Base Layers',        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3),
-    ('zoneBoundaries', 'Zone Boundaries',    'Base Layers',        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4),
-    ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5),
-    ('forestBoundary', 'Forest Boundary',    'Forest Boundary',    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1),
-    ('cadastralMap',   'Cadastral Map',      'Cadastral Map',      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1);
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('streams',        'Streams',            'Watershed Analysis', 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           1, 71.728181, 21.451841, 71.822926, 21.512506),
+    ('watershed',      'Watershed',          'Watershed Analysis', 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2, 71.728179, 21.451808, 71.822433, 21.512483),
+    ('roads',          'Roads',              'Base Layers',        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
+    ('rivers',         'Rivers',             'Base Layers',        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
+    ('villages',       'Village Boundaries', 'Base Layers',        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
+    ('zoneBoundaries', 'Zone Boundaries',    'Base Layers',        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
+    ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('forestBoundary', 'Forest Boundary',    'Forest Boundary',    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
+    ('cadastralMap',   'Cadastral Map',      'Cadastral Map',      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
 
 -- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
 -- client's full 856,700-point survey, served as-is (client wants the real
@@ -187,9 +192,9 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
 -- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
 -- file_path stay unset until a follow-up row update supplies real data, no
 -- code change required either way.
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
-    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available'),
-    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                2, 'pending');
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
+    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
 
 INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
@@ -239,12 +244,12 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
 -- flat vector-section pattern as Forest Boundary/Cadastral Map. Mati Pala
 -- hasn't arrived yet, so it's seeded 'pending' like Tree Species above.
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
-    ('causeway',      'Causeway',      'SMC', 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1),
-    ('checkDam',      'Check Dam',     'SMC', 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2),
-    ('fireline',      'Fireline',      'SMC', 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3),
-    ('potentialSmc',  'Potential SMC', 'SMC', 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4),
-    ('vantalawadi',   'Vantalawadi',   'SMC', 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5);
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('causeway',      'Causeway',      'SMC', 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1, 71.728402, 21.450967, 71.820940, 21.505128),
+    ('checkDam',      'Check Dam',     'SMC', 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2, 71.737601, 21.456108, 71.821241, 21.509884),
+    ('fireline',      'Fireline',      'SMC', 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
+    ('potentialSmc',  'Potential SMC', 'SMC', 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4, 71.730361, 21.458173, 71.820895, 21.502023),
+    ('vantalawadi',   'Vantalawadi',   'SMC', 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5, 71.733656, 21.463890, 71.819923, 21.510452);
 
 INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
     ('matiPala', 'Mati Pala', 'SMC', 'vector', NULL, NULL, '', 6, 'pending');
@@ -295,12 +300,12 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
 -- geology-themed vector layers, each its own one-layer section (same flat
 -- pattern as Forest Boundary/Cadastral Map above) - no handler or component
 -- code needed.
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order) VALUES
-    ('dyke',          'Dyke',          'Dyke',          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1),
-    ('geology',       'Geology',       'Geology',       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1),
-    ('geomorphology', 'Geomorphology', 'Geomorphology', 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1),
-    ('greenwash',     'Greenwash',     'Greenwash',     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1),
-    ('lineament',     'Lineament',     'Lineament',     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1);
+INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('dyke',          'Dyke',          'Dyke',          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1, 71.753944, 21.453344, 71.819504, 21.498314),
+    ('geology',       'Geology',       'Geology',       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('geomorphology', 'Geomorphology', 'Geomorphology', 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('greenwash',     'Greenwash',     'Greenwash',     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
+    ('lineament',     'Lineament',     'Lineament',     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
