@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
@@ -29,6 +30,7 @@ import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/laye
 import { fetchOverlays, overlayDataUrl, type OverlayMeta } from "@/lib/overlays-api";
 import { vectorOverlayDefs } from "@/lib/static-overlays";
 import { buildSections, layerIdOf, type SectionDef } from "@/lib/sections";
+import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
 import type { LegendOverlay } from "@/components/LegendCard";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { ForestCoverOverlay } from "@/components/Map";
@@ -50,6 +52,7 @@ export function MapDashboard() {
   const [error, setError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
+  const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
   const [tourOpen, setTourOpen] = useState(false);
 
   // Accordion: at most one section is on at a time, and only that section's
@@ -320,6 +323,13 @@ export function MapDashboard() {
               forestCoverOverlay={forestCoverOverlay}
               overlays={overlays}
               overlayDefs={overlayDefs}
+              basemap={basemap}
+            />
+
+            <BasemapSwitcher
+              value={basemap}
+              onChange={setBasemap}
+              className="absolute top-3 right-3 z-10"
             />
           </div>
 

@@ -15,6 +15,14 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
+import {
+  BASEMAP_LAYER_IDS,
+  DEFAULT_BASEMAP,
+  basemapById,
+  basemapLayers,
+  basemapSources,
+  type BasemapId,
+} from "@/lib/basemaps";
 import { MapControls } from "@/components/MapControls";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
@@ -95,8 +103,6 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia?.(REDUCED_MOTION_QUERY).matches ?? false;
 }
 
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-
 // MapLibre's built-in attribution control is a native <details>/<summary>
 // element that opens itself on first paint no matter what options it's
 // given — there's no way to start it closed short of fighting its internal
@@ -128,6 +134,11 @@ class CompactAttribution implements IControl {
     this.container.append(button, this.inner);
   }
 
+  /** Swapped when the basemap changes — each provider credits differently. */
+  setHTML(html: string): void {
+    this.inner.innerHTML = html;
+  }
+
   onAdd(): HTMLElement {
     return this.container;
   }
@@ -137,28 +148,19 @@ class CompactAttribution implements IControl {
   }
 }
 
-function mapStyle() {
+// All three basemaps are declared up front and switched by visibility — see
+// lib/basemaps.ts for why that beats map.setStyle().
+function mapStyle(basemap: BasemapId) {
   return {
     version: 8 as const,
-    sources: {
-      basemap: {
-        type: "raster" as const,
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: ATTRIBUTION,
-      },
-    },
+    sources: basemapSources(),
     layers: [
       {
         id: "background",
         type: "background" as const,
         paint: { "background-color": MAP_BACKGROUND },
       },
-      {
-        id: "basemap",
-        type: "raster" as const,
-        source: "basemap",
-      },
+      ...basemapLayers(basemap),
     ],
   };
 }
@@ -449,6 +451,7 @@ export default function Map({
   forestCoverOverlay,
   overlays,
   overlayDefs = [],
+  basemap = DEFAULT_BASEMAP,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -457,6 +460,8 @@ export default function Map({
   overlays?: Record<string, boolean>;
   /** Vector static-overlay defs (key/color/kind), derived from the API's overlay metadata. */
   overlayDefs?: OverlayDef[];
+  /** Which basemap is active. See lib/basemaps.ts. */
+  basemap?: BasemapId;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -467,6 +472,12 @@ export default function Map({
   const overlayDefsRef = useRef(overlayDefs);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
+  const attributionRef = useRef<CompactAttribution | null>(null);
+  // Read by the mount effect, which must build the initial style with
+  // whatever basemap is selected *now*. It is deliberately not a dependency
+  // of that effect — a change is applied by the visibility effect below,
+  // which does not rebuild the map.
+  const basemapRef = useRef(basemap);
   // Keys whose file has been handed to MapLibre. The geometry itself lives in
   // the worker from then on, so there is nothing to cache here beyond the
   // fact that we already asked for it.
@@ -492,20 +503,25 @@ export default function Map({
     overlayDefsRef.current = overlayDefs;
   }, [overlayDefs]);
 
+  useEffect(() => {
+    basemapRef.current = basemap;
+  }, [basemap]);
+
   // map lifecycle: create once, tear down on unmount
   useEffect(() => {
     if (!containerRef.current) return;
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: mapStyle(),
+      style: mapStyle(basemapRef.current),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
       attributionControl: false,
     });
     mapRef.current = map;
 
-    const attribution = new CompactAttribution(ATTRIBUTION);
+    const attribution = new CompactAttribution(basemapById(basemapRef.current).attribution);
+    attributionRef.current = attribution;
     // bottom-right: the map controls dock bottom-left, so sharing that corner
     // would stack the attribution button on top of them.
     map.addControl(attribution, "bottom-right");
@@ -530,6 +546,25 @@ export default function Map({
     const map = mapRef.current;
     if (map && mapLoaded) render(map, data, fitOnceRef.current);
   }, [data, mapLoaded]);
+
+  // Basemap switch. Pure layout visibility over layers that are all already
+  // in the style, so nothing the dashboard has added is disturbed —
+  // map.setStyle() would drop every overlay source, every loaded geometry and
+  // the raster image layer, and they would all have to be rebuilt.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const shown = new Set(basemapById(basemap).layers);
+    for (const layerId of BASEMAP_LAYER_IDS) {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", shown.has(layerId) ? "visible" : "none");
+      }
+    }
+    // Esri and OpenStreetMap require different credits, and only the visible
+    // one may be shown.
+    attributionRef.current?.setHTML(basemapById(basemap).attribution);
+  }, [basemap, mapLoaded]);
 
   // Forest Cover raster: an image source needs a real image up front (unlike
   // a geojson source there's no "empty" state), so it's added/removed
