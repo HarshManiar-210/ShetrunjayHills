@@ -341,19 +341,33 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
     ('matiPala', 'Matipala', grp('existing-water-conservation'), 'vector', NULL, NULL, '', 6, 'pending');
 
--- Single-image drone themes: each is its own one-raster section (single
--- on/off switch, no year dropdown — see sections.ts's yearOf index fallback
--- and SidebarSections.tsx's years.length > 1 check), same flat pattern as
--- Forest Boundary/Cadastral Map above. Ortho needs no legend entry (RGB
--- band composition, not discrete classes); DSM/DTM/CHM/Slope/Aspect's
--- legends were already seeded in legend-config.ts ahead of this delivery.
+-- Single-image drone themes: each is its own one-raster group (single on/off
+-- switch, no year picker), which keeps the rule that a group holding rasters
+-- holds exactly one theme's. Ortho needs no legend entry (RGB band
+-- composition, not discrete classes); DSM/DTM/CHM/Slope/Aspect's legends were
+-- already seeded in legend-config.ts ahead of this delivery.
+--
+-- The extents below were corrected by tools/prepare-drone-rasters.py, which
+-- also rewrote the served PNGs. As delivered, each PNG padded its irregular
+-- footprint out to a rectangle with opaque white while these bounds described
+-- the footprint — so MapLibre stretched the padded canvas to fit the
+-- footprint's box, squeezing the imagery about 29% and painting a white
+-- rectangle over the basemap ("some images look like shrunk from the sides").
+-- All six share one 31068x16641 grid but carried four different extents; they
+-- now agree to within ~40 m north and ~200 m east, and each box matches its
+-- image's aspect exactly, so nothing is distorted.
+--
+-- These are still derived from the delivered numbers, which are the only
+-- georeferencing this imagery has — no GeoTIFF or world file was supplied.
+-- Ask the client for one to place these properly, and before building any
+-- tile pyramid, which would bake the current placement in.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
-    ('dsm',   'Digital Surface Model (DSM)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282),
-    ('dtm',   'Digital Terrain Model (DTM)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.727678,           21.452812,           71.823913,           21.512044),
-    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.727678,           21.452812,           71.823913,           21.512044),
-    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.727678,        21.452812,           71.823913,           21.512044),
-    ('chm',   'Canopy Height Model (CHM)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.727066,           21.452069,           71.823365,           21.512053);
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    ('dsm',   'Digital Surface Model (DSM)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4547790, 71.8240547, 21.5129591),
+    ('dtm',   'Digital Terrain Model (DTM)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
+    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
+    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4551430, 71.8234229, 21.5120913),
+    ('chm',   'Canopy Height Model (CHM)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4558151, 71.8229114, 21.5120633);
 
 -- LULC-Drone: legend and extent were delivered, but the actual raster image
 -- wasn't among the new files — seeded 'pending' like Mati Pala/Tree Species
