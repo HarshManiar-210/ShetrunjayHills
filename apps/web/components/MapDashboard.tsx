@@ -467,20 +467,24 @@ export function MapDashboard() {
   // The legend is what makes the map readable, so it should never be the thing
   // you switch away from to check a number.
   const infoPanel = (className?: string) => (
-    <div className={cn("flex min-h-0 flex-col gap-2 overflow-y-auto scrollbar-thin", className)}>
-      {/* Both shrink-0: letting the legend give way squeezed it down to its
-          own title bar as soon as two rasters were on. The column scrolls
-          instead, so each card keeps its full height. */}
+    <div className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
+      {/* Each card scrolls its own body rather than the column scrolling as a
+          whole, so the two headers stay put and a long legend never pushes
+          the statistics out of reach.
+          `flex-1 min-h-0` lets a card give up height when the other needs it
+          — that is what makes its body scroll — while `max-h-fit` stops it
+          claiming more than its content, so a short legend does not sit in
+          half the column with empty space under it. */}
       <LegendCard
         layers={visibleFeatures}
         overlays={legendOverlays}
         rasterLayers={legendRasterLayers}
-        className="shrink-0"
+        className="min-h-0 max-h-fit flex-1"
       />
       <StatsCard
         rasterLayers={statsRasterLayers}
         vectorFeatures={visibleFeatures}
-        className="shrink-0"
+        className="min-h-0 max-h-fit flex-1"
       />
     </div>
   );

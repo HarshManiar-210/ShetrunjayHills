@@ -297,7 +297,7 @@ export function StatsCard({
       </div>
 
       {!collapsed && (
-        <div className="min-h-0 overflow-y-auto px-(--card-spacing) scrollbar-thin">
+        <div className="min-h-0 flex-1 overflow-y-auto px-(--card-spacing) scrollbar-thin">
           <StatsPanel rasterLayers={rasterLayers} vectorFeatures={vectorFeatures} />
         </div>
       )}

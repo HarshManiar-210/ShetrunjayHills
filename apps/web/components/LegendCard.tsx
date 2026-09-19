@@ -205,7 +205,7 @@ export function LegendCard({
       </div>
 
       {!collapsed && (
-        <div className="min-h-0 overflow-y-auto px-(--card-spacing) scrollbar-thin">
+        <div className="min-h-0 flex-1 overflow-y-auto px-(--card-spacing) scrollbar-thin">
           <LegendContent layers={layers} overlays={overlays} rasterLayers={rasterLayers} />
         </div>
       )}
