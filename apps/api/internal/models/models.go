@@ -40,4 +40,11 @@ type StaticOverlay struct {
 	MinLat *float64 `json:"min_lat,omitempty"`
 	MaxLon *float64 `json:"max_lon,omitempty"`
 	MaxLat *float64 `json:"max_lat,omitempty"`
+	// SizeBytes is the asset's size on disk, filled in by the Overlays
+	// handler rather than stored in the DB — statting the file cannot drift
+	// out of step with it the way a seeded column would. Lets the frontend
+	// warn before someone switches on a layer big enough to stall their tab
+	// (the tree survey is ~166 MB) without hardcoding which keys are heavy.
+	// 0 for a 'pending' row, which has no file.
+	SizeBytes int64 `json:"size_bytes,omitempty"`
 }

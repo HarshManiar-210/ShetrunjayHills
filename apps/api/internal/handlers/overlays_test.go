@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -46,7 +47,7 @@ func TestOverlays(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/overlays", nil)
 			w := httptest.NewRecorder()
 
-			Overlays(tc.repo)(w, req)
+			Overlays(tc.repo, t.TempDir())(w, req)
 
 			if w.Code != tc.wantStatus {
 				t.Fatalf("status = %d, want %d", w.Code, tc.wantStatus)
@@ -63,6 +64,51 @@ func TestOverlays(t *testing.T) {
 				t.Errorf("len(overlays) = %d, want %d", len(got), tc.wantCount)
 			}
 		})
+	}
+}
+
+// Size is measured off disk rather than read from the DB, so it has to be
+// right for a real file, absent for a row whose file has not been delivered,
+// and absent (not an error) for a path that no longer exists.
+func TestOverlaysStampsAssetSize(t *testing.T) {
+	dataRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dataRoot, "vector-data"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	body := []byte(`{"type":"FeatureCollection","features":[]}`)
+	if err := os.WriteFile(filepath.Join(dataRoot, "vector-data", "Roads.geojson"), body, 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	repo := fakeOverlaysGetter{overlays: []models.StaticOverlay{
+		{Key: "roads", FilePath: "vector-data/Roads.geojson"},
+		{Key: "pending", FilePath: ""},
+		{Key: "missing", FilePath: "vector-data/NotDelivered.geojson"},
+	}}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/overlays", nil)
+	w := httptest.NewRecorder()
+	Overlays(repo, dataRoot)(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+
+	var got []models.StaticOverlay
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	want := map[string]int64{"roads": int64(len(body)), "pending": 0, "missing": 0}
+	for _, o := range got {
+		if o.SizeBytes != want[o.Key] {
+			t.Errorf("%s size_bytes = %d, want %d", o.Key, o.SizeBytes, want[o.Key])
+		}
+	}
+
+	// file_path is json:"-" and must stay server-side whatever else changes.
+	if bytes.Contains(w.Body.Bytes(), []byte("vector-data")) {
+		t.Error("response leaked a filesystem path")
 	}
 }
 

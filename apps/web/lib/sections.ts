@@ -54,14 +54,31 @@ export type SectionAccent =
   | "fauna"
   | "carbon";
 
-/** Toggle keys for the permissioned `layers` rows are prefixed to keep them
- *  apart from overlay keys in one flat per-section visibility map. */
+/**
+ * Visibility is one flat map of toggle key → on, covering every layer in the
+ * sidebar at once (any number may be switched on). Three kinds of thing share
+ * that namespace, so two of them are prefixed to keep them apart:
+ *
+ *   `<overlay key>`   a vector static overlay — the row's own key
+ *   `raster:<slug>`   a raster theme, keyed by its section, not by year:
+ *                     the year is a separate choice made in `rasterYear`
+ *   `layer:<id>`      a role-permissioned `layers` row
+ */
 const LAYER_PREFIX = "layer:";
+const RASTER_PREFIX = "raster:";
 
 export function layerIdOf(key: string): number | null {
   return key.startsWith(LAYER_PREFIX)
     ? Number(key.slice(LAYER_PREFIX.length))
     : null;
+}
+
+export function rasterToggleKey(sectionId: string): string {
+  return `${RASTER_PREFIX}${sectionId}`;
+}
+
+export function isRasterToggleKey(key: string): boolean {
+  return key.startsWith(RASTER_PREFIX);
 }
 
 export interface SectionItem {
@@ -269,4 +286,24 @@ export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
   }
 
   return sections;
+}
+
+/**
+ * The toggle keys a section's header switch owns — one for a raster theme,
+ * one per deliverable item for a multi-layer section. Pending items are left
+ * out: they have no data, so "switch the whole section on" must not claim to
+ * have turned them on.
+ */
+export function sectionToggleKeys(section: SectionDef): string[] {
+  if (section.mode === "layer") return [rasterToggleKey(section.id)];
+  return section.items.filter((item) => !item.pending).map((item) => item.key);
+}
+
+/**
+ * Whether a section has anything to show when expanded. A raster theme with a
+ * single image and a section with a single layer are both fully expressed by
+ * the header switch alone, so neither gets a disclosure chevron.
+ */
+export function sectionIsExpandable(section: SectionDef): boolean {
+  return section.mode === "layer" ? section.years.length > 1 : section.items.length > 1;
 }

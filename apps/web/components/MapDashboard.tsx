@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { Sidebar } from "@/components/Sidebar";
@@ -29,21 +30,47 @@ import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
 import { fetchOverlays, overlayDataUrl, type OverlayMeta } from "@/lib/overlays-api";
 import { vectorOverlayDefs } from "@/lib/static-overlays";
-import { buildSections, layerIdOf, type SectionDef } from "@/lib/sections";
+import {
+  buildSections,
+  isRasterToggleKey,
+  layerIdOf,
+  rasterToggleKey,
+  sectionToggleKeys,
+  slugify,
+} from "@/lib/sections";
 import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
 import type { LegendOverlay } from "@/components/LegendCard";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
-import type { ForestCoverOverlay } from "@/components/Map";
+import type { RasterOverlay } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
-// Shared rather than a fresh `{}`, so a section with nothing switched on
-// doesn't hand the sidebar and the map a new object on every render.
-const EMPTY_KEYS: Record<string, boolean> = {};
-
 type MobileSheet = "menu" | "legend" | null;
+
+/**
+ * Above this, switching a layer on prompts first. The study's tree survey is
+ * ~166 MB of GeoJSON and will stall a tab for a while; Streams and Watersheds
+ * at ~20 MB are slow but fine, so the line sits above them. Sizes come from
+ * the API, which stats the files, so no layer is named here.
+ */
+const HEAVY_LAYER_BYTES = 50 * 1024 * 1024;
+
+/** What a raster theme draws at until the opacity control lands. */
+const DEFAULT_RASTER_OPACITY = 0.75;
+
+interface HeavyLayer {
+  key: string;
+  label: string;
+  sizeBytes: number;
+  /** Every key the confirmed action should switch on — a whole section, or one row. */
+  keys?: string[];
+}
+
+function formatMb(bytes: number): string {
+  return `${Math.round(bytes / 1_000_000)} MB`;
+}
 
 export function MapDashboard() {
   const auth = useAuthState();
@@ -55,14 +82,24 @@ export function MapDashboard() {
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
   const [tourOpen, setTourOpen] = useState(false);
 
-  // Accordion: at most one section is on at a time, and only that section's
-  // switched-on layers draw. Each section keeps its own item state so
-  // reopening it restores what was on, rather than resurrecting switches that
-  // look checked while their section is off.
-  const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [sectionVisibility, setSectionVisibility] = useState<Record<string, Record<string, boolean>>>({});
+  // One flat map of toggle key → on, covering every layer in the sidebar:
+  // any number, from any number of sections, draw at once. See lib/sections.ts
+  // for the key namespace. Nothing is on by default.
+  const [visible, setVisible] = useState<Record<string, boolean>>({});
+
+  // Which section boxes are expanded. Disclosure only — a collapsed section's
+  // layers keep drawing, which is the whole point of separating the two now
+  // that visibility is no longer an accordion.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
-  const [lockedPromptSection, setLockedPromptSection] = useState<string | null>(null);
+
+  // A layer big enough to be worth warning about, waiting on confirmation.
+  const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
+  // Heavy layers the user has already accepted this session, so flipping one
+  // off and on again does not re-prompt. A ref, not state: nothing renders
+  // from it, and it must not trigger a re-render when it grows.
+  const confirmedHeavyRef = useRef<Set<string>>(new Set());
 
   const token = getToken();
 
@@ -125,130 +162,170 @@ export function MapDashboard() {
   const sections = useMemo(() => buildSections(overlayMeta), [overlayMeta]);
   const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
 
-  // No layer is visible by default — one only draws once its section is on and
-  // its own switch is turned on.
-  const activeKeys = useMemo(
-    () => (activeSection && sectionVisibility[activeSection]) || EMPTY_KEYS,
-    [activeSection, sectionVisibility],
+  // Size per toggle key, so the heavy-layer warning is driven by what the
+  // files actually weigh (the API stats them — see handlers/overlays.go)
+  // rather than by a hardcoded list of which layers are big.
+  // A plain record rather than a Map: the dynamic import above is named
+  // `Map`, so the global constructor is not reachable by that name here.
+  const heavyLayers = useMemo(() => {
+    const byKey: Record<string, HeavyLayer> = {};
+    for (const overlay of overlayMeta) {
+      const size = overlay.size_bytes ?? 0;
+      if (size < HEAVY_LAYER_BYTES) continue;
+      const key =
+        overlay.asset_type === "raster" ? rasterToggleKey(slugify(overlay.section)) : overlay.key;
+      // A raster theme is keyed by section, so its years collapse onto one
+      // entry — warn with the largest of them.
+      if (byKey[key] && byKey[key].sizeBytes >= size) continue;
+      byKey[key] = { key, label: overlay.label, sizeBytes: size };
+    }
+    return byKey;
+  }, [overlayMeta]);
+
+  const setKeysVisible = useCallback((keys: string[], on: boolean) => {
+    setVisible((v) => {
+      const next = { ...v };
+      for (const key of keys) next[key] = on;
+      return next;
+    });
+  }, []);
+
+  // Switching a layer *on* is the only direction that can cost anything, so
+  // that is the only direction the size warning gates. Turning things off,
+  // and anything already confirmed, goes straight through.
+  const requestKeys = useCallback(
+    (keys: string[], on: boolean) => {
+      if (!on) {
+        setKeysVisible(keys, false);
+        return;
+      }
+      const heavy = keys.map((k) => heavyLayers[k]).find(Boolean);
+      if (heavy && !confirmedHeavyRef.current.has(heavy.key)) {
+        setHeavyPrompt({ ...heavy, keys });
+        return;
+      }
+      setKeysVisible(keys, true);
+    },
+    [heavyLayers, setKeysVisible],
   );
+
+  const confirmHeavy = useCallback(() => {
+    if (!heavyPrompt) return;
+    // Remembered for the session: having said yes once, flipping the same
+    // layer off and on again should not ask a second time.
+    confirmedHeavyRef.current.add(heavyPrompt.key);
+    setKeysVisible(heavyPrompt.keys ?? [heavyPrompt.key], true);
+    setHeavyPrompt(null);
+  }, [heavyPrompt, setKeysVisible]);
 
   const toggleSection = useCallback(
     (section: string, on: boolean) => {
-      setActiveSection(on ? section : null);
-      setSectionVisibility((v) => {
-        if (!on) return { ...v, [section]: {} };
-        const def = sections.find((s) => s.label === section);
-        // A section with exactly one item has nothing to choose between — the
-        // section switch itself is the layer switch, so skip the sub-toggle.
-        const initial =
-          def && def.mode === "multi" && def.items.length === 1
-            ? { [def.items[0].key]: true }
-            : (v[section] ?? {});
-        return { ...v, [section]: initial };
-      });
+      const def = sections.find((s) => s.label === section);
+      if (def) requestKeys(sectionToggleKeys(def), on);
     },
-    [sections],
+    [sections, requestKeys],
   );
 
   const toggleItem = useCallback(
-    (key: string) => {
-      if (!activeSection) return;
-      setSectionVisibility((v) => {
-        const current = v[activeSection] ?? {};
-        return { ...v, [activeSection]: { ...current, [key]: !current[key] } };
-      });
-    },
-    [activeSection],
+    (key: string) => requestKeys([key], !visible[key]),
+    [requestKeys, visible],
   );
 
-  // Search result picked: unlike the switches, this has to take the layer from
-  // "not even in the open section" to visible in one step — open its section
-  // (which, being an accordion, closes whichever was open) and switch it on.
-  // Always on, never a toggle: someone who searched for a layer wants to see
-  // it, not to turn off the one they just found.
-  const revealLayer = useCallback((section: string, key: string | null) => {
-    setActiveSection(section);
-    if (key !== null) {
-      setSectionVisibility((v) => ({ ...v, [section]: { ...(v[section] ?? {}), [key]: true } }));
-    }
-    setMobileSheet(null);
+  const toggleExpanded = useCallback((section: string) => {
+    setExpanded((e) => ({ ...e, [section]: !e[section] }));
   }, []);
+
+  // Search result picked: switch that layer on and open its section so the
+  // row is visible in the sidebar. Always on, never a toggle — someone who
+  // searched for a layer wants to see it, not to turn off what they found.
+  const revealLayer = useCallback(
+    (section: string, key: string) => {
+      setExpanded((e) => ({ ...e, [section]: true }));
+      requestKeys([key], true);
+      setMobileSheet(null);
+    },
+    [requestKeys],
+  );
 
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
     setRasterYear((y) => ({ ...y, [sectionId]: year }));
   }, []);
 
-  // The open section's switched-on rows, split back into the two things the
-  // map takes: overlay keys, and ids of the permissioned `layers` rows. Both
-  // are Map props, so they are rebuilt only when the switches actually change
-  // — a new object every render would re-run the map's source and filter
-  // effects for nothing.
+  // Everything switched on, split back into what the map takes: vector
+  // overlay keys, and ids of the permissioned `layers` rows. Raster themes
+  // are handled separately below — they share the visibility map but are not
+  // geojson. Both results are Map props, so they are rebuilt only when the
+  // switches actually change; a new object every render would re-run the
+  // map's source and filter effects for nothing.
   const { overlays, visibility } = useMemo(() => {
     const overlayKeys: Record<string, boolean> = {};
     const layerIds: Record<number, boolean> = {};
-    for (const [key, on] of Object.entries(activeKeys)) {
-      if (!on) continue;
+    for (const [key, on] of Object.entries(visible)) {
+      if (!on || isRasterToggleKey(key)) continue;
       const layerId = layerIdOf(key);
       if (layerId === null) overlayKeys[key] = true;
       else layerIds[layerId] = true;
     }
     return { overlays: overlayKeys, visibility: layerIds };
-  }, [activeKeys]);
+  }, [visible]);
 
   const visibleFeatures = useMemo(
     () => (layers ?? EMPTY).features.filter((f) => visibility[f.properties.id]),
     [layers, visibility],
   );
 
-  const openSection: SectionDef | undefined = useMemo(
-    () => sections.find((s) => s.label === activeSection),
-    [sections, activeSection],
+  /** Every raster theme currently switched on, with the year each is showing. */
+  const activeRasters = useMemo(
+    () =>
+      sections
+        .filter((section) => section.mode === "layer" && visible[rasterToggleKey(section.id)])
+        .flatMap((section) => {
+          // Falls back to the newest year, which is what the sidebar's own
+          // year control shows when nothing has been picked yet.
+          const year = rasterYear[section.id] ?? section.years.at(-1)?.year ?? null;
+          const image = section.years.find((y) => y.year === year) ?? section.years.at(-1);
+          return image ? [{ section, image }] : [];
+        }),
+    [sections, visible, rasterYear],
   );
 
-  // A raster section is "on" simply by being the open one — it has a single
-  // layer, so the section switch is the layer switch.
-  const rasterSection = openSection?.mode === "layer" ? openSection : undefined;
-  const selectedYear = rasterSection
-    ? (rasterYear[rasterSection.id] ?? rasterSection.years.at(-1)?.year ?? null)
-    : null;
-  const selectedRaster = rasterSection?.years.find((y) => y.year === selectedYear);
-
-  const forestCoverOverlay: ForestCoverOverlay | null = useMemo(
+  const rasterOverlays: RasterOverlay[] = useMemo(
     () =>
-      selectedRaster
-        ? { url: overlayDataUrl(selectedRaster.key), bounds: selectedRaster.bounds, visible: true }
-        : null,
-    [selectedRaster],
+      activeRasters.map(({ section, image }) => ({
+        id: section.id,
+        url: overlayDataUrl(image.key),
+        bounds: image.bounds,
+        opacity: DEFAULT_RASTER_OPACITY,
+      })),
+    [activeRasters],
   );
 
   const legendRasterLayers = useMemo(
-    () => (rasterSection ? [{ id: rasterSection.id, name: rasterSection.label }] : []),
-    [rasterSection],
+    () => activeRasters.map(({ section }) => ({ id: section.id, name: section.label })),
+    [activeRasters],
   );
 
   const statsRasterLayers: StatsRasterLayer[] = useMemo(
     () =>
-      rasterSection
-        ? [
-            {
-              id: rasterSection.id,
-              name: rasterSection.label,
-              year: selectedYear,
-              years: rasterSection.years.map((y) => y.year),
-            },
-          ]
-        : [],
-    [rasterSection, selectedYear],
+      activeRasters.map(({ section, image }) => ({
+        id: section.id,
+        name: section.label,
+        year: image.year,
+        years: section.years.map((y) => y.year),
+      })),
+    [activeRasters],
   );
 
   // Static overlays carry a colour but no geometry in React state, so the
-  // legend takes their swatches straight off the section definition.
+  // legend takes their swatches straight off the section definitions — now
+  // across every section, not just one open one.
   const legendOverlays: LegendOverlay[] = useMemo(
     () =>
-      (openSection?.items ?? [])
+      sections
+        .flatMap((section) => section.items)
         .filter((item) => overlays[item.key])
         .map(({ key, label, color, geometryKind }) => ({ key, label, color, geometryKind })),
-    [openSection, overlays],
+    [sections, overlays],
   );
 
   const sidebarSections = (
@@ -263,13 +340,13 @@ export function MapDashboard() {
       )}
       <SidebarSections
         sections={sections}
-        activeSection={activeSection}
+        visibility={visible}
+        expanded={expanded}
+        onToggleExpanded={toggleExpanded}
         onToggleSection={toggleSection}
-        visibility={activeKeys}
         onToggleItem={toggleItem}
         rasterYear={rasterYear}
         onRasterYearChange={changeRasterYear}
-        onDisabledClick={setLockedPromptSection}
       />
     </>
   );
@@ -293,12 +370,7 @@ export function MapDashboard() {
         onLogoutClick={auth.logout}
         onHelpClick={() => setTourOpen(true)}
         search={
-          <LayerSearch
-            sections={sections}
-            visibility={activeKeys}
-            activeSection={activeSection}
-            onSelect={revealLayer}
-          />
+          <LayerSearch sections={sections} visibility={visible} onSelect={revealLayer} />
         }
       />
 
@@ -320,7 +392,7 @@ export function MapDashboard() {
             <Map
               data={layers ?? EMPTY}
               visibility={visibility}
-              forestCoverOverlay={forestCoverOverlay}
+              rasterOverlays={rasterOverlays}
               overlays={overlays}
               overlayDefs={overlayDefs}
               basemap={basemap}
@@ -378,14 +450,24 @@ export function MapDashboard() {
         onSuccess={auth.onLoginSuccess}
       />
 
-      <Dialog open={lockedPromptSection !== null} onOpenChange={(o) => !o && setLockedPromptSection(null)}>
+      {/* Heavy layers are worth a warning, not a block: the client wants the
+          real survey data shown, and someone who knows what they are asking
+          for should be able to ask for it. */}
+      <Dialog open={heavyPrompt !== null} onOpenChange={(o) => !o && setHeavyPrompt(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{lockedPromptSection} is off</DialogTitle>
+            <DialogTitle>{heavyPrompt?.label} is a large layer</DialogTitle>
             <DialogDescription>
-              Please enable the {lockedPromptSection} switch first to interact with these layers.
+              This layer is about {heavyPrompt ? formatMb(heavyPrompt.sizeBytes) : ""} and can take
+              a while to load — the map may be unresponsive until it finishes. Switch it on anyway?
             </DialogDescription>
           </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHeavyPrompt(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmHeavy}>Switch it on</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

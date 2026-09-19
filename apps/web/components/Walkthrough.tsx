@@ -25,17 +25,17 @@ const STEPS: Step[] = [
   {
     target: "sections",
     title: "Themes and layers",
-    body: "Every layer lives in a section — Forest Cover, Green Cover, Watershed Analysis, Base Layers and so on. Switch a section on first; only that section's layers draw at a time, so the map never turns into a pile of overlapping imagery.",
+    body: "Every layer lives in a section — Forest Cover, Watershed Analysis, Base Layers and so on. Switch on as many as you like: they all draw together, with vector layers always above raster imagery.",
   },
   {
     target: "section-theme",
     title: "Switch a section on",
-    body: "This switch turns the section on. A section marked “Pending” has no data delivered yet. Multi-year themes like this one add a Year dropdown once they are on; the grouped sections further down list their layers with a switch each.",
+    body: "The switch turns a section's layers on; clicking its name expands it, so you can reach a multi-year theme's Year dropdown or a group's individual layers without changing what is drawn. A layer marked “Pending” has no data delivered yet.",
   },
   {
     target: "search",
     title: "Find a layer fast",
-    body: "Rather than scrolling the sections, type part of a layer's name here and pick it — the dashboard opens the right section and switches that layer on for you.",
+    body: "Rather than scrolling the sections, type part of a layer's name here and pick it — the dashboard expands the right section and switches that layer on, leaving whatever else you have on alone.",
   },
   {
     target: "info-panel",
