@@ -15,7 +15,18 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
+import { popupHtml } from "@/lib/feature-popup";
+import {
+  BASEMAP_LAYER_IDS,
+  DEFAULT_BASEMAP,
+  basemapById,
+  basemapLayers,
+  basemapSources,
+  type BasemapId,
+} from "@/lib/basemaps";
 import { MapControls } from "@/components/MapControls";
+import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
+import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 
@@ -23,7 +34,17 @@ const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
 const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
 
-const BACKGROUND = "#EDEDE8";
+// The ground behind the basemap tiles — all you see while they load, and in
+// any gap past the edge of coverage. Mirrors --background from globals.css's
+// dark palette (oklch(0.192 0.003 96)), so a slow tile fetch reads as the page
+// continuing rather than as a hole punched in it.
+const MAP_BACKGROUND = "#151413";
+
+// Casing under every line, and the stroke around every point: a light halo
+// that keeps hairline geometry legible over dark imagery. Deliberately *not*
+// MAP_BACKGROUND — its whole job is to stand off the basemap, so the two must
+// not track each other.
+const CASING = "#EDEDE8";
 
 const INITIAL_CENTER: [number, number] = [71.7800412, 21.4718707]; // Shetrunjay Hill Range, near Palitana
 const INITIAL_ZOOM = 11;
@@ -38,17 +59,61 @@ const OUTLINE_WIDTH = 0.75;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
-// Forest Cover's real per-year raster (from the `static_overlays` DB row,
-// served through the API — see lib/overlays-api.ts), placed at that row's
-// own extent since the imagery has no embedded geo tags.
-export interface ForestCoverOverlay {
+// Shared, so a caller that passes nothing doesn't hand the reconcile effect
+// below a fresh array identity on every render.
+const EMPTY_RASTERS: RasterOverlay[] = [];
+
+// A raster theme currently switched on — imagery from a `static_overlays`
+// row (served through the API, see lib/overlays-api.ts), placed at that row's
+// own extent since the files carry no embedded geo tags.
+//
+// Several can be on at once, so each gets its own image source and layer
+// keyed by `id`; `url` changes when the theme's selected year changes.
+export interface RasterOverlay {
+  /** Stable per theme, not per year — the section's slug. */
+  id: string;
   url: string;
   bounds: LngLatBoundsLike;
-  visible: boolean;
+  opacity: number;
 }
 
-const RASTER_OVERLAY_SOURCE = "forest-cover-raster";
-const RASTER_OVERLAY_LAYER = "forest-cover-raster-layer";
+const RASTER_SOURCE_PREFIX = "raster-overlay-";
+const RASTER_LAYER_PREFIX = "raster-overlay-layer-";
+
+const rasterSourceId = (id: string) => `${RASTER_SOURCE_PREFIX}${id}`;
+const rasterLayerId = (id: string) => `${RASTER_LAYER_PREFIX}${id}`;
+
+/**
+ * The lowest layer that is *not* basemap or raster imagery — i.e. the first
+ * vector layer. Every raster is inserted before it, which is what keeps
+ * "vector data on top of all raster data" (the brief's Layer Structure note)
+ * true no matter what order things happen to be switched on in.
+ *
+ * Returns undefined when no vector layer exists yet; MapLibre then appends,
+ * and any vector layer added later lands above it anyway.
+ */
+function firstVectorLayerId(map: MapLibreMap): string | undefined {
+  for (const layer of map.getStyle().layers) {
+    if (layer.id === "background") continue;
+    if (BASEMAP_LAYER_IDS.includes(layer.id)) continue;
+    if (layer.id.startsWith(RASTER_LAYER_PREFIX)) continue;
+    return layer.id;
+  }
+  return undefined;
+}
+
+/** SW/NE bounds → the four corners an image source wants, clockwise from NW. */
+function imageCoordinates(
+  bounds: LngLatBoundsLike,
+): [[number, number], [number, number], [number, number], [number, number]] {
+  const b = LngLatBounds.convert(bounds);
+  return [
+    b.getNorthWest().toArray() as [number, number],
+    b.getNorthEast().toArray() as [number, number],
+    b.getSouthEast().toArray() as [number, number],
+    b.getSouthWest().toArray() as [number, number],
+  ];
+}
 
 // Marching-ants dash frames for the reference-layer flow animation.
 // line-dasharray takes no expression, so it can't vary per feature and can't
@@ -85,8 +150,6 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia?.(REDUCED_MOTION_QUERY).matches ?? false;
 }
 
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-
 // MapLibre's built-in attribution control is a native <details>/<summary>
 // element that opens itself on first paint no matter what options it's
 // given — there's no way to start it closed short of fighting its internal
@@ -118,6 +181,11 @@ class CompactAttribution implements IControl {
     this.container.append(button, this.inner);
   }
 
+  /** Swapped when the basemap changes — each provider credits differently. */
+  setHTML(html: string): void {
+    this.inner.innerHTML = html;
+  }
+
   onAdd(): HTMLElement {
     return this.container;
   }
@@ -127,28 +195,19 @@ class CompactAttribution implements IControl {
   }
 }
 
-function mapStyle() {
+// All three basemaps are declared up front and switched by visibility — see
+// lib/basemaps.ts for why that beats map.setStyle().
+function mapStyle(basemap: BasemapId) {
   return {
     version: 8 as const,
-    sources: {
-      basemap: {
-        type: "raster" as const,
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        tileSize: 256,
-        attribution: ATTRIBUTION,
-      },
-    },
+    sources: basemapSources(),
     layers: [
       {
         id: "background",
         type: "background" as const,
-        paint: { "background-color": BACKGROUND },
+        paint: { "background-color": MAP_BACKGROUND },
       },
-      {
-        id: "basemap",
-        type: "raster" as const,
-        source: "basemap",
-      },
+      ...basemapLayers(basemap),
     ],
   };
 }
@@ -166,32 +225,86 @@ function byGeometryType(
   };
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+/** The one layer per vector overlay that should answer a click. */
+function hitLayerId(def: OverlayDef): string {
+  const sourceId = `overlay-${def.key}`;
+  if (def.kind === "line") return `${sourceId}-line`;
+  if (def.kind === "point") return `${sourceId}-circle`;
+  return `${sourceId}-fill`;
 }
 
-// Click popup: the layer's name. The API serves geometry only, so there are no
-// attribute fields to list beneath it yet.
-function attachPopups(map: MapLibreMap): Popup {
-  const layerIds = ["polygons-fill", "lines", "points"];
-  const popup = new Popup({ closeButton: true, closeOnClick: true, maxWidth: "260px" });
+/**
+ * Every layer a click should be tested against, resolved at click time rather
+ * than bound once: overlay layers are added as their metadata arrives, so a
+ * fixed list captured at map load would miss all of them.
+ *
+ * Casing and flow layers are left out deliberately — they are decoration drawn
+ * over the real layer, and including them would return the same feature twice.
+ */
+function clickableLayerIds(map: MapLibreMap, defs: OverlayDef[]): string[] {
+  const ids = ["polygons-fill", "lines", "points", ...defs.map(hitLayerId)];
+  return ids.filter((id) => map.getLayer(id));
+}
 
-  map.on("click", layerIds, (e) => {
-    const feature = e.features?.[0] as MapGeoJSONFeature | undefined;
-    if (!feature) return;
-    const props = (feature.properties ?? {}) as Record<string, string | number>;
-    const name = typeof props.name === "string" ? escapeHtml(props.name) : "";
-    popup.setLngLat(e.lngLat).setHTML(`<div class="text-sm font-medium">${name}</div>`).addTo(map);
+/** Which overlay a hit layer belongs to, so the popup can title itself. */
+function labelForLayer(layerId: string, defs: OverlayDef[]): string {
+  const def = defs.find((d) => hitLayerId(d) === layerId);
+  return def?.label ?? "Feature";
+}
+
+/**
+ * Click popups for vector features.
+ *
+ * The client reported that "any Vector Data is not showing metadata on
+ * clicking", and it was not: this only ever bound the three `layers`-table
+ * layer ids, which nothing is currently seeded into, and printed a single
+ * `name` property. The static overlays — which are everything actually drawn
+ * — had no click handler at all.
+ *
+ * Bound as one map-level handler that queries at click time, so overlays
+ * added later are covered without rebinding.
+ */
+function attachPopups(
+  map: MapLibreMap,
+  defsRef: { current: OverlayDef[] },
+  measuringRef: { current: boolean },
+): Popup {
+  const popup = new Popup({ closeButton: true, closeOnClick: true, maxWidth: "300px" });
+
+  map.on("click", (e) => {
+    // While a measuring tool is open a click means "add a vertex", not
+    // "identify what is under here".
+    if (measuringRef.current) return;
+    const layers = clickableLayerIds(map, defsRef.current);
+    if (layers.length === 0) return;
+
+    const hits = map.queryRenderedFeatures(e.point, { layers });
+    const feature = hits[0] as MapGeoJSONFeature | undefined;
+    if (!feature) {
+      popup.remove();
+      return;
+    }
+
+    const label =
+      typeof feature.properties?.name === "string"
+        ? feature.properties.name
+        : labelForLayer(feature.layer.id, defsRef.current);
+
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(popupHtml(label, feature.properties))
+      .addTo(map);
   });
 
-  for (const id of layerIds) {
-    map.on("mouseenter", id, () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", id, () => {
-      map.getCanvas().style.cursor = "";
-    });
-  }
+  // Cursor feedback, from the same query — a per-layer mouseenter/mouseleave
+  // pair would have to be rebound every time an overlay is added.
+  map.on("mousemove", (e) => {
+    // The measuring tool owns the cursor while it is open (crosshair).
+    if (measuringRef.current) return;
+    const layers = clickableLayerIds(map, defsRef.current);
+    const over = layers.length > 0 && map.queryRenderedFeatures(e.point, { layers }).length > 0;
+    map.getCanvas().style.cursor = over ? "pointer" : "";
+  });
 
   return popup;
 }
@@ -235,7 +348,7 @@ function addLayers(
     source: "lines",
     filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": BACKGROUND, "line-width": LINE_CASING_WIDTH },
+    paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
   });
   map.addLayer({
     id: "lines",
@@ -255,7 +368,7 @@ function addLayers(
       "circle-color": ["get", "color"],
       "circle-radius": 6,
       "circle-stroke-width": 2,
-      "circle-stroke-color": BACKGROUND,
+      "circle-stroke-color": CASING,
     },
   });
 }
@@ -288,7 +401,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         type: "line",
         source: sourceId,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": BACKGROUND, "line-width": LINE_CASING_WIDTH },
+        paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
       });
       map.addLayer({
         id: `${sourceId}-line`,
@@ -305,7 +418,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         // into each other and the flow stops reading as movement.
         layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
         paint: {
-          "line-color": BACKGROUND,
+          "line-color": CASING,
           "line-width": LINE_WIDTH,
           "line-dasharray": DASH_SEQUENCE[0],
         },
@@ -322,16 +435,20 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
           "circle-color": color,
           "circle-radius": 2.5,
           "circle-stroke-width": 0.5,
-          "circle-stroke-color": BACKGROUND,
+          "circle-stroke-color": CASING,
         },
       });
     } else {
+      // An 'outline' layer still gets a fill, drawn fully transparent. It is
+      // never seen, but MapLibre hit-tests geometry rather than pixels, so it
+      // is what lets a boundary be clicked anywhere inside it rather than
+      // only on the hairline itself.
       map.addLayer({
         id: `${sourceId}-fill`,
         type: "fill",
         source: sourceId,
         layout: { visibility: "none" },
-        paint: { "fill-color": color, "fill-opacity": 0.15 },
+        paint: { "fill-color": color, "fill-opacity": kind === "outline" ? 0 : 0.15 },
       });
       map.addLayer({
         id: `${sourceId}-outline`,
@@ -346,7 +463,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         layout: { visibility: "none" },
         paint: {
-          "line-color": BACKGROUND,
+          "line-color": CASING,
           "line-width": OUTLINE_WIDTH,
           "line-dasharray": DASH_SEQUENCE[0],
         },
@@ -371,7 +488,7 @@ function flyToIfCloser(map: MapLibreMap, bounds: LngLatBoundsLike | undefined) {
   }
 }
 
-function overlayLayerIds(kind: "line" | "fill" | "point", sourceId: string) {
+function overlayLayerIds(kind: OverlayDef["kind"], sourceId: string) {
   if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
   if (kind === "point") return [`${sourceId}-circle`];
   return [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
@@ -436,17 +553,21 @@ export default function Map({
   data,
   visibility,
   onReady,
-  forestCoverOverlay,
+  rasterOverlays = EMPTY_RASTERS,
   overlays,
   overlayDefs = [],
+  basemap = DEFAULT_BASEMAP,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
   onReady?: (map: MapLibreMap) => void;
-  forestCoverOverlay?: ForestCoverOverlay | null;
+  /** Raster themes currently switched on. Several may be on at once. */
+  rasterOverlays?: RasterOverlay[];
   overlays?: Record<string, boolean>;
   /** Vector static-overlay defs (key/color/kind), derived from the API's overlay metadata. */
   overlayDefs?: OverlayDef[];
+  /** Which basemap is active. See lib/basemaps.ts. */
+  basemap?: BasemapId;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -457,6 +578,22 @@ export default function Map({
   const overlayDefsRef = useRef(overlayDefs);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
+  const attributionRef = useRef<CompactAttribution | null>(null);
+  // Set by MeasureTool; read by the popup and cursor handlers, which are bound
+  // once at map load and so cannot close over React state.
+  const measuringRef = useRef(false);
+  // Raster theme id → the image URL currently loaded for it, so the effect
+  // below can tell "already on, same year" from "already on, year changed"
+  // and only swap the texture when it actually has to.
+  //
+  // A plain record rather than a Map: this module's own default export is
+  // named `Map`, so the global constructor is not reachable by that name here.
+  const liveRastersRef = useRef<Record<string, string>>({});
+  // Read by the mount effect, which must build the initial style with
+  // whatever basemap is selected *now*. It is deliberately not a dependency
+  // of that effect — a change is applied by the visibility effect below,
+  // which does not rebuild the map.
+  const basemapRef = useRef(basemap);
   // Keys whose file has been handed to MapLibre. The geometry itself lives in
   // the worker from then on, so there is nothing to cache here beyond the
   // fact that we already asked for it.
@@ -473,6 +610,7 @@ export default function Map({
   // during the initial render: this component is only ever loaded client-side
   // (dynamic(..., { ssr: false }) in MapDashboard).
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
+  const [measureMode, setMeasureMode] = useState<MeasureMode>(null);
 
   useEffect(() => {
     dataRef.current = data;
@@ -482,20 +620,25 @@ export default function Map({
     overlayDefsRef.current = overlayDefs;
   }, [overlayDefs]);
 
+  useEffect(() => {
+    basemapRef.current = basemap;
+  }, [basemap]);
+
   // map lifecycle: create once, tear down on unmount
   useEffect(() => {
     if (!containerRef.current) return;
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: mapStyle(),
+      style: mapStyle(basemapRef.current),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
       attributionControl: false,
     });
     mapRef.current = map;
 
-    const attribution = new CompactAttribution(ATTRIBUTION);
+    const attribution = new CompactAttribution(basemapById(basemapRef.current).attribution);
+    attributionRef.current = attribution;
     // bottom-right: the map controls dock bottom-left, so sharing that corner
     // would stack the attribution button on top of them.
     map.addControl(attribution, "bottom-right");
@@ -503,7 +646,7 @@ export default function Map({
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
       addOverlaySources(map, overlayDefsRef.current);
-      popupRef.current = attachPopups(map);
+      popupRef.current = attachPopups(map, overlayDefsRef, measuringRef);
       setMapLoaded(true);
       onReady?.(map);
     });
@@ -521,41 +664,93 @@ export default function Map({
     if (map && mapLoaded) render(map, data, fitOnceRef.current);
   }, [data, mapLoaded]);
 
-  // Forest Cover raster: an image source needs a real image up front (unlike
-  // a geojson source there's no "empty" state), so it's added/removed
-  // wholesale rather than kept around hidden like the other overlays.
+  // Basemap switch. Pure layout visibility over layers that are all already
+  // in the style, so nothing the dashboard has added is disturbed —
+  // map.setStyle() would drop every overlay source, every loaded geometry and
+  // the raster image layer, and they would all have to be rebuilt.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    if (!forestCoverOverlay?.visible) {
-      if (map.getLayer(RASTER_OVERLAY_LAYER)) map.removeLayer(RASTER_OVERLAY_LAYER);
-      if (map.getSource(RASTER_OVERLAY_SOURCE)) map.removeSource(RASTER_OVERLAY_SOURCE);
-      return;
+    const shown = new Set(basemapById(basemap).layers);
+    for (const layerId of BASEMAP_LAYER_IDS) {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", shown.has(layerId) ? "visible" : "none");
+      }
+    }
+    // Esri and OpenStreetMap require different credits, and only the visible
+    // one may be shown.
+    attributionRef.current?.setHTML(basemapById(basemap).attribution);
+  }, [basemap, mapLoaded]);
+
+  // Raster themes. An image source needs a real image up front (a geojson
+  // source has an "empty" state, an image source does not), so these are
+  // added and removed wholesale rather than kept around hidden like the
+  // vector overlays.
+  //
+  // Any number can be on at once, so this reconciles the live set against the
+  // requested one: drop what has gone, add what is new, and re-point a source
+  // whose URL changed (that is a year change on a theme that is already on —
+  // updateImage swaps the texture without the layer ever leaving the map).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const live = liveRastersRef.current;
+    const wanted = new Set(rasterOverlays.map((r) => r.id));
+
+    for (const id of Object.keys(live)) {
+      if (wanted.has(id)) continue;
+      if (map.getLayer(rasterLayerId(id))) map.removeLayer(rasterLayerId(id));
+      if (map.getSource(rasterSourceId(id))) map.removeSource(rasterSourceId(id));
+      delete live[id];
     }
 
-    const bounds = LngLatBounds.convert(forestCoverOverlay.bounds);
-    const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
-      bounds.getNorthWest().toArray() as [number, number],
-      bounds.getNorthEast().toArray() as [number, number],
-      bounds.getSouthEast().toArray() as [number, number],
-      bounds.getSouthWest().toArray() as [number, number],
-    ];
+    for (const raster of rasterOverlays) {
+      const sourceId = rasterSourceId(raster.id);
+      const layerId = rasterLayerId(raster.id);
+      const existing = map.getSource<ImageSource>(sourceId);
 
-    const existing = map.getSource<ImageSource>(RASTER_OVERLAY_SOURCE);
-    if (existing) {
-      existing.updateImage({ url: forestCoverOverlay.url, coordinates });
-      return;
+      if (existing) {
+        if (live[raster.id] !== raster.url) {
+          existing.updateImage({ url: raster.url, coordinates: imageCoordinates(raster.bounds) });
+        }
+        if (map.getLayer(layerId)) {
+          map.setPaintProperty(layerId, "raster-opacity", raster.opacity);
+        }
+      } else {
+        map.addSource(sourceId, {
+          type: "image",
+          url: raster.url,
+          coordinates: imageCoordinates(raster.bounds),
+        });
+        // beforeId, so imagery can never cover the vector geometry —
+        // see firstVectorLayerId.
+        map.addLayer(
+          {
+            id: layerId,
+            type: "raster",
+            source: sourceId,
+            paint: { "raster-opacity": raster.opacity },
+          },
+          firstVectorLayerId(map),
+        );
+      }
+
+      live[raster.id] = raster.url;
     }
 
-    map.addSource(RASTER_OVERLAY_SOURCE, { type: "image", url: forestCoverOverlay.url, coordinates });
-    map.addLayer({
-      id: RASTER_OVERLAY_LAYER,
-      type: "raster",
-      source: RASTER_OVERLAY_SOURCE,
-      paint: { "raster-opacity": 0.75 },
-    });
-  }, [forestCoverOverlay, mapLoaded]);
+    // Stacking order is explicit rather than incidental. Insertion order alone
+    // would leave it depending on the sequence switches were flipped in, which
+    // matters for compare mode: the compared year has to sit above the base
+    // year for the blend to read correctly. Moving each layer in turn to just
+    // below the first vector layer leaves the last entry on top.
+    const floor = firstVectorLayerId(map);
+    for (const raster of rasterOverlays) {
+      const layerId = rasterLayerId(raster.id);
+      if (map.getLayer(layerId)) map.moveLayer(layerId, floor);
+    }
+  }, [rasterOverlays, mapLoaded]);
 
   // The overlay-metadata fetch (MapDashboard's fetchOverlays) typically lands
   // after the map's own "load" event, so a def arriving later than mount
@@ -670,6 +865,8 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
+        measureMode={measureMode}
+        onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
         fitBounds={() => {
           const map = mapRef.current;
@@ -677,6 +874,28 @@ export default function Map({
           if (map && bounds) map.fitBounds(bounds, { padding: 40 });
           else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
         }}
+      />
+
+      {/* Under the tool stack it belongs to, so the readout of a measurement
+          sits beside the button that started it. */}
+      {/* Keyed on the mode so switching tools remounts with a clean slate,
+          rather than an effect inside it resetting state after the fact. */}
+      <MeasureTool
+        key={measureMode ?? "none"}
+        mapRef={mapRef}
+        mapLoaded={mapLoaded}
+        mode={measureMode}
+        onExit={() => setMeasureMode(null)}
+        measuringRef={measuringRef}
+        className="absolute top-3 right-14 z-10"
+      />
+
+      {/* Bottom-centre, between the basemap switcher on the left and the
+          legend card on the right. */}
+      <CoordinateReadout
+        mapRef={mapRef}
+        mapLoaded={mapLoaded}
+        className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 md:block"
       />
 
       {!mapLoaded && (

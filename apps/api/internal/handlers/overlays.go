@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -19,6 +20,11 @@ type overlaysGetter interface {
 	GetStaticOverlays(ctx context.Context) ([]models.StaticOverlay, error)
 }
 
+// layerGroupsGetter is the subset of *repository.Repository LayerGroups needs.
+type layerGroupsGetter interface {
+	GetLayerGroups(ctx context.Context) ([]models.LayerGroup, error)
+}
+
 // overlayFilePathGetter is the subset of *repository.Repository OverlayData
 // needs.
 type overlayFilePathGetter interface {
@@ -28,12 +34,24 @@ type overlayFilePathGetter interface {
 // Overlays lists every static overlay's display metadata — never a
 // filesystem path, only what the frontend needs to render a switch and, by
 // key, ask OverlayData for the underlying asset.
-func Overlays(repo overlaysGetter) http.HandlerFunc {
+//
+// Each row is stamped with its asset's size on disk. That is measured here
+// rather than stored in the DB because a seeded column drifts the moment a
+// file is replaced, and because it lets the frontend warn about a heavy layer
+// from data instead of from a hardcoded list of keys (CLAUDE.md's core
+// invariant). A stat per row against a warm directory cache is cheap, and the
+// response is cached for a minute anyway.
+func Overlays(repo overlaysGetter, dataRoot string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		overlays, err := repo.GetStaticOverlays(r.Context())
 		if err != nil {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
+		}
+
+		root := filepath.Clean(dataRoot)
+		for i := range overlays {
+			overlays[i].SizeBytes = assetSize(root, overlays[i].FilePath)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -91,5 +109,43 @@ func OverlayData(repo overlayFilePathGetter, dataRoot string) http.HandlerFunc {
 		}
 
 		http.ServeFile(w, r, full)
+	}
+}
+
+// assetSize reports an overlay asset's size in bytes, or 0 when there is no
+// file to measure — a 'pending' row, or a path that has not been delivered
+// yet. Size is advisory (it drives a "this layer is large" warning), so a
+// missing file is not an error worth failing the whole listing over.
+//
+// relPath is DB-controlled rather than user input, but it is cleaned and
+// joined exactly as OverlayData does, so a "../.." row cannot stat its way
+// out of dataRoot.
+func assetSize(root, relPath string) int64 {
+	if relPath == "" {
+		return 0
+	}
+	full := filepath.Join(root, filepath.Clean(string(filepath.Separator)+relPath))
+	info, err := os.Stat(full)
+	if err != nil || info.IsDir() {
+		return 0
+	}
+	return info.Size()
+}
+
+// LayerGroups serves the sidebar's tree as a flat parent-linked list. Kept
+// separate from Overlays rather than nested inside it so each endpoint stays
+// one query, and so the tree can be cached on its own — it changes only when
+// the seed does.
+func LayerGroups(repo layerGroupsGetter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		groups, err := repo.GetLayerGroups(r.Context())
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		json.NewEncoder(w).Encode(groups)
 	}
 }

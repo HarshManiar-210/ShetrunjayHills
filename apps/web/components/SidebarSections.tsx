@@ -1,8 +1,17 @@
 import { memo } from "react";
-import { Layers, type LucideIcon } from "lucide-react";
+import { ChevronDown, Layers, type LucideIcon } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { iconForGeometry, type RasterYear, type SectionAccent, type SectionDef } from "@/lib/sections";
+import {
+  DEFAULT_RASTER_OPACITY,
+  iconForGeometry,
+  sectionIsExpandable,
+  sectionToggleKeys,
+  type RasterYear,
+  type SectionAccent,
+  type SectionDef,
+} from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
 /**
@@ -111,7 +120,11 @@ function SidebarSectionBox({
   label,
   icon: Icon,
   accent,
+  depth,
   active,
+  expandable,
+  expanded,
+  onToggleExpanded,
   right,
   tourTarget,
   children,
@@ -119,35 +132,59 @@ function SidebarSectionBox({
   label: string;
   icon: LucideIcon;
   accent: SectionAccent;
+  /** 0 for a top-level heading. Nested groups get lighter chrome. */
+  depth: number;
+  /** Something in this section is drawing. Independent of `expanded`. */
   active: boolean;
+  expandable: boolean;
+  expanded: boolean;
+  onToggleExpanded: () => void;
   right?: React.ReactNode;
   tourTarget?: string;
   children?: React.ReactNode;
 }) {
-  const hasBody = Boolean(children);
+  const hasBody = expandable && expanded && Boolean(children);
   const style = ACCENT_STYLES[accent];
+
+  // Only the top level is set in wide-tracked small caps. Nested groups sit
+  // in a column already narrowed by their parent's padding, and uppercase
+  // plus letter-spacing costs roughly a third of the width — enough to
+  // truncate "Existing Water Conservation" and "Forest Cover (Yearwise)".
+  // Sentence case wraps instead of eliding, so full names stay readable.
+  const labelClass =
+    depth === 0
+      ? "min-w-0 text-[11px] font-semibold tracking-wider break-words uppercase transition-colors"
+      : "min-w-0 text-xs font-medium break-words transition-colors";
 
   return (
     <section
       data-tour={tourTarget}
       className={cn(
-        "overflow-hidden rounded-xl border bg-card transition-all duration-200",
-        active
-          ? cn("shadow-e3 ring-1", style.edge)
-          : cn("shadow-e2 hover:-translate-y-px hover:shadow-e3", style.idleEdge),
+        "overflow-hidden border transition-all duration-200",
+        // A nested group is a card *inside* a card, so it drops the elevation
+        // and the hover lift — stacking those at three levels turns the
+        // column into a pile of competing boxes.
+        depth === 0
+          ? cn(
+              "rounded-xl bg-card",
+              active
+                ? cn("shadow-e3 ring-1", style.edge)
+                : cn("shadow-e2 hover:-translate-y-px hover:shadow-e3", style.idleEdge),
+            )
+          : cn("rounded-lg bg-card/40", active ? style.edge : style.idleEdge),
       )}
     >
       <header
         className={cn(
           "flex items-center justify-between gap-2 px-2.5 py-2 transition-colors",
-          // Both states wash the header in the section's own hue; the open one
-          // just does it three times as strongly.
+          // Both states wash the header in the section's own hue; a section
+          // that is drawing just does it three times as strongly.
           "bg-linear-to-b",
           active ? style.header : style.idle,
           hasBody && cn("border-b", active ? style.rule : "border-border/50"),
         )}
       >
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 flex-1 items-center gap-2">
           <span
             className={cn(
               "flex size-5 shrink-0 items-center justify-center rounded-md ring-1 shadow-e1 transition-colors",
@@ -156,14 +193,33 @@ function SidebarSectionBox({
           >
             <Icon className="size-3" strokeWidth={2.25} />
           </span>
-          <p
-            className={cn(
-              "truncate text-[11px] font-semibold tracking-wider uppercase transition-colors",
-              active ? "text-foreground" : "text-muted-foreground",
-            )}
-          >
-            {label}
-          </p>
+          {/* The name is the disclosure control, so reaching a section's rows
+              never touches the switch that decides what draws — the two were
+              the same gesture under the old accordion and are now separate
+              concerns. A section with nothing to disclose stays plain text. */}
+          {expandable ? (
+            <button
+              type="button"
+              onClick={onToggleExpanded}
+              aria-expanded={expanded}
+              className="flex min-w-0 flex-1 items-center gap-1 text-left"
+            >
+              <p className={cn(labelClass, active ? "text-foreground" : "text-muted-foreground")}>
+                {label}
+              </p>
+              <ChevronDown
+                className={cn(
+                  "size-3 shrink-0 text-muted-foreground transition-transform",
+                  !expanded && "-rotate-90",
+                )}
+                strokeWidth={2.5}
+              />
+            </button>
+          ) : (
+            <p className={cn(labelClass, active ? "text-foreground" : "text-muted-foreground")}>
+              {label}
+            </p>
+          )}
         </span>
         {right}
       </header>
@@ -172,11 +228,13 @@ function SidebarSectionBox({
   );
 }
 
+// Every row is independently switchable — there is no "enable the section
+// first" step any more, and any number of rows across any number of sections
+// can be on at once.
 function ToggleItemRow({
   label,
   icon: Icon,
   color,
-  enabled,
   checked,
   onActivate,
 }: {
@@ -187,7 +245,6 @@ function ToggleItemRow({
    * as well as a switch.
    */
   color: string;
-  enabled: boolean;
   checked: boolean;
   onActivate: () => void;
 }) {
@@ -195,7 +252,6 @@ function ToggleItemRow({
     <div
       role="button"
       tabIndex={0}
-      aria-disabled={!enabled}
       onClick={onActivate}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -204,21 +260,17 @@ function ToggleItemRow({
         }
       }}
       className={cn(
-        "group flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
-        !enabled && "cursor-not-allowed text-muted-foreground/60",
+        "group flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition-colors",
         // A checked row keeps the tint whether or not the pointer is on it, so
         // you can read off what is drawn without hunting for lit switches.
-        enabled && checked && "cursor-pointer bg-primary/12 font-medium text-foreground",
-        enabled && !checked && "cursor-pointer text-foreground/80 hover:bg-primary/8 hover:text-primary",
+        checked
+          ? "bg-primary/12 font-medium text-foreground"
+          : "text-foreground/80 hover:bg-primary/8 hover:text-primary",
       )}
     >
-      <Icon
-        className={cn("size-4 transition-colors", !enabled && "text-muted-foreground/60")}
-        style={enabled ? { color } : undefined}
-        strokeWidth={1.75}
-      />
+      <Icon className="size-4 transition-colors" style={{ color }} strokeWidth={1.75} />
       <span className="flex-1">{label}</span>
-      <Switch size="sm" checked={checked} aria-disabled={!enabled} aria-label={`Toggle ${label} layer`} tabIndex={-1} />
+      <Switch size="sm" checked={checked} aria-label={`Toggle ${label} layer`} tabIndex={-1} />
     </div>
   );
 }
@@ -238,72 +290,221 @@ function PendingItemRow({ label, icon: Icon }: { label: string; icon: LucideIcon
 
 // Multi-year rasters show one year at a time, so the year is a dropdown rather
 // than another set of switches.
+// Always live, even while the theme is switched off: picking the year you
+// want before turning the imagery on is a reasonable order to work in, and
+// the choice is remembered either way.
 function YearControl({
   label,
   years,
   year,
-  enabled,
   onChange,
-  onDisabledClick,
 }: {
   label: string;
   years: RasterYear[];
   year: number | null;
-  enabled: boolean;
   onChange: (year: number) => void;
-  onDisabledClick: () => void;
 }) {
-  const current = years.find((y) => y.year === year);
   return (
     <div className="px-1.5 py-1">
       <span className="mb-1 block text-xs text-muted-foreground/80">Year</span>
-      {enabled ? (
-        <Select value={year != null ? String(year) : undefined} onValueChange={(v) => onChange(Number(v))}>
-          <SelectTrigger className="h-8 w-full text-sm" aria-label={`Select ${label} year`}>
-            <SelectValue placeholder="Select a year" />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map((y) => (
-              <SelectItem key={y.year} value={String(y.year)}>
-                {y.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <button
-          type="button"
-          onClick={onDisabledClick}
-          className="flex h-8 w-full cursor-not-allowed items-center rounded-md border border-input bg-transparent px-3 text-sm text-muted-foreground/60"
-        >
-          {current?.label ?? "Select a year"}
-        </button>
+      <Select value={year != null ? String(year) : undefined} onValueChange={(v) => onChange(Number(v))}>
+        <SelectTrigger className="h-8 w-full text-sm" aria-label={`Select ${label} year`}>
+          <SelectValue placeholder="Select a year" />
+        </SelectTrigger>
+        <SelectContent>
+          {years.map((y) => (
+            <SelectItem key={y.year} value={String(y.year)}>
+              {y.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/**
+ * One node of the tree: its header switch, its own layers, then its child
+ * groups. Recursive, because the client's structure nests (Forest Layers >
+ * Forest Cover > its years) and the depth is set by seed rows, not by code.
+ */
+function SectionNode({
+  section,
+  visibility,
+  expanded,
+  onToggleExpanded,
+  onToggleSection,
+  onToggleItem,
+  rasterYear,
+  onRasterYearChange,
+  rasterOpacity,
+  onRasterOpacityChange,
+  tourTarget,
+}: {
+  section: SectionDef;
+  visibility: Record<string, boolean>;
+  expanded: Record<string, boolean>;
+  onToggleExpanded: (id: string) => void;
+  onToggleSection: (id: string, on: boolean) => void;
+  onToggleItem: (key: string) => void;
+  rasterYear: Record<string, number>;
+  onRasterYearChange: (sectionId: string, year: number) => void;
+  rasterOpacity: Record<string, number>;
+  onRasterOpacityChange: (sectionId: string, opacity: number) => void;
+  tourTarget?: string;
+}) {
+  const keys = sectionToggleKeys(section);
+  // The header switch is on only when everything beneath it is on, so a group
+  // with some rows checked reads as off and turning it on fills in the rest.
+  const allOn = keys.length > 0 && keys.every((key) => visibility[key]);
+  const anyOn = keys.some((key) => visibility[key]);
+
+  const body = (
+    <>
+      {section.mode === "layer" && section.years.length > 1 && (
+        <YearControl
+          label={section.label}
+          years={section.years}
+          year={rasterYear[section.id] ?? section.years.at(-1)?.year ?? null}
+          onChange={(year) => onRasterYearChange(section.id, year)}
+        />
       )}
+
+      {section.mode === "layer" && (
+        <OpacityControl
+          label={section.label}
+          opacity={rasterOpacity[section.id] ?? DEFAULT_RASTER_OPACITY}
+          onChange={(opacity) => onRasterOpacityChange(section.id, opacity)}
+        />
+      )}
+
+      {section.items.map((item) =>
+        item.pending ? (
+          <PendingItemRow
+            key={item.key}
+            label={item.label}
+            icon={item.icon ?? iconForGeometry(item.geometryKind)}
+          />
+        ) : (
+          <ToggleItemRow
+            key={item.key}
+            label={item.label}
+            icon={item.icon ?? iconForGeometry(item.geometryKind)}
+            color={item.color}
+            checked={Boolean(visibility[item.key])}
+            onActivate={() => onToggleItem(item.key)}
+          />
+        ),
+      )}
+
+      {section.children.length > 0 && (
+        <div className="flex flex-col gap-1.5 p-1">
+          {section.children.map((child) => (
+            <SectionNode
+              key={child.id}
+              section={child}
+              visibility={visibility}
+              expanded={expanded}
+              onToggleExpanded={onToggleExpanded}
+              onToggleSection={onToggleSection}
+              onToggleItem={onToggleItem}
+              rasterYear={rasterYear}
+              onRasterYearChange={onRasterYearChange}
+              rasterOpacity={rasterOpacity}
+              onRasterOpacityChange={onRasterOpacityChange}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <SidebarSectionBox
+      label={section.label}
+      icon={section.icon}
+      accent={section.accent}
+      depth={section.depth}
+      active={anyOn}
+      expandable={sectionIsExpandable(section)}
+      expanded={Boolean(expanded[section.id])}
+      onToggleExpanded={() => onToggleExpanded(section.id)}
+      tourTarget={tourTarget}
+      right={
+        <Switch
+          size="sm"
+          checked={allOn}
+          onCheckedChange={(checked) => onToggleSection(section.id, checked)}
+          aria-label={`Toggle ${section.label}`}
+        />
+      }
+    >
+      {body}
+    </SidebarSectionBox>
+  );
+}
+
+// Raster-only, per the brief ("Provide an opacity slider specifically for
+// Raster layers"). Vector layers are thin geometry over imagery — fading them
+// makes them unreadable rather than revealing anything underneath.
+function OpacityControl({
+  label,
+  opacity,
+  onChange,
+}: {
+  label: string;
+  opacity: number;
+  onChange: (opacity: number) => void;
+}) {
+  return (
+    <div className="px-1.5 py-1">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground/80">Opacity</span>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {Math.round(opacity * 100)}%
+        </span>
+      </div>
+      <Slider
+        value={[Math.round(opacity * 100)]}
+        min={0}
+        max={100}
+        step={5}
+        aria-label={`${label} opacity`}
+        onValueChange={([next]) => onChange(next / 100)}
+      />
     </div>
   );
 }
 
 function SidebarSectionsImpl({
   sections,
-  activeSection,
-  onToggleSection,
   visibility,
+  expanded,
+  onToggleExpanded,
+  onToggleSection,
   onToggleItem,
   rasterYear,
   onRasterYearChange,
-  onDisabledClick,
+  rasterOpacity,
+  onRasterOpacityChange,
 }: {
   sections: SectionDef[];
-  activeSection: string | null;
-  onToggleSection: (section: string, on: boolean) => void;
-  /** Toggle key → on, for the section currently open. */
+  /** Toggle key → on, across every group at once. See lib/sections.ts. */
   visibility: Record<string, boolean>;
+  /** Group id → disclosed. Independent of what is drawing. */
+  expanded: Record<string, boolean>;
+  onToggleExpanded: (id: string) => void;
+  onToggleSection: (id: string, on: boolean) => void;
   onToggleItem: (key: string) => void;
-  /** Section id → selected year. */
+  /** Group id → selected year. */
   rasterYear: Record<string, number>;
   onRasterYearChange: (sectionId: string, year: number) => void;
-  onDisabledClick: (section: string) => void;
+  /** Group id → 0..1 opacity. Absent means DEFAULT_RASTER_OPACITY. */
+  rasterOpacity: Record<string, number>;
+  onRasterOpacityChange: (sectionId: string, opacity: number) => void;
 }) {
+  const onCount = Object.values(visibility).filter(Boolean).length;
+
   return (
     <div data-tour="sections" className="flex flex-col">
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/50 bg-panel/85 px-4 py-2.5 backdrop-blur-sm">
@@ -311,83 +512,32 @@ function SidebarSectionsImpl({
         <p className="text-[11px] font-semibold tracking-[0.14em] text-foreground/70 uppercase">
           Map Layers
         </p>
-        {activeSection && (
-          <span className="ml-auto min-w-0 truncate rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary ring-1 ring-primary/25">
-            {activeSection}
+        {onCount > 0 && (
+          <span className="ml-auto shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary ring-1 ring-primary/25">
+            {onCount} on
           </span>
         )}
       </div>
 
       <div className="flex flex-col gap-2.5 p-3">
-        {sections.map((section, i) => {
-          const on = activeSection === section.label;
-          const years = section.years;
-
-          const body =
-            section.mode === "layer" ? (
-              // A single-image raster (Orthomosaic, DSM, …) has nothing to choose
-              // between either — same bare on/off switch as a single-item
-              // vector section, no dropdown.
-              years.length > 1 ? (
-                <YearControl
-                  label={section.label}
-                  years={years}
-                  year={rasterYear[section.id] ?? years.at(-1)?.year ?? null}
-                  enabled={on}
-                  onChange={(year) => onRasterYearChange(section.id, year)}
-                  onDisabledClick={() => onDisabledClick(section.label)}
-                />
-              ) : null
-              // A single-item section has nothing to choose between, so the
-              // section switch above is the only control it needs.
-            ) : section.items.length > 1 ? (
-              section.items.map((item) =>
-                item.pending ? (
-                  <PendingItemRow
-                    key={item.key}
-                    label={item.label}
-                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
-                  />
-                ) : (
-                  <ToggleItemRow
-                    key={item.key}
-                    label={item.label}
-                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
-                    color={item.color}
-                    enabled={on}
-                    checked={Boolean(visibility[item.key])}
-                    onActivate={() => {
-                      if (!on) onDisabledClick(section.label);
-                      else onToggleItem(item.key);
-                    }}
-                  />
-                ),
-              )
-            ) : null;
-
-          return (
-            <SidebarSectionBox
-              key={section.label}
-              label={section.label}
-              icon={section.icon}
-              accent={section.accent}
-              active={on}
-              // The walkthrough points at the first section as its example of
-              // "switch a section on"; the rest need no target of their own.
-              tourTarget={i === 0 ? "section-theme" : undefined}
-              right={
-                <Switch
-                  size="sm"
-                  checked={on}
-                  onCheckedChange={(checked) => onToggleSection(section.label, checked)}
-                  aria-label={`Toggle ${section.label}`}
-                />
-              }
-            >
-              {body}
-            </SidebarSectionBox>
-          );
-        })}
+        {sections.map((section, i) => (
+          <SectionNode
+            key={section.id}
+            section={section}
+            visibility={visibility}
+            expanded={expanded}
+            onToggleExpanded={onToggleExpanded}
+            onToggleSection={onToggleSection}
+            onToggleItem={onToggleItem}
+            rasterYear={rasterYear}
+            onRasterYearChange={onRasterYearChange}
+            rasterOpacity={rasterOpacity}
+            onRasterOpacityChange={onRasterOpacityChange}
+            // The walkthrough points at the first heading as its example;
+            // the rest need no target of their own.
+            tourTarget={i === 0 ? "section-theme" : undefined}
+          />
+        ))}
       </div>
     </div>
   );

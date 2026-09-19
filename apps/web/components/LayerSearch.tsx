@@ -5,34 +5,50 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { SectionDef } from "@/lib/sections";
+import { rasterToggleKey, type SectionDef } from "@/lib/sections";
 
 interface SearchEntry {
-  /** Sidebar section this layer is switched on from. */
+  /** Where this layer sits, e.g. "Forest Layers · Forest Cover (Yearwise)". */
   section: string;
+  /** Group ids from the root down to the layer, so picking it can open the path. */
+  path: string[];
   label: string;
-  /** Toggle key within that section; null for a section that *is* one layer. */
-  key: string | null;
+  /** The layer's own toggle key, in the flat namespace from lib/sections.ts. */
+  key: string;
 }
 
-// Flattens the sidebar's sections into one searchable list. A single-layer
-// section (a raster theme) contributes the section itself, since the section is
-// the layer there.
+// Walks the sidebar tree into one searchable list. A raster theme contributes
+// the group itself, since the group is the layer there; every other group
+// contributes its own rows. Two groups can share a label (both conservation
+// branches have a "Matipala"), which is why an entry carries its breadcrumb
+// as well as its name.
 function buildIndex(sections: SectionDef[]): SearchEntry[] {
   const index: SearchEntry[] = [];
 
-  for (const section of sections) {
+  function walk(section: SectionDef, ancestry: SectionDef[]) {
+    const path = [...ancestry, section];
+    const ids = path.map((s) => s.id);
+    const breadcrumb = path.map((s) => s.label).join(" · ");
+
     if (section.mode === "layer") {
-      index.push({ section: section.label, label: section.label, key: null });
-      continue;
+      index.push({
+        section: ancestry.map((s) => s.label).join(" · ") || section.label,
+        path: ids,
+        label: section.label,
+        key: rasterToggleKey(section.id),
+      });
+    } else {
+      for (const item of section.items) {
+        // A pending item has no data to reveal — not searchable.
+        if (item.pending) continue;
+        index.push({ section: breadcrumb, path: ids, label: item.label, key: item.key });
+      }
     }
-    for (const item of section.items) {
-      // A pending item has no data to reveal — not searchable.
-      if (item.pending) continue;
-      index.push({ section: section.label, label: item.label, key: item.key });
-    }
+
+    for (const child of section.children) walk(child, path);
   }
 
+  for (const section of sections) walk(section, []);
   return index;
 }
 
@@ -73,15 +89,13 @@ function search(index: SearchEntry[], query: string): SearchEntry[] {
 export function LayerSearch({
   sections,
   visibility,
-  activeSection,
   onSelect,
   className,
 }: {
   sections: SectionDef[];
-  /** Toggle key → on, for the section currently open. Drives the "On" badge. */
+  /** Toggle key → on, across every section. Drives the "On" badge. */
   visibility: Record<string, boolean>;
-  activeSection: string | null;
-  onSelect: (section: string, key: string | null) => void;
+  onSelect: (path: string[], key: string) => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -118,7 +132,7 @@ export function LayerSearch({
   }
 
   function choose(result: SearchEntry) {
-    onSelect(result.section, result.key);
+    onSelect(result.path, result.key);
     reset();
   }
 
@@ -197,12 +211,10 @@ export function LayerSearch({
             </p>
           ) : (
             results.map((result, i) => {
-              const on =
-                result.section === activeSection &&
-                (result.key === null || Boolean(visibility[result.key]));
+              const on = Boolean(visibility[result.key]);
               return (
                 <button
-                  key={`${result.section}:${result.key ?? "section"}`}
+                  key={result.key}
                   type="button"
                   role="option"
                   aria-selected={i === activeIndex}

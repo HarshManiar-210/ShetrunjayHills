@@ -7,9 +7,15 @@ export interface OverlayMeta {
   id: number;
   key: string;
   label: string;
-  section: string;
+  /** The layer_groups row this overlay sits under. See fetchLayerGroups. */
+  group_id: number;
   asset_type: "vector" | "raster";
-  kind?: "line" | "fill" | "point";
+  /**
+   * How the layer draws, which is also what its legend swatch looks like.
+   * 'outline' is a boundary with no tint (Village/Taluka/District/Study Area);
+   * 'fill' is a tinted area (Forest Boundary, Geology).
+   */
+  kind?: "line" | "fill" | "outline" | "point";
   color?: string;
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
@@ -17,6 +23,32 @@ export interface OverlayMeta {
   min_lat?: number;
   max_lon?: number;
   max_lat?: number;
+  /**
+   * The asset's size on disk, measured by the API rather than stored in the
+   * DB. Drives the "this layer is large" warning before a heavy layer is
+   * switched on, so which layers are heavy stays data (CLAUDE.md's core
+   * invariant). Absent for a 'pending' row, which has no file.
+   */
+  size_bytes?: number;
+}
+
+/**
+ * A node in the sidebar's tree. Arrives flat with a parent link rather than
+ * nested — lib/sections.ts assembles the nesting. `parent_id` is absent on a
+ * top-level heading.
+ */
+export interface LayerGroup {
+  id: number;
+  key: string;
+  label: string;
+  parent_id?: number;
+  sort_order: number;
+}
+
+export async function fetchLayerGroups(): Promise<LayerGroup[]> {
+  const res = await fetch(`${API_URL}/api/layer-groups`);
+  if (!res.ok) throw new Error("failed to load layer groups");
+  return res.json();
 }
 
 export async function fetchOverlays(): Promise<OverlayMeta[]> {

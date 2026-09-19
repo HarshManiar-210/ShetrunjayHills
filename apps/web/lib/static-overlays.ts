@@ -12,7 +12,7 @@ export interface OverlayDef {
   label: string;
   url: string;
   color: string;
-  kind: "line" | "fill" | "point";
+  kind: "line" | "fill" | "outline" | "point";
   /**
    * SW/NE corners of the layer's own geometry, from its `static_overlays`
    * row. The map frames a layer from this the moment its switch is flipped,
@@ -26,8 +26,8 @@ export interface OverlayDef {
 export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
   return meta
     .filter(
-      (o): o is OverlayMeta & { kind: "line" | "fill" | "point" } =>
-        o.kind === "line" || o.kind === "fill" || o.kind === "point",
+      (o): o is OverlayMeta & { kind: "line" | "fill" | "outline" | "point" } =>
+        o.kind === "line" || o.kind === "fill" || o.kind === "outline" || o.kind === "point",
     )
     .map((o) => ({
       key: o.key,
