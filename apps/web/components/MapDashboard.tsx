@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { BasemapSwitcher } from "@/components/BasemapSwitcher";
+import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
@@ -101,6 +102,17 @@ export function MapDashboard() {
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
   // fading one raster to see another underneath does not fade both.
   const [rasterOpacity, setRasterOpacity] = useState<Record<string, number>>({});
+
+  // The year bar drives one theme at a time. Only the user's explicit choice
+  // is stored; which theme is actually focused is derived below, so a theme
+  // being switched off cannot leave the bar pointing at nothing.
+  const [preferredTheme, setPreferredTheme] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  // Group id -> the year being compared against, or absent when compare mode
+  // is off for that theme. Per theme, so switching the bar to another layer
+  // does not carry someone else's comparison across.
+  const [compareYear, setCompareYear] = useState<Record<string, number>>({});
+  const [blend, setBlend] = useState(0.5);
 
   // A layer big enough to be worth warning about, waiting on confirmation.
   const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
@@ -328,15 +340,77 @@ export function MapDashboard() {
     [allSections, visible, rasterYear],
   );
 
+  /** Switched-on raster themes that actually have years to step through. */
+  const temporalThemes: TemporalTheme[] = useMemo(
+    () =>
+      activeRasters
+        .filter(({ section }) => section.years.length > 1)
+        .map(({ section }) => ({ id: section.id, label: section.label, years: section.years })),
+    [activeRasters],
+  );
+
+  // Derived rather than stored: the user's pick wins while that theme is
+  // still on, otherwise the bar adopts the most recently switched-on one.
+  // Deriving it means switching a theme off cannot leave the bar pointing at
+  // a layer that is gone, with no effect needed to repair the state.
+  const focusedTheme = useMemo(() => {
+    if (temporalThemes.length === 0) return null;
+    if (preferredTheme && temporalThemes.some((t) => t.id === preferredTheme)) {
+      return preferredTheme;
+    }
+    return temporalThemes[temporalThemes.length - 1].id;
+  }, [temporalThemes, preferredTheme]);
+
+  const focusedYears = temporalThemes.find((t) => t.id === focusedTheme)?.years ?? [];
+  const focusedYear = focusedTheme
+    ? (rasterYear[focusedTheme] ?? focusedYears.at(-1)?.year ?? null)
+    : null;
+  const focusedCompareYear = focusedTheme ? (compareYear[focusedTheme] ?? null) : null;
+
+  // Defined here rather than beside the other change handlers because it
+  // needs `focusedTheme`, which is derived just above.
+  const changeCompareYear = useCallback(
+    (year: number | null) => {
+      if (!focusedTheme) return;
+      setCompareYear((c) => {
+        const next = { ...c };
+        if (year === null) delete next[focusedTheme];
+        else next[focusedTheme] = year;
+        return next;
+      });
+    },
+    [focusedTheme],
+  );
+
   const rasterOverlays: RasterOverlay[] = useMemo(
     () =>
-      activeRasters.map(({ section, image }) => ({
-        id: section.id,
-        url: overlayDataUrl(image.key),
-        bounds: image.bounds,
-        opacity: rasterOpacity[section.id] ?? DEFAULT_RASTER_OPACITY,
-      })),
-    [activeRasters, rasterOpacity],
+      activeRasters.flatMap(({ section, image }) => {
+        const opacity = rasterOpacity[section.id] ?? DEFAULT_RASTER_OPACITY;
+        const base = {
+          id: section.id,
+          url: overlayDataUrl(image.key),
+          bounds: image.bounds,
+          opacity,
+        };
+
+        // Compare mode draws the second year as its own layer stacked over the
+        // first, faded by the blend. Listing it after the base is what puts it
+        // on top — the map reconciler restacks in array order.
+        const against = compareYear[section.id];
+        const other = against != null ? section.years.find((y) => y.year === against) : undefined;
+        if (!other) return [base];
+
+        return [
+          base,
+          {
+            id: `${section.id}:compare`,
+            url: overlayDataUrl(other.key),
+            bounds: other.bounds,
+            opacity: opacity * blend,
+          },
+        ];
+      }),
+    [activeRasters, rasterOpacity, compareYear, blend],
   );
 
   const legendRasterLayers = useMemo(
@@ -438,6 +512,34 @@ export function MapDashboard() {
               overlayDefs={overlayDefs}
               basemap={basemap}
             />
+
+            {/* Sits a row above the coordinate readout, which keeps the
+                bottom-centre position the brief shows for the readout while
+                giving the timeline its own line. */}
+            {temporalThemes.length > 0 && focusedTheme && (
+              // Centred within the band the other floating panels leave free,
+              // rather than within the map: the basemap switcher holds the
+              // bottom-left corner and the legend the bottom-right (from xl,
+              // where it appears), and centring on the map itself overlaps
+              // both once the bar is wide. The container is click-through so
+              // the empty space beside the bar does not eat map drags.
+              <div className="pointer-events-none absolute right-3 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex xl:right-[19.5rem]">
+                <YearBar
+                  themes={temporalThemes}
+                  focusedId={focusedTheme}
+                  onFocusChange={setPreferredTheme}
+                  year={focusedYear}
+                  onYearChange={(year) => changeRasterYear(focusedTheme, year)}
+                  playing={playing}
+                  onPlayingChange={setPlaying}
+                  compareYear={focusedCompareYear}
+                  onCompareYearChange={changeCompareYear}
+                  blend={blend}
+                  onBlendChange={setBlend}
+                  className="pointer-events-auto"
+                />
+              </div>
+            )}
 
             {/* Bottom-left: the map tools took the right edge, per the brief. */}
             <BasemapSwitcher

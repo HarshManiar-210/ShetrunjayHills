@@ -725,6 +725,17 @@ export default function Map({
 
       live[raster.id] = raster.url;
     }
+
+    // Stacking order is explicit rather than incidental. Insertion order alone
+    // would leave it depending on the sequence switches were flipped in, which
+    // matters for compare mode: the compared year has to sit above the base
+    // year for the blend to read correctly. Moving each layer in turn to just
+    // below the first vector layer leaves the last entry on top.
+    const floor = firstVectorLayerId(map);
+    for (const raster of rasterOverlays) {
+      const layerId = rasterLayerId(raster.id);
+      if (map.getLayer(layerId)) map.moveLayer(layerId, floor);
+    }
   }, [rasterOverlays, mapLoaded]);
 
   // The overlay-metadata fetch (MapDashboard's fetchOverlays) typically lands
