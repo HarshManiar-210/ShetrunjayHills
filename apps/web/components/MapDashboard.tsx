@@ -468,16 +468,19 @@ export function MapDashboard() {
   // you switch away from to check a number.
   const infoPanel = (className?: string) => (
     <div className={cn("flex min-h-0 flex-col gap-2 overflow-y-auto scrollbar-thin", className)}>
+      {/* Both shrink-0: letting the legend give way squeezed it down to its
+          own title bar as soon as two rasters were on. The column scrolls
+          instead, so each card keeps its full height. */}
       <LegendCard
         layers={visibleFeatures}
         overlays={legendOverlays}
         rasterLayers={legendRasterLayers}
-        className="min-h-0 shrink"
+        className="shrink-0"
       />
       <StatsCard
         rasterLayers={statsRasterLayers}
         vectorFeatures={visibleFeatures}
-        className="min-h-0 shrink-0"
+        className="shrink-0"
       />
     </div>
   );
@@ -525,11 +528,11 @@ export function MapDashboard() {
             {temporalThemes.length > 0 && focusedTheme && (
               // Centred within the band the other floating panels leave free,
               // rather than within the map: the basemap switcher holds the
-              // bottom-left corner and the legend the bottom-right (from xl,
-              // where it appears), and centring on the map itself overlaps
-              // both once the bar is wide. The container is click-through so
-              // the empty space beside the bar does not eat map drags.
-              <div className="pointer-events-none absolute right-3 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex xl:right-[19.5rem]">
+              // bottom-left corner and the tool stack the bottom-right, and
+              // centring on the map itself runs the bar under both once it is
+              // wide. The container is click-through so the empty space beside
+              // the bar does not eat map drags.
+              <div className="pointer-events-none absolute right-14 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex">
                 <YearBar
                   themes={temporalThemes}
                   focusedId={focusedTheme}
@@ -555,11 +558,13 @@ export function MapDashboard() {
             />
           </div>
 
-          {/* Top-right, clearing the tool stack at right-3. Height follows
-              content up to the map's height rather than stretching to the
-              bottom, so a short legend stays a short card. */}
+          {/* Top-right, now flush to the edge the tool stack vacated. Height
+              follows content, capped so a long legend stops clear of those
+              tools rather than running into them: the stack is a fixed 205px
+              (six 28px buttons, a separator and padding), plus its own inset
+              and a gap between the two. */}
           {infoPanel(
-            "absolute top-3 right-14 z-10 hidden max-h-[calc(100%-1.75rem)] w-72 xl:flex",
+            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-17rem)] w-72 xl:flex",
           )}
         </div>
       </div>
