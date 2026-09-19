@@ -25,6 +25,7 @@ import {
   type BasemapId,
 } from "@/lib/basemaps";
 import { MapControls } from "@/components/MapControls";
+import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
 import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
@@ -263,10 +264,17 @@ function labelForLayer(layerId: string, defs: OverlayDef[]): string {
  * Bound as one map-level handler that queries at click time, so overlays
  * added later are covered without rebinding.
  */
-function attachPopups(map: MapLibreMap, defsRef: { current: OverlayDef[] }): Popup {
+function attachPopups(
+  map: MapLibreMap,
+  defsRef: { current: OverlayDef[] },
+  measuringRef: { current: boolean },
+): Popup {
   const popup = new Popup({ closeButton: true, closeOnClick: true, maxWidth: "300px" });
 
   map.on("click", (e) => {
+    // While a measuring tool is open a click means "add a vertex", not
+    // "identify what is under here".
+    if (measuringRef.current) return;
     const layers = clickableLayerIds(map, defsRef.current);
     if (layers.length === 0) return;
 
@@ -291,6 +299,8 @@ function attachPopups(map: MapLibreMap, defsRef: { current: OverlayDef[] }): Pop
   // Cursor feedback, from the same query — a per-layer mouseenter/mouseleave
   // pair would have to be rebound every time an overlay is added.
   map.on("mousemove", (e) => {
+    // The measuring tool owns the cursor while it is open (crosshair).
+    if (measuringRef.current) return;
     const layers = clickableLayerIds(map, defsRef.current);
     const over = layers.length > 0 && map.queryRenderedFeatures(e.point, { layers }).length > 0;
     map.getCanvas().style.cursor = over ? "pointer" : "";
@@ -569,6 +579,9 @@ export default function Map({
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
   const attributionRef = useRef<CompactAttribution | null>(null);
+  // Set by MeasureTool; read by the popup and cursor handlers, which are bound
+  // once at map load and so cannot close over React state.
+  const measuringRef = useRef(false);
   // Raster theme id → the image URL currently loaded for it, so the effect
   // below can tell "already on, same year" from "already on, year changed"
   // and only swap the texture when it actually has to.
@@ -597,6 +610,7 @@ export default function Map({
   // during the initial render: this component is only ever loaded client-side
   // (dynamic(..., { ssr: false }) in MapDashboard).
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
+  const [measureMode, setMeasureMode] = useState<MeasureMode>(null);
 
   useEffect(() => {
     dataRef.current = data;
@@ -632,7 +646,7 @@ export default function Map({
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
       addOverlaySources(map, overlayDefsRef.current);
-      popupRef.current = attachPopups(map, overlayDefsRef);
+      popupRef.current = attachPopups(map, overlayDefsRef, measuringRef);
       setMapLoaded(true);
       onReady?.(map);
     });
@@ -851,6 +865,8 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
+        measureMode={measureMode}
+        onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
         fitBounds={() => {
           const map = mapRef.current;
@@ -858,6 +874,20 @@ export default function Map({
           if (map && bounds) map.fitBounds(bounds, { padding: 40 });
           else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
         }}
+      />
+
+      {/* Under the tool stack it belongs to, so the readout of a measurement
+          sits beside the button that started it. */}
+      {/* Keyed on the mode so switching tools remounts with a clean slate,
+          rather than an effect inside it resetting state after the fact. */}
+      <MeasureTool
+        key={measureMode ?? "none"}
+        mapRef={mapRef}
+        mapLoaded={mapLoaded}
+        mode={measureMode}
+        onExit={() => setMeasureMode(null)}
+        measuringRef={measuringRef}
+        className="absolute top-3 right-14 z-10"
       />
 
       {/* Bottom-centre, between the basemap switcher on the left and the
