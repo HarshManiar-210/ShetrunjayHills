@@ -876,9 +876,9 @@ export default function Map({
         }}
       />
 
-      {/* Under the tool stack it belongs to, so the readout of a measurement
-          sits beside the button that started it. */}
-      {/* Keyed on the mode so switching tools remounts with a clean slate,
+      {/* Top-left: the right column belongs to the legend now, and the
+          readout has to stay clear of it for as long as a measurement is open.
+          Keyed on the mode so switching tools remounts with a clean slate,
           rather than an effect inside it resetting state after the fact. */}
       <MeasureTool
         key={measureMode ?? "none"}
@@ -887,7 +887,7 @@ export default function Map({
         mode={measureMode}
         onExit={() => setMeasureMode(null)}
         measuringRef={measuringRef}
-        className="absolute top-3 right-14 z-10"
+        className="absolute top-3 left-3 z-10"
       />
 
       {/* Bottom-centre, between the basemap switcher on the left and the

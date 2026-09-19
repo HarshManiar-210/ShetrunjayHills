@@ -1,15 +1,19 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronDown, ListTree } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
-import { legendFor } from "@/lib/legend-config";
+import { legendFor, type RasterLegend } from "@/lib/legend-config";
 import { geometryKindOf } from "@/lib/sections";
 import type { LayerFeature } from "@/lib/layers-api";
 
 // Many features can share one layer, so the legend lists one row per layer,
 // not per feature.
 function uniqueLayers(features: LayerFeature[]): LayerFeature[] {
-  const seen = new Map<number, LayerFeature>();
+  const seen = new globalThis.Map<number, LayerFeature>();
   for (const feature of features) {
     if (!seen.has(feature.properties.id)) seen.set(feature.properties.id, feature);
   }
@@ -38,10 +42,39 @@ export interface LegendOverlay {
 }
 
 /**
+ * The continuous ramp the client asked for: the theme's class colours laid
+ * end to end beneath the class list.
+ *
+ * Only drawn for an ordered palette (see RasterLegend.ramp). Hard colour stops
+ * rather than a smooth blend — the imagery is classified, so a smooth fade
+ * would imply intermediate values the data does not contain, while the strip
+ * still reads as one scale running low to high.
+ */
+function ClassRamp({ legend }: { legend: RasterLegend }) {
+  const stops = legend.classes
+    .map((cls, i) => {
+      const from = (i / legend.classes.length) * 100;
+      const to = ((i + 1) / legend.classes.length) * 100;
+      return `${cls.color} ${from}%, ${cls.color} ${to}%`;
+    })
+    .join(", ");
+
+  // No end captions: the class list sits directly above in the same order, so
+  // naming the ends again would say the same thing twice. The strip's job is
+  // to show the scale as one continuous thing.
+  return (
+    <span
+      className="mt-1 h-2 w-full rounded-full ring-1 ring-foreground/10"
+      style={{ backgroundImage: `linear-gradient(to right, ${stops})` }}
+      aria-hidden
+    />
+  );
+}
+
+/**
  * Legend body — swatch rows for the switched-on vector layers and overlays,
- * then a class list per switched-on raster section. Card chrome (header, tabs,
- * collapse) lives in components/MapInfoPanel.tsx, which is the only place this
- * renders.
+ * then a class list per switched-on raster theme, with a gradient ramp beneath
+ * any theme whose classes are ordered.
  */
 export function LegendContent({
   layers,
@@ -118,6 +151,7 @@ export function LegendContent({
                       </div>
                     ))}
                   </div>
+                  {legend.ramp && <ClassRamp legend={legend} />}
                   {legend.note && (
                     <span className="text-[10px] text-muted-foreground/70 italic">{legend.note}</span>
                   )}
@@ -128,5 +162,53 @@ export function LegendContent({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * The Legend as its own panel.
+ *
+ * It used to share a card with Statistics behind a tab strip, which meant only
+ * one could be read at a time — and the legend is what makes the map legible,
+ * so it should not be something you switch away from to see a number. They are
+ * now two independent cards, each collapsible on its own.
+ */
+export function LegendCard({
+  layers,
+  overlays,
+  rasterLayers,
+  className,
+}: {
+  layers: LayerFeature[];
+  overlays?: LegendOverlay[];
+  rasterLayers?: LegendRasterLayer[];
+  className?: string;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <Card className={cn("shadow-e3", className)} size="sm" data-tour="legend">
+      <div className="flex shrink-0 items-center gap-2 px-(--card-spacing)">
+        <ListTree className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+        <p className="min-w-0 flex-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          Legend
+        </p>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label={collapsed ? "Expand legend" : "Collapse legend"}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <ChevronDown className={cn("transition-transform", collapsed && "-rotate-90")} />
+        </Button>
+      </div>
+
+      {!collapsed && (
+        <div className="min-h-0 overflow-y-auto px-(--card-spacing) scrollbar-thin">
+          <LegendContent layers={layers} overlays={overlays} rasterLayers={rasterLayers} />
+        </div>
+      )}
+    </Card>
   );
 }
