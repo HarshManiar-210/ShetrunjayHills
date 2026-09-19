@@ -108,11 +108,10 @@ export function LegendContent({
                   >
                     {legend.classes.map((cls) => (
                       <div key={cls.value} className="flex items-center gap-1.5 text-xs">
-                        <span
-                          className="size-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: cls.color }}
-                          aria-hidden
-                        />
+                        {/* A raster class is a solid block, per the brief —
+                            the same shape LayerSwatch gives a filled polygon,
+                            and deliberately not the dot a point layer gets. */}
+                        <LayerSwatch color={cls.color} geometryKind="raster" />
                         <span className="truncate" title={cls.label}>
                           {isLong(legend) ? (cls.shortLabel ?? cls.label) : cls.label}
                         </span>

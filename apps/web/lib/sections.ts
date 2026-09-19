@@ -23,6 +23,7 @@ import {
   Gem,
   Layers3,
   Sprout,
+  Square,
   Zap,
   ScrollText,
   PawPrint,
@@ -205,7 +206,17 @@ export function slugify(label: string): string {
 
 export function iconForGeometry(kind: SwatchGeometryKind): LucideIcon {
   if (kind === "point") return MapPin;
-  return kind === "line" ? Route : SquareDashed;
+  if (kind === "line") return Route;
+  if (kind === "raster") return Image;
+  return kind === "polygon" ? Square : SquareDashed;
+}
+
+/** static_overlays.kind -> the legend's shape vocabulary. */
+export function swatchKindOf(kind: OverlayMeta["kind"]): SwatchGeometryKind {
+  if (kind === "line") return "line";
+  if (kind === "point") return "point";
+  if (kind === "outline") return "polygon-outline";
+  return "polygon";
 }
 
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
@@ -306,8 +317,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         key: o.key,
         label: o.label,
         color: o.color ?? DEFAULT_OVERLAY_COLOR,
-        geometryKind:
-          o.kind === "line" ? "line" : o.kind === "point" ? "point" : "polygon",
+        geometryKind: swatchKindOf(o.kind),
         pending: o.status === "pending",
         icon: ITEM_STYLE[o.key],
       })),

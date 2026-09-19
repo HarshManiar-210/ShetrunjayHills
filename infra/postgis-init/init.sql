@@ -92,7 +92,12 @@ CREATE TABLE static_overlays (
     -- text `section` column, which could only express one flat level.
     group_id   INTEGER NOT NULL REFERENCES layer_groups (id) ON DELETE RESTRICT,
     asset_type TEXT NOT NULL CHECK (asset_type IN ('vector', 'raster')),
-    kind       TEXT CHECK (kind IN ('line', 'fill', 'point')),
+    -- How a vector layer draws, and therefore what its legend swatch looks
+    -- like. 'fill' is a solid-tinted area (Forest Boundary, Geology);
+    -- 'outline' is a boundary drawn as an outline only, with no tint
+    -- (Village/Taluka/District/Study Area) -- the brief asks for those two to
+    -- be distinguishable in the legend. NULL for a raster row.
+    kind       TEXT CHECK (kind IN ('line', 'fill', 'outline', 'point')),
     color      TEXT,
     file_path  TEXT NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
@@ -267,11 +272,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('watershed',      'Watershed',          grp('hydrogeology'), 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2, 71.728179, 21.451808, 71.822433, 21.512483),
     ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
     ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
-    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
-    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
-    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
+    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'outline', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
+    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
-    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
+    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
 
 -- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
 -- client's full 856,700-point survey, served as-is (client wants the real
@@ -460,4 +465,4 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- DistrictBoundary.geojson. That row is now honestly labelled District
 -- Boundary, and this is the taluka layer that should have sat beside it.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('talukaBoundary', 'Taluka Boundary', grp('administrative-boundaries'), 'vector', 'fill', '#C98BDB', 'vector-data/Talukas.geojson', 6, 71.352470, 21.144960, 72.298580, 22.353210);
+    ('talukaBoundary', 'Taluka Boundary', grp('administrative-boundaries'), 'vector', 'outline', '#C98BDB', 'vector-data/Talukas.geojson', 6, 71.352470, 21.144960, 72.298580, 22.353210);

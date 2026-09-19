@@ -10,7 +10,12 @@ export interface OverlayMeta {
   /** The layer_groups row this overlay sits under. See fetchLayerGroups. */
   group_id: number;
   asset_type: "vector" | "raster";
-  kind?: "line" | "fill" | "point";
+  /**
+   * How the layer draws, which is also what its legend swatch looks like.
+   * 'outline' is a boundary with no tint (Village/Taluka/District/Study Area);
+   * 'fill' is a tinted area (Forest Boundary, Geology).
+   */
+  kind?: "line" | "fill" | "outline" | "point";
   color?: string;
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";

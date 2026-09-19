@@ -429,12 +429,16 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         },
       });
     } else {
+      // An 'outline' layer still gets a fill, drawn fully transparent. It is
+      // never seen, but MapLibre hit-tests geometry rather than pixels, so it
+      // is what lets a boundary be clicked anywhere inside it rather than
+      // only on the hairline itself.
       map.addLayer({
         id: `${sourceId}-fill`,
         type: "fill",
         source: sourceId,
         layout: { visibility: "none" },
-        paint: { "fill-color": color, "fill-opacity": 0.15 },
+        paint: { "fill-color": color, "fill-opacity": kind === "outline" ? 0 : 0.15 },
       });
       map.addLayer({
         id: `${sourceId}-outline`,
@@ -474,7 +478,7 @@ function flyToIfCloser(map: MapLibreMap, bounds: LngLatBoundsLike | undefined) {
   }
 }
 
-function overlayLayerIds(kind: "line" | "fill" | "point", sourceId: string) {
+function overlayLayerIds(kind: OverlayDef["kind"], sourceId: string) {
   if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
   if (kind === "point") return [`${sourceId}-circle`];
   return [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
