@@ -43,6 +43,7 @@ import {
   layerIdOf,
   rasterToggleKey,
   sectionToggleKeys,
+  DEFAULT_RASTER_OPACITY,
 } from "@/lib/sections";
 import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
 import type { LegendOverlay } from "@/components/LegendCard";
@@ -62,9 +63,6 @@ type MobileSheet = "menu" | "legend" | null;
  * the API, which stats the files, so no layer is named here.
  */
 const HEAVY_LAYER_BYTES = 50 * 1024 * 1024;
-
-/** What a raster theme draws at until the opacity control lands. */
-const DEFAULT_RASTER_OPACITY = 0.75;
 
 interface HeavyLayer {
   key: string;
@@ -100,6 +98,9 @@ export function MapDashboard() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
+  // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
+  // fading one raster to see another underneath does not fade both.
+  const [rasterOpacity, setRasterOpacity] = useState<Record<string, number>>({});
 
   // A layer big enough to be worth warning about, waiting on confirmation.
   const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
@@ -285,6 +286,10 @@ export function MapDashboard() {
     setRasterYear((y) => ({ ...y, [sectionId]: year }));
   }, []);
 
+  const changeRasterOpacity = useCallback((sectionId: string, opacity: number) => {
+    setRasterOpacity((o) => ({ ...o, [sectionId]: opacity }));
+  }, []);
+
   // Everything switched on, split back into what the map takes: vector
   // overlay keys, and ids of the permissioned `layers` rows. Raster themes
   // are handled separately below — they share the visibility map but are not
@@ -329,9 +334,9 @@ export function MapDashboard() {
         id: section.id,
         url: overlayDataUrl(image.key),
         bounds: image.bounds,
-        opacity: DEFAULT_RASTER_OPACITY,
+        opacity: rasterOpacity[section.id] ?? DEFAULT_RASTER_OPACITY,
       })),
-    [activeRasters],
+    [activeRasters, rasterOpacity],
   );
 
   const legendRasterLayers = useMemo(
@@ -381,6 +386,8 @@ export function MapDashboard() {
         onToggleItem={toggleItem}
         rasterYear={rasterYear}
         onRasterYearChange={changeRasterYear}
+        rasterOpacity={rasterOpacity}
+        onRasterOpacityChange={changeRasterOpacity}
       />
     </>
   );

@@ -346,12 +346,16 @@ export function sectionToggleKeys(section: SectionDef): string[] {
   return [...own, ...section.children.flatMap(sectionToggleKeys)];
 }
 
+/** What a raster theme draws at until its opacity slider is touched. */
+export const DEFAULT_RASTER_OPACITY = 0.75;
+
 /**
- * Whether a section has anything to disclose. A raster theme with a single
- * image and a group with a single layer and no children are both fully
- * expressed by the header switch, so neither gets a chevron.
+ * Whether a section has anything to disclose. Every raster theme does — it
+ * has an opacity slider even when it is a single image with no year to pick.
+ * A group with one layer and no children is fully expressed by its header
+ * switch, so it gets no chevron.
  */
 export function sectionIsExpandable(section: SectionDef): boolean {
   if (section.children.length > 0) return true;
-  return section.mode === "layer" ? section.years.length > 1 : section.items.length > 1;
+  return section.mode === "layer" ? true : section.items.length > 1;
 }

@@ -1,8 +1,10 @@
 import { memo } from "react";
 import { ChevronDown, Layers, type LucideIcon } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  DEFAULT_RASTER_OPACITY,
   iconForGeometry,
   sectionIsExpandable,
   sectionToggleKeys,
@@ -335,6 +337,8 @@ function SectionNode({
   onToggleItem,
   rasterYear,
   onRasterYearChange,
+  rasterOpacity,
+  onRasterOpacityChange,
   tourTarget,
 }: {
   section: SectionDef;
@@ -345,6 +349,8 @@ function SectionNode({
   onToggleItem: (key: string) => void;
   rasterYear: Record<string, number>;
   onRasterYearChange: (sectionId: string, year: number) => void;
+  rasterOpacity: Record<string, number>;
+  onRasterOpacityChange: (sectionId: string, opacity: number) => void;
   tourTarget?: string;
 }) {
   const keys = sectionToggleKeys(section);
@@ -361,6 +367,14 @@ function SectionNode({
           years={section.years}
           year={rasterYear[section.id] ?? section.years.at(-1)?.year ?? null}
           onChange={(year) => onRasterYearChange(section.id, year)}
+        />
+      )}
+
+      {section.mode === "layer" && (
+        <OpacityControl
+          label={section.label}
+          opacity={rasterOpacity[section.id] ?? DEFAULT_RASTER_OPACITY}
+          onChange={(opacity) => onRasterOpacityChange(section.id, opacity)}
         />
       )}
 
@@ -396,6 +410,8 @@ function SectionNode({
               onToggleItem={onToggleItem}
               rasterYear={rasterYear}
               onRasterYearChange={onRasterYearChange}
+              rasterOpacity={rasterOpacity}
+              onRasterOpacityChange={onRasterOpacityChange}
             />
           ))}
         </div>
@@ -428,6 +444,38 @@ function SectionNode({
   );
 }
 
+// Raster-only, per the brief ("Provide an opacity slider specifically for
+// Raster layers"). Vector layers are thin geometry over imagery — fading them
+// makes them unreadable rather than revealing anything underneath.
+function OpacityControl({
+  label,
+  opacity,
+  onChange,
+}: {
+  label: string;
+  opacity: number;
+  onChange: (opacity: number) => void;
+}) {
+  return (
+    <div className="px-1.5 py-1">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground/80">Opacity</span>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {Math.round(opacity * 100)}%
+        </span>
+      </div>
+      <Slider
+        value={[Math.round(opacity * 100)]}
+        min={0}
+        max={100}
+        step={5}
+        aria-label={`${label} opacity`}
+        onValueChange={([next]) => onChange(next / 100)}
+      />
+    </div>
+  );
+}
+
 function SidebarSectionsImpl({
   sections,
   visibility,
@@ -437,6 +485,8 @@ function SidebarSectionsImpl({
   onToggleItem,
   rasterYear,
   onRasterYearChange,
+  rasterOpacity,
+  onRasterOpacityChange,
 }: {
   sections: SectionDef[];
   /** Toggle key → on, across every group at once. See lib/sections.ts. */
@@ -449,6 +499,9 @@ function SidebarSectionsImpl({
   /** Group id → selected year. */
   rasterYear: Record<string, number>;
   onRasterYearChange: (sectionId: string, year: number) => void;
+  /** Group id → 0..1 opacity. Absent means DEFAULT_RASTER_OPACITY. */
+  rasterOpacity: Record<string, number>;
+  onRasterOpacityChange: (sectionId: string, opacity: number) => void;
 }) {
   const onCount = Object.values(visibility).filter(Boolean).length;
 
@@ -478,6 +531,8 @@ function SidebarSectionsImpl({
             onToggleItem={onToggleItem}
             rasterYear={rasterYear}
             onRasterYearChange={onRasterYearChange}
+            rasterOpacity={rasterOpacity}
+            onRasterOpacityChange={onRasterOpacityChange}
             // The walkthrough points at the first heading as its example;
             // the rest need no target of their own.
             tourTarget={i === 0 ? "section-theme" : undefined}
