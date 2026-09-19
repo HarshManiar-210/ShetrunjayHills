@@ -82,3 +82,23 @@ func (r *Repository) GetLayerGroups(ctx context.Context) ([]models.LayerGroup, e
 
 	return groups, nil
 }
+
+// GetStaticOverlay returns one overlay row by key, including its FilePath and
+// extent — what RasterStats needs to find the image and turn its pixels into
+// ground area. Returns pgx.ErrNoRows (wrapped) when no such key exists.
+func (r *Repository) GetStaticOverlay(ctx context.Context, key string) (models.StaticOverlay, error) {
+	var o models.StaticOverlay
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, key, label, group_id, asset_type, COALESCE(kind, ''), COALESCE(color, ''),
+			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status
+		FROM static_overlays
+		WHERE key = $1
+	`, key).Scan(
+		&o.ID, &o.Key, &o.Label, &o.GroupID, &o.AssetType, &o.Kind, &o.Color,
+		&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status,
+	)
+	if err != nil {
+		return models.StaticOverlay{}, fmt.Errorf("repository: get static overlay: %w", err)
+	}
+	return o, nil
+}

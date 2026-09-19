@@ -1,12 +1,45 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
-import { rasterStats, STUDY_AREA_HA, type RasterLayerStats, type StatsRasterLayer } from "@/lib/stats-mock";
+import { ClassDonut } from "@/components/ClassDonut";
 import { geometryKindOf } from "@/lib/sections";
+import {
+  fetchRasterStats,
+  nameClasses,
+  type NamedClassStat,
+  type RasterStats,
+} from "@/lib/raster-stats-api";
 import type { LayerFeature } from "@/lib/layers-api";
 
-export type { StatsRasterLayer };
+/**
+ * Real surveyed area of the Shetrunjay study area, in hectares — read off
+ * StudyArea.geojson's own `areaSqKm` property, not estimated.
+ */
+export const STUDY_AREA_HA = 3396;
+
+/**
+ * A raster theme currently on the map, and the specific image it is showing.
+ * `imageKey` is the static_overlays key for the selected year, which is what
+ * the statistics endpoint measures.
+ */
+export interface StatsRasterLayer {
+  id: string;
+  name: string;
+  imageKey: string;
+  year: number | null;
+  years: number[];
+}
+
+/**
+ * Above this many classes a donut stops being readable, so the panel shows the
+ * stacked bar and table instead. Vegetation Change's transition matrix runs to
+ * nineteen classes and lands here; Forest Cover, LULC and Fragmentation have
+ * five each and get the ring the brief asked for.
+ */
+const MAX_DONUT_CLASSES = 6;
 
 const COUNT = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 const PERCENT = new Intl.NumberFormat(undefined, {
@@ -14,8 +47,9 @@ const PERCENT = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 });
 
-// One row per vector layer, counted off the features actually loaded into the
-// map — unlike the raster class shares, these counts are real.
+const toHectares = (sqMetres: number) => sqMetres / 10_000;
+
+// One row per vector layer, counted off the features actually loaded.
 interface VectorLayerCount {
   id: number;
   name: string;
@@ -30,110 +64,149 @@ function countByLayer(features: LayerFeature[]): VectorLayerCount[] {
     const { id, name, color } = feature.properties;
     const existing = counts.get(id);
     if (existing) existing.count += 1;
-    else counts.set(id, { id, name, color, count: 1, geometryKind: geometryKindOf(feature.geometry.type) });
+    else
+      counts.set(id, {
+        id,
+        name,
+        color,
+        count: 1,
+        geometryKind: geometryKindOf(feature.geometry.type),
+      });
   }
   return [...counts.values()];
 }
 
-function StackedBar({ classes }: { classes: RasterLayerStats["classes"] }) {
+/** Part-to-whole as a bar, for themes with too many classes to ring. */
+function StackedBar({ classes }: { classes: NamedClassStat[] }) {
   return (
-    <div className="flex h-2 w-full overflow-hidden rounded-full" role="presentation">
+    <div className="flex h-2 w-full gap-px overflow-hidden rounded-full" role="presentation">
       {classes.map((cls) => (
         <span
-          key={String(cls.value)}
-          className="h-full"
-          style={{ width: `${cls.percent}%`, backgroundColor: cls.color }}
-          title={`${cls.label} — ${PERCENT.format(cls.percent)}%`}
+          key={cls.key}
+          className="h-full first:rounded-l-full last:rounded-r-full"
+          style={{ width: `${cls.share * 100}%`, backgroundColor: cls.color }}
+          title={`${cls.label} — ${PERCENT.format(cls.share * 100)}%`}
         />
       ))}
     </div>
   );
 }
 
-// Year-over-year share of the one class the theme tracks. Bars scale against
-// the largest point rather than 100%, so a theme whose tracked class never
-// exceeds ~20% still shows a readable shape.
-function TrendBars({
-  trend,
-  selectedYear,
-}: {
-  trend: NonNullable<RasterLayerStats["trend"]>;
-  selectedYear: number | null;
-}) {
-  const peak = Math.max(...trend.points.map((p) => p.percent));
-
+/**
+ * Doubles as the chart's legend and as its table view: identity is never
+ * carried by slice colour alone.
+ */
+function ClassTable({ classes }: { classes: NamedClassStat[] }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] text-muted-foreground">{trend.className} share by year</span>
-      <div className="flex h-12 items-end gap-1">
-        {trend.points.map((point) => {
-          const current = point.year === selectedYear;
-          return (
-            <div key={point.year} className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
-              <span
-                className={cn("w-full rounded-sm transition-opacity", !current && "opacity-45")}
-                style={{
-                  height: `${Math.max(4, (point.percent / peak) * 34)}px`,
-                  backgroundColor: trend.color,
-                }}
-                title={`${point.year} — ${PERCENT.format(point.percent)}%`}
-              />
-              <span
-                className={cn(
-                  "text-[9px] tabular-nums",
-                  current ? "font-medium text-foreground" : "text-muted-foreground/70",
-                )}
-              >
-                {String(point.year).slice(2)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      {classes.map((cls) => (
+        <div key={cls.key} className="flex items-center gap-1.5 text-xs">
+          <LayerSwatch color={cls.color} geometryKind="raster" />
+          <span className="min-w-0 flex-1 truncate" title={cls.label}>
+            {cls.label}
+          </span>
+          <span className="shrink-0 tabular-nums text-muted-foreground">
+            {COUNT.format(toHectares(cls.areaSqM))} ha
+          </span>
+          <span className="w-11 shrink-0 text-right tabular-nums">
+            {PERCENT.format(cls.share * 100)}%
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function RasterStatsBlock({ stats }: { stats: RasterLayerStats }) {
+function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
+  const [stats, setStats] = useState<RasterStats | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  // One fetch per image. Changing year remounts this block (StatsPanel keys
+  // it on imageKey), so there is nothing to reset here — only the async
+  // callbacks set state, and the guard drops a response that lost the race.
+  useEffect(() => {
+    let cancelled = false;
+    fetchRasterStats(layer.imageKey)
+      .then((result) => {
+        if (!cancelled) setStats(result);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [layer.imageKey]);
+
+  const classes = stats && !stats.photographic ? nameClasses(layer.id, stats.classes ?? []) : [];
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-xs font-medium">{stats.name}</span>
-        {stats.year != null && (
+        <span className="truncate text-xs font-medium">{layer.name}</span>
+        {layer.year != null && (
           <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-            {stats.year}
+            {layer.year}
           </span>
         )}
       </div>
 
-      <StackedBar classes={stats.classes} />
+      {!stats && !failed && (
+        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Loader2 className="size-3 animate-spin" strokeWidth={2} />
+          Measuring…
+        </span>
+      )}
 
-      <div className="flex flex-col gap-0.5">
-        {stats.classes.map((cls) => (
-          <div key={String(cls.value)} className="flex items-center gap-1.5 text-xs">
-            <span
-              className="size-2.5 shrink-0 rounded-full"
-              style={{ backgroundColor: cls.color }}
-              aria-hidden
-            />
-            <span className="min-w-0 flex-1 truncate" title={cls.label}>
-              {cls.label}
-            </span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {COUNT.format(cls.areaHa)} ha
-            </span>
-            <span className="w-11 shrink-0 text-right tabular-nums">
-              {PERCENT.format(cls.percent)}%
+      {failed && (
+        <span className="text-[11px] text-muted-foreground/70 italic">
+          Could not measure this layer.
+        </span>
+      )}
+
+      {stats?.photographic && (
+        <span className="text-[11px] text-muted-foreground/70 italic">
+          Photographic image — no classes to summarise
+        </span>
+      )}
+
+      {classes.length > 0 && (
+        <>
+          <div className="flex items-baseline justify-between gap-2 text-[11px]">
+            <span className="text-muted-foreground">Mapped area</span>
+            <span className="font-medium tabular-nums">
+              {COUNT.format(toHectares(stats!.area_sq_m))} ha
             </span>
           </div>
-        ))}
-      </div>
 
-      {stats.trend && <TrendBars trend={stats.trend} selectedYear={stats.year} />}
+          {/* Ring above the table, not beside it. The panel is 18rem wide and
+              the ring takes 104px of that; side by side, every class name
+              elided to "Moder…". Stacked, the names read in full. */}
+          {classes.length <= MAX_DONUT_CLASSES ? (
+            <div className="flex flex-col items-center gap-1.5">
+              <ClassDonut classes={classes} caption={`${layer.name} class shares`} />
+              <ClassTable classes={classes} />
+            </div>
+          ) : (
+            <>
+              <StackedBar classes={classes} />
+              <ClassTable classes={classes} />
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
+/**
+ * The Statistics tab: class areas per raster theme, measured from the imagery
+ * itself by the API, plus feature counts for the vector layers on screen.
+ *
+ * These replace the synthetic filler this panel used to show. The numbers are
+ * now real enough to check: Forest Cover's measured footprint comes to
+ * 33.6 km² against the study area boundary's own surveyed 33.96 km².
+ */
 export function StatsPanel({
   rasterLayers,
   vectorFeatures,
@@ -143,15 +216,9 @@ export function StatsPanel({
   vectorFeatures: LayerFeature[];
   className?: string;
 }) {
-  const rasterBlocks = rasterLayers
-    .map((layer) => rasterStats(layer))
-    .filter((s): s is RasterLayerStats => s !== null);
   const vectorCounts = countByLayer(vectorFeatures);
-  // Photographic rasters are on the map but have no classes to count — say so
-  // rather than silently omitting them.
-  const photographic = rasterLayers.filter((layer) => layer.isPhotographic);
 
-  if (rasterBlocks.length === 0 && vectorCounts.length === 0 && photographic.length === 0) {
+  if (rasterLayers.length === 0 && vectorCounts.length === 0) {
     return (
       <p className={cn("text-xs text-muted-foreground", className)}>
         No statistics yet — switch on a layer to see its breakdown.
@@ -166,17 +233,11 @@ export function StatsPanel({
         <span className="font-medium tabular-nums">{COUNT.format(STUDY_AREA_HA)} ha</span>
       </div>
 
-      {rasterBlocks.map((stats) => (
-        <RasterStatsBlock key={stats.layerId} stats={stats} />
-      ))}
-
-      {photographic.map((layer) => (
-        <div key={layer.id} className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium">{layer.name}</span>
-          <span className="text-[11px] text-muted-foreground/70 italic">
-            Photographic image — no classes to summarise
-          </span>
-        </div>
+      {/* Keyed on the image, so stepping the year remounts the block with
+          clean state rather than an effect clearing the previous year's
+          numbers after the fact. */}
+      {rasterLayers.map((layer) => (
+        <RasterStatsBlock key={`${layer.id}:${layer.imageKey}`} layer={layer} />
       ))}
 
       {vectorCounts.length > 0 && (
@@ -194,13 +255,6 @@ export function StatsPanel({
             </div>
           ))}
         </div>
-      )}
-
-      {rasterBlocks.length > 0 && (
-        <p className="border-t border-border pt-2 text-[10px] text-muted-foreground/70 italic">
-          Class shares are illustrative placeholders — no zonal statistics have been
-          delivered yet. Feature counts are real.
-        </p>
       )}
     </div>
   );

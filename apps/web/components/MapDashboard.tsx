@@ -423,6 +423,9 @@ export function MapDashboard() {
       activeRasters.map(({ section, image }) => ({
         id: section.id,
         name: section.label,
+        // The overlay row for the year on screen — what the statistics
+        // endpoint measures.
+        imageKey: image.key,
         year: image.year,
         years: section.years.map((y) => y.year),
       })),
