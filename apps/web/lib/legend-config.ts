@@ -71,8 +71,8 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     ],
     note: "Non-Forest renders semi-transparent so the basemap shows through, per the source doc.",
   },
-  lulc: {
-    layerId: "lulc",
+  "historical-land-use": {
+    layerId: "historical-land-use",
     classes: [
       { value: 1, label: "Barren", color: "#816c65" },
       { value: 2, label: "Builtup", color: "#ff0025" },
@@ -83,8 +83,8 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   // Drone-sourced LULC classification — a separate delivery from the
   // satellite `lulc` theme above, with its own (different) palette.
-  "lulc-drone": {
-    layerId: "lulc-drone",
+  "current-land-use": {
+    layerId: "current-land-use",
     classes: [
       { value: 1, label: "Barren", color: "#947a54" },
       { value: 2, label: "Builtup", color: "#dc1010" },
@@ -93,8 +93,8 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 5, label: "Waterbodies", color: "#0000ff" },
     ],
   },
-  fragmentation: {
-    layerId: "fragmentation",
+  "forest-fragmentation": {
+    layerId: "forest-fragmentation",
     classes: [
       { value: "patch", label: "Patch", color: "#e07b34" },
       { value: "edge", label: "Edge", color: "#ffff00" },
@@ -310,8 +310,8 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // shows Near Infrared reflectance most years, but the literal Red band in
   // 1980); that per-year mapping isn't modeled anywhere in this app, so it
   // isn't shown here.
-  fcc: {
-    layerId: "fcc",
+  "satellite-imagery": {
+    layerId: "satellite-imagery",
     classes: [
       { value: "R", label: "Red Band", color: "#FF0000" },
       { value: "G", label: "Green Band", color: "#00FF00" },
@@ -344,6 +344,12 @@ export const LEGEND_CONFIG: Record<string, RasterLegend> = {
   ),
 };
 
+/**
+ * `layerId` is a raster theme's group key, straight off its `layer_groups`
+ * row — the same id lib/sections.ts puts on a SectionDef. Renaming a group's
+ * key in the seed therefore means renaming its entry here; renaming only its
+ * *label* does not.
+ */
 export function legendFor(layerId: string): RasterLegend | undefined {
   return LEGEND_CONFIG[layerId];
 }

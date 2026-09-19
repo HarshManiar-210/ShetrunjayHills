@@ -37,12 +37,44 @@ CREATE TABLE role_layer_permissions (
     PRIMARY KEY (role_id, layer_id)
 );
 
--- Base Layers / Watershed Analysis vector reference geometry and Forest
--- Cover raster imagery. Not RBAC-permissioned (every visitor sees the same
--- reference data), so no role_id here — just a key the frontend switches on
--- and a file_path the API resolves against DATA_ROOT to serve the asset.
--- Adding a new overlay (another vector layer, another raster year) is a row
--- insert here, not a frontend/API code change.
+-- The sidebar's tree. The client's layer structure is two and three levels
+-- deep (Forest Layers > Forest Cover > its years), which the flat `section`
+-- text column this replaces could not express: a group's parent is another
+-- group, and every static overlay hangs off exactly one group.
+--
+-- Re-ordering the sidebar, renaming a heading or adding a whole branch of the
+-- tree is a change to these rows, never to Go or TypeScript (CLAUDE.md's core
+-- invariant). `key` is a stable slug the frontend uses for presentation
+-- lookups (icon, accent colour) and its own state; `label` is what the
+-- sidebar shows, so relabelling for the client invalidates nothing.
+--
+-- One rule the seed below relies on: a group that holds rasters holds exactly
+-- one theme's rasters, because the frontend renders such a group as a single
+-- layer with a year picker. Six unrelated drone rasters therefore get six
+-- groups, not one.
+CREATE TABLE layer_groups (
+    id         SERIAL PRIMARY KEY,
+    key        TEXT NOT NULL UNIQUE,
+    label      TEXT NOT NULL,
+    -- NULL for a top-level heading. A group is deleted with its subtree.
+    parent_id  INTEGER REFERENCES layer_groups (id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX layer_groups_parent_idx ON layer_groups (parent_id);
+
+-- Resolves a group key to its id, so the seed rows below stay readable
+-- instead of carrying a scalar subquery each. Kept (not dropped) so later
+-- migrations that add layers can use it too.
+CREATE FUNCTION grp(group_key TEXT) RETURNS INTEGER AS $$
+    SELECT id FROM layer_groups WHERE key = group_key;
+$$ LANGUAGE sql STABLE;
+
+-- Vector reference geometry and raster imagery. Not RBAC-permissioned (every
+-- visitor sees the same reference data), so no role_id here — just a key the
+-- frontend switches on and a file_path the API resolves against DATA_ROOT to
+-- serve the asset. Adding a new overlay (another vector layer, another raster
+-- year) is a row insert here, not a frontend/API code change.
 -- min_lon/min_lat/max_lon/max_lat (SW/NE corners, EPSG:4326) place a raster
 -- overlay on the map — the source imagery has no embedded geo tags of its
 -- own. NULL for vector rows, which carry their own geometry instead.
@@ -56,7 +88,9 @@ CREATE TABLE static_overlays (
     id         SERIAL PRIMARY KEY,
     key        TEXT NOT NULL UNIQUE,
     label      TEXT NOT NULL,
-    section    TEXT NOT NULL,
+    -- The group this layer sits under in the sidebar. Replaces the old free
+    -- text `section` column, which could only express one flat level.
+    group_id   INTEGER NOT NULL REFERENCES layer_groups (id) ON DELETE RESTRICT,
     asset_type TEXT NOT NULL CHECK (asset_type IN ('vector', 'raster')),
     kind       TEXT CHECK (kind IN ('line', 'fill', 'point')),
     color      TEXT,
@@ -169,22 +203,75 @@ WHERE
     OR (r.name IN ('admin', 'support_team'));
 
 -- ---------------------------------------------------------------------------
+-- Seed: layer groups (the sidebar tree)
+--
+-- Mirrors the client's "Layer Structure" list from the UI/UX brief. Every
+-- heading they asked for exists here even where the data has not been
+-- delivered, so the dashboard shows their structure from day one and each
+-- delivery is a row update (status 'pending' -> 'available' plus a file_path)
+-- rather than another schema or code change.
+--
+-- Three mappings were judgement calls, flagged rather than guessed silently:
+--   * "Satellite Imagery" under Forest Layers is taken to be the FCC series,
+--     the only satellite imagery stack delivered.
+--   * "Forest Cover FSI" / "Forest Type FSI" read as naming the source of
+--     those themes rather than separate layers, so they are not own groups.
+--   * "Proposed Conservation Sites" already has one delivered file
+--     (potentialSMC.geojson, whose features carry a Name like "Check Dam"),
+--     so it is seeded as one layer beside the three named placeholders.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
+    ('forest-layers',               'Forest Layers',               NULL, 1),
+    ('landuse',                     'Landuse',                     NULL, 2),
+    ('drone-data',                  'Drone Data',                  NULL, 3),
+    ('drone-analysis',              'Drone Analysis',              NULL, 4),
+    ('hydrogeology',                'Hydrogeology',                NULL, 5),
+    ('existing-water-conservation', 'Existing Water Conservation', NULL, 6),
+    ('proposed-conservation-sites', 'Proposed Conservation Sites', NULL, 7),
+    ('biodiversity-data',           'Biodiversity Data',           NULL, 8),
+    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 9),
+    ('reference',                   'Reference',                   NULL, 10);
+
+-- Second level. Each of these holds one theme's rasters, so the frontend
+-- renders it as a single layer with a year picker -- which is why the six
+-- drone products get a group each rather than sharing one.
+INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
+    ('forest-cover',         'Forest Cover (Yearwise)', grp('forest-layers'), 2),
+    ('forest-type',          'Forest Type (Yearwise)',  grp('forest-layers'), 3),
+    ('vegetation-change',    'Vegetation Change',       grp('forest-layers'), 4),
+    ('forest-fragmentation', 'Forest Fragmentation',    grp('forest-layers'), 5),
+    ('satellite-imagery',    'Satellite Imagery',       grp('forest-layers'), 6),
+
+    ('historical-land-use',  'Historical Land Use (Satellite)', grp('landuse'), 1),
+    ('current-land-use',     'Current Land Use (Drone)',        grp('landuse'), 2),
+
+    ('orthomosaic', 'Orthomosaic',                 grp('drone-data'), 1),
+    ('dsm',         'Digital Surface Model (DSM)', grp('drone-data'), 2),
+    ('dtm',         'Digital Terrain Model (DTM)', grp('drone-data'), 3),
+    ('slope',       'Slope',                       grp('drone-data'), 4),
+    ('aspect',      'Aspect',                      grp('drone-data'), 5),
+    ('chm',         'Canopy Height Model (CHM)',   grp('drone-data'), 6),
+
+    ('toposheet',   'Toposheet',                   grp('reference'), 2);
+
+-- ---------------------------------------------------------------------------
 -- Seed: static overlays
 -- file_path is relative to DATA_ROOT (see apps/api/cmd/api/main.go), which
 -- points at the monorepo's apps/ directory — so these are relative to
 -- apps/vector-data and apps/raster-data.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('streams',        'Streams',            'Watershed Analysis', 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           1, 71.728181, 21.451841, 71.822926, 21.512506),
-    ('watershed',      'Watershed',          'Watershed Analysis', 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2, 71.728179, 21.451808, 71.822433, 21.512483),
-    ('roads',          'Roads',              'Base Layers',        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
-    ('rivers',         'Rivers',             'Base Layers',        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
-    ('villages',       'Village Boundaries', 'Base Layers',        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
-    ('zoneBoundaries', 'Zone Boundaries',    'Base Layers',        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
-    ('studyArea',      'Study Area',         'Base Layers',        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('forestBoundary', 'Forest Boundary',    'Forest Boundary',    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
-    ('cadastralMap',   'Cadastral Map',      'Cadastral Map',      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('streams',        'Stream Network',            grp('hydrogeology'), 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           1, 71.728181, 21.451841, 71.822926, 21.512506),
+    ('watershed',      'Watershed',          grp('hydrogeology'), 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2, 71.728179, 21.451808, 71.822433, 21.512483),
+    ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
+    ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
+    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'fill', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
+    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'fill', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
+    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'fill', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
+    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'fill', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
 
 -- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
 -- client's full 856,700-point survey, served as-is (client wants the real
@@ -192,18 +279,18 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
 -- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
 -- file_path stay unset until a follow-up row update supplies real data, no
 -- code change required either way.
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeHeight',  'Tree Height',  'Tree Inventory', 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
-    ('treeSpecies', 'Tree Species', 'Tree Inventory', 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
+    ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
 
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('forest_cover_1980', '1980', 'Forest Cover', 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('forest_cover_1989', '1989', 'Forest Cover', 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_1998', '1998', 'Forest Cover', 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2008', '2008', 'Forest Cover', 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2018', '2018', 'Forest Cover', 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2025', '2025', 'Forest Cover', 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('forest_cover_2026', '2026', 'Forest Cover', 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
+    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- Vegetation Change: same per-year-raster shape as Forest Cover, but each
 -- image is a from→to transition (see legend-config.ts's 25-class VDF/MDF/
@@ -211,48 +298,48 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
 -- single year. sort_order (and the key's trailing year) is the transition's
 -- end year, which sections.ts falls back to for ordering/selection since the
 -- label itself isn't a bare number here.
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('vegetation_change_1980_1989', '1980 → 1989', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.727577, 21.452491, 71.822678, 21.511575),
-    ('vegetation_change_1989_1998', '1989 → 1998', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_1998_2008', '1998 → 2008', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2008_2018', '2008 → 2018', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2018_2025', '2018 → 2025', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2025_2026', '2025 → 2026', 'Vegetation Change', 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('vegetation_change_1980_1989', '1980 → 1989', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.727577, 21.452491, 71.822678, 21.511575),
+    ('vegetation_change_1989_1998', '1989 → 1998', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_1998_2008', '1998 → 2008', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_2008_2018', '2008 → 2018', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_2018_2025', '2018 → 2025', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('vegetation_change_2025_2026', '2025 → 2026', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- LULC: same per-year-raster shape as Forest Cover (see legend-config.ts's
 -- Barren/Builtup/Dense Vegetation/Scrub/Waterbody classes).
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('lulc_1980', '1980', 'LULC', 'raster', 'raster-data/lulc/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('lulc_1989', '1989', 'LULC', 'raster', 'raster-data/lulc/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_1998', '1998', 'LULC', 'raster', 'raster-data/lulc/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2008', '2008', 'LULC', 'raster', 'raster-data/lulc/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2018', '2018', 'LULC', 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2025', '2025', 'LULC', 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('lulc_2026', '2026', 'LULC', 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
+    ('lulc_2026', '2026', grp('historical-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fragmentation_1980', '1980', 'Fragmentation', 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('fragmentation_1989', '1989', 'Fragmentation', 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_1998', '1998', 'Fragmentation', 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2008', '2008', 'Fragmentation', 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2018', '2018', 'Fragmentation', 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2025', '2025', 'Fragmentation', 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
-    ('fragmentation_2026', '2026', 'Fragmentation', 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
+    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
 -- flat vector-section pattern as Forest Boundary/Cadastral Map. Mati Pala
 -- hasn't arrived yet, so it's seeded 'pending' like Tree Species above.
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('causeway',      'Causeway',      'SMC', 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1, 71.728402, 21.450967, 71.820940, 21.505128),
-    ('checkDam',      'Check Dam',     'SMC', 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2, 71.737601, 21.456108, 71.821241, 21.509884),
-    ('fireline',      'Fireline',      'SMC', 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
-    ('potentialSmc',  'Potential SMC', 'SMC', 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4, 71.730361, 21.458173, 71.820895, 21.502023),
-    ('vantalawadi',   'Vantalawadi',   'SMC', 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5, 71.733656, 21.463890, 71.819923, 21.510452);
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1, 71.728402, 21.450967, 71.820940, 21.505128),
+    ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2, 71.737601, 21.456108, 71.821241, 21.509884),
+    ('fireline',      'Fireline',      grp('reference'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
+    ('potentialSmc',  'Potential SMC', grp('proposed-conservation-sites'), 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4, 71.730361, 21.458173, 71.820895, 21.502023),
+    ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5, 71.733656, 21.463890, 71.819923, 21.510452);
 
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, status) VALUES
-    ('matiPala', 'Mati Pala', 'SMC', 'vector', NULL, NULL, '', 6, 'pending');
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
+    ('matiPala', 'Matipala', grp('existing-water-conservation'), 'vector', NULL, NULL, '', 6, 'pending');
 
 -- Single-image drone themes: each is its own one-raster section (single
 -- on/off switch, no year dropdown — see sections.ts's yearOf index fallback
@@ -260,20 +347,20 @@ INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_
 -- Forest Boundary/Cadastral Map above. Ortho needs no legend entry (RGB
 -- band composition, not discrete classes); DSM/DTM/CHM/Slope/Aspect's
 -- legends were already seeded in legend-config.ts ahead of this delivery.
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'orthomosaic', 'orthomosaic', 'raster', 'raster-data/orthomosaic.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
-    ('dsm',   'DSM',   'DSM',   'raster', 'raster-data/DSM.png',   1, 71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282),
-    ('dtm',   'DTM',   'DTM',   'raster', 'raster-data/DTM.png',   1, 71.727678,           21.452812,           71.823913,           21.512044),
-    ('slope', 'Slope', 'Slope', 'raster', 'raster-data/Slope.png', 1, 71.727678,           21.452812,           71.823913,           21.512044),
-    ('aspect', 'Aspect', 'Aspect', 'raster', 'raster-data/Aspect.png', 1, 71.727678,        21.452812,           71.823913,           21.512044),
-    ('chm',   'CHM',   'CHM',   'raster', 'raster-data/CHM.png',   1, 71.727066,           21.452069,           71.823365,           21.512053);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378),
+    ('dsm',   'Digital Surface Model (DSM)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282),
+    ('dtm',   'Digital Terrain Model (DTM)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.727678,           21.452812,           71.823913,           21.512044),
+    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.727678,           21.452812,           71.823913,           21.512044),
+    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.727678,        21.452812,           71.823913,           21.512044),
+    ('chm',   'Canopy Height Model (CHM)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.727066,           21.452069,           71.823365,           21.512053);
 
 -- LULC-Drone: legend and extent were delivered, but the actual raster image
 -- wasn't among the new files — seeded 'pending' like Mati Pala/Tree Species
 -- above. Flip to 'available' and fill in file_path/extent once it arrives,
 -- no other row or code change needed.
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, status) VALUES
-    ('lulcDrone', 'LULC-Drone', 'LULC-Drone', 'raster', '', 1, 'pending');
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, status) VALUES
+    ('lulcDrone', 'LULC-Drone', grp('current-land-use'), 'raster', '', 1, 'pending');
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
@@ -287,27 +374,76 @@ INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_or
 -- 1989 on matches the standard FCC convention (NIR→R, Red→G, Green→B);
 -- 1980 doesn't (literal Red→R, NIR→G and B) — as delivered, not a
 -- transcription error. 1980's G and B both "Band 6: Near Infrared" likewise.
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fcc_1980', '1980', 'FCC', 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
-    ('fcc_1989', '1989', 'FCC', 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_1998', '1998', 'FCC', 'raster', 'raster-data/FCC/1998.png', 1998, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2008', '2008', 'FCC', 'raster', 'raster-data/FCC/2008.png', 2008, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2018', '2018', 'FCC', 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2025', '2025', 'FCC', 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2026', '2026', 'FCC', 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('fcc_1980', '1980', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
+    ('fcc_1989', '1989', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_1998', '1998', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1998.png', 1998, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2008', '2008', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2008.png', 2008, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2018', '2018', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2025', '2025', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('fcc_2026', '2026', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
 
 -- Dyke/Geology/Geomorphology/Greenwash/Lineament: five newly delivered
 -- geology-themed vector layers, each its own one-layer section (same flat
 -- pattern as Forest Boundary/Cadastral Map above) - no handler or component
 -- code needed.
-INSERT INTO static_overlays (key, label, section, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('dyke',          'Dyke',          'Dyke',          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1, 71.753944, 21.453344, 71.819504, 21.498314),
-    ('geology',       'Geology',       'Geology',       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('geomorphology', 'Geomorphology', 'Geomorphology', 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('greenwash',     'Greenwash',     'Greenwash',     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
-    ('lineament',     'Lineament',     'Lineament',     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1, 71.753944, 21.453344, 71.819504, 21.498314),
+    ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
+    ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
-INSERT INTO static_overlays (key, label, section, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', 'Toposheet', 'raster', 'raster-data/toposheet.png', 1, 71.728494, 21.451980, 71.821804, 21.511973);
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.728494, 21.451980, 71.821804, 21.511973);
+
+-- ---------------------------------------------------------------------------
+-- Seed: layers from the client's structure with no data delivered yet.
+--
+-- Seeded 'pending' exactly like Tree Species and Matipala above: no kind,
+-- colour, file or extent, and the sidebar renders them as a disabled
+-- placeholder. Each goes live by updating its row; nothing else changes.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, status) VALUES
+    ('greenCover', 'Green Cover', grp('forest-layers'), 'raster', '', 1, 'pending'),
+    ('forestType', 'Forest Type', grp('forest-type'),   'raster', '', 1, 'pending');
+
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
+    -- Drone Analysis. Tree Height and Tree Species are seeded above; these
+    -- are the rest of the brief's list for that group.
+    ('treeDensity',         'Tree Density',                grp('drone-analysis'), 'vector', NULL, NULL, '', 3, 'pending'),
+    ('treeCount',           'Tree Count',                  grp('drone-analysis'), 'vector', NULL, NULL, '', 4, 'pending'),
+    ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
+    ('growingStock',        'Growing Stock',               grp('drone-analysis'), 'vector', NULL, NULL, '', 6, 'pending'),
+    ('treesOutsideForests', 'Trees Outside Forests (TOF)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
+
+    ('floodDepth', 'Flood Depth (m)', grp('hydrogeology'), 'vector', NULL, NULL, '', 7, 'pending'),
+
+    -- Proposed Conservation Sites. potentialSMC.geojson is already delivered
+    -- and its features carry a Name ("Check Dam", ...), so it may already
+    -- cover all three of these -- confirm with the client before filling in.
+    ('proposedMatipala',    'Matipala',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 2, 'pending'),
+    ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 3, 'pending'),
+    ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 4, 'pending'),
+
+    -- Biodiversity Data. The brief marks Rare Species as something to
+    -- highlight within Field Plots; it is its own layer so it can be styled
+    -- and switched independently once the data lands.
+    ('fieldPlots',         'Field Plots and Statistics', grp('biodiversity-data'), 'vector', NULL, NULL, '', 1, 'pending'),
+    ('rareSpecies',        'Rare Species',               grp('biodiversity-data'), 'vector', NULL, NULL, '', 2, 'pending'),
+    ('wildlifeMovement',   'Wildlife Movement',          grp('biodiversity-data'), 'vector', NULL, NULL, '', 3, 'pending'),
+    ('habitatSuitability', 'Habitat Suitability',        grp('biodiversity-data'), 'vector', NULL, NULL, '', 4, 'pending'),
+    ('wildlifeCorridors',  'Wildlife Corridors',         grp('biodiversity-data'), 'vector', NULL, NULL, '', 5, 'pending'),
+
+    ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
+
+-- Taluka Boundary. Talukas.geojson was delivered but never seeded, which is
+-- half of why the client reported "Zone File is showing District boundary" --
+-- the other half being that the Zone Boundaries row pointed at
+-- DistrictBoundary.geojson. That row is now honestly labelled District
+-- Boundary, and this is the taluka layer that should have sat beside it.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('talukaBoundary', 'Taluka Boundary', grp('administrative-boundaries'), 'vector', 'fill', '#C98BDB', 'vector-data/Talukas.geojson', 6, 71.352470, 21.144960, 72.298580, 22.353210);

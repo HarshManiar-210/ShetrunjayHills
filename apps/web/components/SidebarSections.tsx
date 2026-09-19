@@ -118,6 +118,7 @@ function SidebarSectionBox({
   label,
   icon: Icon,
   accent,
+  depth,
   active,
   expandable,
   expanded,
@@ -129,6 +130,8 @@ function SidebarSectionBox({
   label: string;
   icon: LucideIcon;
   accent: SectionAccent;
+  /** 0 for a top-level heading. Nested groups get lighter chrome. */
+  depth: number;
   /** Something in this section is drawing. Independent of `expanded`. */
   active: boolean;
   expandable: boolean;
@@ -141,14 +144,32 @@ function SidebarSectionBox({
   const hasBody = expandable && expanded && Boolean(children);
   const style = ACCENT_STYLES[accent];
 
+  // Only the top level is set in wide-tracked small caps. Nested groups sit
+  // in a column already narrowed by their parent's padding, and uppercase
+  // plus letter-spacing costs roughly a third of the width — enough to
+  // truncate "Existing Water Conservation" and "Forest Cover (Yearwise)".
+  // Sentence case wraps instead of eliding, so full names stay readable.
+  const labelClass =
+    depth === 0
+      ? "min-w-0 text-[11px] font-semibold tracking-wider break-words uppercase transition-colors"
+      : "min-w-0 text-xs font-medium break-words transition-colors";
+
   return (
     <section
       data-tour={tourTarget}
       className={cn(
-        "overflow-hidden rounded-xl border bg-card transition-all duration-200",
-        active
-          ? cn("shadow-e3 ring-1", style.edge)
-          : cn("shadow-e2 hover:-translate-y-px hover:shadow-e3", style.idleEdge),
+        "overflow-hidden border transition-all duration-200",
+        // A nested group is a card *inside* a card, so it drops the elevation
+        // and the hover lift — stacking those at three levels turns the
+        // column into a pile of competing boxes.
+        depth === 0
+          ? cn(
+              "rounded-xl bg-card",
+              active
+                ? cn("shadow-e3 ring-1", style.edge)
+                : cn("shadow-e2 hover:-translate-y-px hover:shadow-e3", style.idleEdge),
+            )
+          : cn("rounded-lg bg-card/40", active ? style.edge : style.idleEdge),
       )}
     >
       <header
@@ -181,12 +202,7 @@ function SidebarSectionBox({
               aria-expanded={expanded}
               className="flex min-w-0 flex-1 items-center gap-1 text-left"
             >
-              <p
-                className={cn(
-                  "truncate text-[11px] font-semibold tracking-wider uppercase transition-colors",
-                  active ? "text-foreground" : "text-muted-foreground",
-                )}
-              >
+              <p className={cn(labelClass, active ? "text-foreground" : "text-muted-foreground")}>
                 {label}
               </p>
               <ChevronDown
@@ -198,12 +214,7 @@ function SidebarSectionBox({
               />
             </button>
           ) : (
-            <p
-              className={cn(
-                "truncate text-[11px] font-semibold tracking-wider uppercase transition-colors",
-                active ? "text-foreground" : "text-muted-foreground",
-              )}
-            >
+            <p className={cn(labelClass, active ? "text-foreground" : "text-muted-foreground")}>
               {label}
             </p>
           )}
@@ -310,6 +321,113 @@ function YearControl({
   );
 }
 
+/**
+ * One node of the tree: its header switch, its own layers, then its child
+ * groups. Recursive, because the client's structure nests (Forest Layers >
+ * Forest Cover > its years) and the depth is set by seed rows, not by code.
+ */
+function SectionNode({
+  section,
+  visibility,
+  expanded,
+  onToggleExpanded,
+  onToggleSection,
+  onToggleItem,
+  rasterYear,
+  onRasterYearChange,
+  tourTarget,
+}: {
+  section: SectionDef;
+  visibility: Record<string, boolean>;
+  expanded: Record<string, boolean>;
+  onToggleExpanded: (id: string) => void;
+  onToggleSection: (id: string, on: boolean) => void;
+  onToggleItem: (key: string) => void;
+  rasterYear: Record<string, number>;
+  onRasterYearChange: (sectionId: string, year: number) => void;
+  tourTarget?: string;
+}) {
+  const keys = sectionToggleKeys(section);
+  // The header switch is on only when everything beneath it is on, so a group
+  // with some rows checked reads as off and turning it on fills in the rest.
+  const allOn = keys.length > 0 && keys.every((key) => visibility[key]);
+  const anyOn = keys.some((key) => visibility[key]);
+
+  const body = (
+    <>
+      {section.mode === "layer" && section.years.length > 1 && (
+        <YearControl
+          label={section.label}
+          years={section.years}
+          year={rasterYear[section.id] ?? section.years.at(-1)?.year ?? null}
+          onChange={(year) => onRasterYearChange(section.id, year)}
+        />
+      )}
+
+      {section.items.map((item) =>
+        item.pending ? (
+          <PendingItemRow
+            key={item.key}
+            label={item.label}
+            icon={item.icon ?? iconForGeometry(item.geometryKind)}
+          />
+        ) : (
+          <ToggleItemRow
+            key={item.key}
+            label={item.label}
+            icon={item.icon ?? iconForGeometry(item.geometryKind)}
+            color={item.color}
+            checked={Boolean(visibility[item.key])}
+            onActivate={() => onToggleItem(item.key)}
+          />
+        ),
+      )}
+
+      {section.children.length > 0 && (
+        <div className="flex flex-col gap-1.5 p-1">
+          {section.children.map((child) => (
+            <SectionNode
+              key={child.id}
+              section={child}
+              visibility={visibility}
+              expanded={expanded}
+              onToggleExpanded={onToggleExpanded}
+              onToggleSection={onToggleSection}
+              onToggleItem={onToggleItem}
+              rasterYear={rasterYear}
+              onRasterYearChange={onRasterYearChange}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <SidebarSectionBox
+      label={section.label}
+      icon={section.icon}
+      accent={section.accent}
+      depth={section.depth}
+      active={anyOn}
+      expandable={sectionIsExpandable(section)}
+      expanded={Boolean(expanded[section.id])}
+      onToggleExpanded={() => onToggleExpanded(section.id)}
+      tourTarget={tourTarget}
+      right={
+        <Switch
+          size="sm"
+          checked={allOn}
+          onCheckedChange={(checked) => onToggleSection(section.id, checked)}
+          aria-label={`Toggle ${section.label}`}
+        />
+      }
+    >
+      {body}
+    </SidebarSectionBox>
+  );
+}
+
 function SidebarSectionsImpl({
   sections,
   visibility,
@@ -321,14 +439,14 @@ function SidebarSectionsImpl({
   onRasterYearChange,
 }: {
   sections: SectionDef[];
-  /** Toggle key → on, across every section at once. See lib/sections.ts. */
+  /** Toggle key → on, across every group at once. See lib/sections.ts. */
   visibility: Record<string, boolean>;
-  /** Section label → disclosed. Independent of what is drawing. */
+  /** Group id → disclosed. Independent of what is drawing. */
   expanded: Record<string, boolean>;
-  onToggleExpanded: (section: string) => void;
-  onToggleSection: (section: string, on: boolean) => void;
+  onToggleExpanded: (id: string) => void;
+  onToggleSection: (id: string, on: boolean) => void;
   onToggleItem: (key: string) => void;
-  /** Section id → selected year. */
+  /** Group id → selected year. */
   rasterYear: Record<string, number>;
   onRasterYearChange: (sectionId: string, year: number) => void;
 }) {
@@ -349,70 +467,22 @@ function SidebarSectionsImpl({
       </div>
 
       <div className="flex flex-col gap-2.5 p-3">
-        {sections.map((section, i) => {
-          const keys = sectionToggleKeys(section);
-          // A section's header switch is on when everything it owns is on, so
-          // a multi-layer section with only some rows checked reads as off at
-          // the header and turning it on fills in the rest.
-          const allOn = keys.length > 0 && keys.every((key) => visibility[key]);
-          const anyOn = keys.some((key) => visibility[key]);
-          const expandable = sectionIsExpandable(section);
-
-          const body =
-            section.mode === "layer" ? (
-              <YearControl
-                label={section.label}
-                years={section.years}
-                year={rasterYear[section.id] ?? section.years.at(-1)?.year ?? null}
-                onChange={(year) => onRasterYearChange(section.id, year)}
-              />
-            ) : (
-              section.items.map((item) =>
-                item.pending ? (
-                  <PendingItemRow
-                    key={item.key}
-                    label={item.label}
-                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
-                  />
-                ) : (
-                  <ToggleItemRow
-                    key={item.key}
-                    label={item.label}
-                    icon={item.icon ?? iconForGeometry(item.geometryKind)}
-                    color={item.color}
-                    checked={Boolean(visibility[item.key])}
-                    onActivate={() => onToggleItem(item.key)}
-                  />
-                ),
-              )
-            );
-
-          return (
-            <SidebarSectionBox
-              key={section.label}
-              label={section.label}
-              icon={section.icon}
-              accent={section.accent}
-              active={anyOn}
-              expandable={expandable}
-              expanded={Boolean(expanded[section.label])}
-              onToggleExpanded={() => onToggleExpanded(section.label)}
-              // The walkthrough points at the first section as its example of
-              // "switch a section on"; the rest need no target of their own.
-              tourTarget={i === 0 ? "section-theme" : undefined}
-              right={
-                <Switch
-                  size="sm"
-                  checked={allOn}
-                  onCheckedChange={(checked) => onToggleSection(section.label, checked)}
-                  aria-label={`Toggle ${section.label}`}
-                />
-              }
-            >
-              {body}
-            </SidebarSectionBox>
-          );
-        })}
+        {sections.map((section, i) => (
+          <SectionNode
+            key={section.id}
+            section={section}
+            visibility={visibility}
+            expanded={expanded}
+            onToggleExpanded={onToggleExpanded}
+            onToggleSection={onToggleSection}
+            onToggleItem={onToggleItem}
+            rasterYear={rasterYear}
+            onRasterYearChange={onRasterYearChange}
+            // The walkthrough points at the first heading as its example;
+            // the rest need no target of their own.
+            tourTarget={i === 0 ? "section-theme" : undefined}
+          />
+        ))}
       </div>
     </div>
   );

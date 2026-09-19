@@ -21,11 +21,14 @@ type Layer struct {
 // FilePath is resolved against DATA_ROOT server-side and never serialized to
 // the client; the client fetches the asset itself through OverlayData by Key.
 type StaticOverlay struct {
-	ID        int      `json:"id"`
-	Key       string   `json:"key"`
-	Label     string   `json:"label"`
-	Section   string   `json:"section"`
-	AssetType string   `json:"asset_type"`
+	ID    int    `json:"id"`
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	// GroupID is the layer_groups row this overlay sits under in the sidebar.
+	// The frontend assembles the tree from the group list; a layer knows only
+	// its own parent.
+	GroupID   int    `json:"group_id"`
+	AssetType string `json:"asset_type"`
 	Kind      string   `json:"kind,omitempty"`
 	Color     string   `json:"color,omitempty"`
 	FilePath  string   `json:"-"`
@@ -47,4 +50,15 @@ type StaticOverlay struct {
 	// (the tree survey is ~166 MB) without hardcoding which keys are heavy.
 	// 0 for a 'pending' row, which has no file.
 	SizeBytes int64 `json:"size_bytes,omitempty"`
+}
+
+// LayerGroup is a node in the sidebar's tree. ParentID is nil for a
+// top-level heading. Ordering, nesting and labels are all rows, so the
+// sidebar's structure changes without touching Go or TypeScript.
+type LayerGroup struct {
+	ID        int    `json:"id"`
+	Key       string `json:"key"`
+	Label     string `json:"label"`
+	ParentID  *int   `json:"parent_id,omitempty"`
+	SortOrder int    `json:"sort_order"`
 }

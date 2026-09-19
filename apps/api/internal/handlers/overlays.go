@@ -20,6 +20,11 @@ type overlaysGetter interface {
 	GetStaticOverlays(ctx context.Context) ([]models.StaticOverlay, error)
 }
 
+// layerGroupsGetter is the subset of *repository.Repository LayerGroups needs.
+type layerGroupsGetter interface {
+	GetLayerGroups(ctx context.Context) ([]models.LayerGroup, error)
+}
+
 // overlayFilePathGetter is the subset of *repository.Repository OverlayData
 // needs.
 type overlayFilePathGetter interface {
@@ -125,4 +130,22 @@ func assetSize(root, relPath string) int64 {
 		return 0
 	}
 	return info.Size()
+}
+
+// LayerGroups serves the sidebar's tree as a flat parent-linked list. Kept
+// separate from Overlays rather than nested inside it so each endpoint stays
+// one query, and so the tree can be cached on its own — it changes only when
+// the seed does.
+func LayerGroups(repo layerGroupsGetter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		groups, err := repo.GetLayerGroups(r.Context())
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		json.NewEncoder(w).Encode(groups)
+	}
 }

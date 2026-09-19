@@ -80,6 +80,7 @@ func main() {
 	// Static overlays (Base Layers, Watershed Analysis, Forest Cover raster)
 	// aren't RBAC-permissioned rows, so they sit outside the Auth group —
 	// every visitor sees the same reference geometry/imagery.
+	r.Get("/api/layer-groups", handlers.LayerGroups(repo))
 	r.Get("/api/overlays", handlers.Overlays(repo, dataRoot))
 	r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
 

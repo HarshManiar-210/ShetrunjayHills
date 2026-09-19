@@ -8,34 +8,47 @@ import { cn } from "@/lib/utils";
 import { rasterToggleKey, type SectionDef } from "@/lib/sections";
 
 interface SearchEntry {
-  /** Sidebar section this layer lives in. */
+  /** Where this layer sits, e.g. "Forest Layers · Forest Cover (Yearwise)". */
   section: string;
+  /** Group ids from the root down to the layer, so picking it can open the path. */
+  path: string[];
   label: string;
   /** The layer's own toggle key, in the flat namespace from lib/sections.ts. */
   key: string;
 }
 
-// Flattens the sidebar's sections into one searchable list. A raster theme
-// contributes the section itself, since the section is the layer there.
+// Walks the sidebar tree into one searchable list. A raster theme contributes
+// the group itself, since the group is the layer there; every other group
+// contributes its own rows. Two groups can share a label (both conservation
+// branches have a "Matipala"), which is why an entry carries its breadcrumb
+// as well as its name.
 function buildIndex(sections: SectionDef[]): SearchEntry[] {
   const index: SearchEntry[] = [];
 
-  for (const section of sections) {
+  function walk(section: SectionDef, ancestry: SectionDef[]) {
+    const path = [...ancestry, section];
+    const ids = path.map((s) => s.id);
+    const breadcrumb = path.map((s) => s.label).join(" · ");
+
     if (section.mode === "layer") {
       index.push({
-        section: section.label,
+        section: ancestry.map((s) => s.label).join(" · ") || section.label,
+        path: ids,
         label: section.label,
         key: rasterToggleKey(section.id),
       });
-      continue;
+    } else {
+      for (const item of section.items) {
+        // A pending item has no data to reveal — not searchable.
+        if (item.pending) continue;
+        index.push({ section: breadcrumb, path: ids, label: item.label, key: item.key });
+      }
     }
-    for (const item of section.items) {
-      // A pending item has no data to reveal — not searchable.
-      if (item.pending) continue;
-      index.push({ section: section.label, label: item.label, key: item.key });
-    }
+
+    for (const child of section.children) walk(child, path);
   }
 
+  for (const section of sections) walk(section, []);
   return index;
 }
 
@@ -82,7 +95,7 @@ export function LayerSearch({
   sections: SectionDef[];
   /** Toggle key → on, across every section. Drives the "On" badge. */
   visibility: Record<string, boolean>;
-  onSelect: (section: string, key: string) => void;
+  onSelect: (path: string[], key: string) => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -119,7 +132,7 @@ export function LayerSearch({
   }
 
   function choose(result: SearchEntry) {
-    onSelect(result.section, result.key);
+    onSelect(result.path, result.key);
     reset();
   }
 

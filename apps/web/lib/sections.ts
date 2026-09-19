@@ -20,29 +20,34 @@ import {
   TrendingUp,
   Compass,
   Aperture,
-  Ruler,
   Gem,
   Layers3,
   Sprout,
   Zap,
   ScrollText,
+  PawPrint,
+  Ruler,
+  Hash,
+  Scale,
+  Waves,
   type LucideIcon,
 } from "lucide-react";
-import type { OverlayMeta } from "@/lib/overlays-api";
+import type { LayerGroup, OverlayMeta } from "@/lib/overlays-api";
 import type { SwatchGeometryKind } from "@/components/LayerSwatch";
 
 /**
- * The sidebar's sections, derived entirely from what the API returns — the
- * `section` column on `static_overlays`. Adding a layer or a whole section
- * stays a seed insert, never an edit here (CLAUDE.md's core invariant).
+ * The sidebar's tree, assembled from two API lists: `layer_groups` (the
+ * headings and their nesting) and `static_overlays` (the layers, each
+ * pointing at one group). Both are seed rows, so adding a layer, renaming a
+ * heading or restructuring the whole tree stays a data change — never an edit
+ * here (CLAUDE.md's core invariant).
  *
- * The role-permissioned `layers` rows (roads, boundaries, species points,
- * …) aren't surfaced as a sidebar section — layerIdOf below is unreachable
- * dead-code protection kept only because MapDashboard's key-splitting logic
- * still checks for a `layer:` prefix that nothing currently produces.
+ * A group whose rows are rasters is one layer with a year picker, not a list
+ * of layers; that is why the seed gives each unrelated raster theme its own
+ * group. A group can hold layers and child groups at once.
  */
 
-/** Subject colour for a section, resolved to the --sec-* tokens in globals.css. */
+/** Subject colour for a group, resolved to the --sec-* tokens in globals.css. */
 export type SectionAccent =
   | "forest"
   | "canopy"
@@ -60,21 +65,19 @@ export type SectionAccent =
  * that namespace, so two of them are prefixed to keep them apart:
  *
  *   `<overlay key>`   a vector static overlay — the row's own key
- *   `raster:<slug>`   a raster theme, keyed by its section, not by year:
- *                     the year is a separate choice made in `rasterYear`
+ *   `raster:<group>`  a raster theme, keyed by its group, not by year:
+ *                     the year is a separate choice, held in `rasterYear`
  *   `layer:<id>`      a role-permissioned `layers` row
  */
 const LAYER_PREFIX = "layer:";
 const RASTER_PREFIX = "raster:";
 
 export function layerIdOf(key: string): number | null {
-  return key.startsWith(LAYER_PREFIX)
-    ? Number(key.slice(LAYER_PREFIX.length))
-    : null;
+  return key.startsWith(LAYER_PREFIX) ? Number(key.slice(LAYER_PREFIX.length)) : null;
 }
 
-export function rasterToggleKey(sectionId: string): string {
-  return `${RASTER_PREFIX}${sectionId}`;
+export function rasterToggleKey(groupKey: string): string {
+  return `${RASTER_PREFIX}${groupKey}`;
 }
 
 export function isRasterToggleKey(key: string): boolean {
@@ -89,89 +92,80 @@ export interface SectionItem {
   geometryKind: SwatchGeometryKind;
   /** No data yet — render as a disabled placeholder, not a working switch. */
   pending?: boolean;
-  /** Presentation only — see ITEM_STYLE below. Falls back to iconForGeometry when unset. */
+  /** Presentation only — see ITEM_STYLE. Falls back to iconForGeometry when unset. */
   icon?: LucideIcon;
 }
 
 export interface RasterYear {
   /** Sort/selection identity — not always the same text as `label` (e.g. a transition range). */
   year: number;
-  /** What the dropdown shows — a bare year for Forest Cover, a "start → end" range for a transition theme. */
+  /** What the picker shows — a bare year, or a "start → end" range for a transition theme. */
   label: string;
   key: string;
   bounds: [[number, number], [number, number]];
 }
 
-// Most per-year raster labels are the bare year itself ("1989"). A theme
-// whose label is a range ("1980 → 1989") isn't itself a sort key, so fall
-// back to the trailing year baked into the row's key (see init.sql's
-// vegetation_change_* keys) for ordering and default-year selection. A
-// single-image theme (Orthomosaic, DSM, CHM, …) has no year at all — its one row
-// falls back to its position among its section's rasters, which is a valid
-// (if arbitrary) sort/select key precisely because there's nothing else in
-// that section to compare it against.
-function yearOf(o: OverlayMeta, indexFallback = NaN): number {
-  const direct = Number(o.label);
-  if (!Number.isNaN(direct)) return direct;
-  const trailing = o.key.match(/(\d{4})$/);
-  if (trailing) return Number(trailing[1]);
-  return indexFallback;
-}
-
 export interface SectionDef {
   label: string;
-  /** Slug of the label — the legend/statistics id for a raster section. */
+  /** The group's seed key. Unique, unlike the label — two groups are both "Matipala". */
   id: string;
   accent: SectionAccent;
   icon: LucideIcon;
   /**
-   * layer — the section *is* one layer: a header switch, plus a year dropdown
-   *         when the section's rows are per-year rasters.
-   * multi — thin reference geometry meant to be drawn together.
+   * layer — the group *is* one layer: a switch, plus a year picker when it
+   *         holds more than one image.
+   * multi — a heading over layers and/or nested groups.
    */
   mode: "layer" | "multi";
+  /** Layers hanging directly off this group. */
   items: SectionItem[];
+  /** Per-year imagery, when this group is a raster theme. */
   years: RasterYear[];
+  /** Nested groups, in seeded order. */
+  children: SectionDef[];
+  /** 0 for a top-level heading. Drives the sidebar's indentation. */
+  depth: number;
 }
 
 /**
- * Presentation only — icon and subject colour per section name. A section the
- * DB grows that isn't listed here still renders, on the fallback below; no
- * behaviour is gated on the name.
+ * Presentation only — icon and subject colour per group key. A group the seed
+ * grows that isn't listed here still renders, on DEFAULT_STYLE; no behaviour
+ * is gated on the key.
  */
-const SECTION_STYLE: Record<
-  string,
-  { accent: SectionAccent; icon: LucideIcon }
-> = {
-  "Forest Cover": { accent: "forest", icon: Trees },
-  "Watershed Analysis": { accent: "water", icon: Droplets },
-  "Base Layers": { accent: "infra", icon: Layers },
-  LULC: { accent: "land", icon: LandPlot },
-  "Forest Boundary": { accent: "canopy", icon: Trees },
-  "Cadastral Map": { accent: "carbon", icon: MapIcon },
-  Fragmentation: { accent: "change", icon: Puzzle },
-  SMC: { accent: "water", icon: Dam },
+const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> = {
+  "forest-layers": { accent: "forest", icon: Trees },
+  "forest-cover": { accent: "forest", icon: Trees },
+  "forest-type": { accent: "canopy", icon: TreePine },
+  "vegetation-change": { accent: "change", icon: TrendingUp },
+  "forest-fragmentation": { accent: "change", icon: Puzzle },
+  "satellite-imagery": { accent: "imagery", icon: Aperture },
+
+  landuse: { accent: "land", icon: LandPlot },
+  "historical-land-use": { accent: "land", icon: LandPlot },
+  "current-land-use": { accent: "land", icon: MapIcon },
+
+  "drone-data": { accent: "imagery", icon: Image },
   orthomosaic: { accent: "imagery", icon: Image },
-  FCC: { accent: "imagery", icon: Aperture },
-  DSM: { accent: "land", icon: Mountain },
-  DTM: { accent: "land", icon: MountainSnow },
-  CHM: { accent: "canopy", icon: TreePine },
-  Slope: { accent: "land", icon: TrendingUp },
-  Aspect: { accent: "land", icon: Compass },
-  "LULC-Drone": { accent: "land", icon: LandPlot },
-  Dyke: { accent: "land", icon: Ruler },
-  Geology: { accent: "carbon", icon: Gem },
-  Geomorphology: { accent: "land", icon: Layers3 },
-  Greenwash: { accent: "canopy", icon: Sprout },
-  Lineament: { accent: "land", icon: Zap },
-  Toposheet: { accent: "imagery", icon: ScrollText },
+  dsm: { accent: "land", icon: Mountain },
+  dtm: { accent: "land", icon: MountainSnow },
+  slope: { accent: "land", icon: TrendingUp },
+  aspect: { accent: "land", icon: Compass },
+  chm: { accent: "canopy", icon: TreePine },
+
+  "drone-analysis": { accent: "canopy", icon: Sprout },
+  hydrogeology: { accent: "water", icon: Droplets },
+  "existing-water-conservation": { accent: "water", icon: Dam },
+  "proposed-conservation-sites": { accent: "water", icon: Target },
+  "biodiversity-data": { accent: "fauna", icon: PawPrint },
+  "administrative-boundaries": { accent: "infra", icon: MapIcon },
+  reference: { accent: "infra", icon: Layers },
+  toposheet: { accent: "imagery", icon: ScrollText },
 };
 
 /**
- * Presentation only — a per-item icon override, keyed by overlay `key`, for
- * a multi-item section whose rows would otherwise all render the same
- * geometry-shape icon (e.g. SMC's four fill layers). An item not listed here
- * still renders, on iconForGeometry's shape-based fallback; no behaviour is
+ * Presentation only — a per-layer icon override, keyed by overlay `key`, for
+ * groups whose rows would otherwise all render the same geometry-shape icon.
+ * A layer not listed here falls back to iconForGeometry; no behaviour is
  * gated on the key.
  */
 const ITEM_STYLE: Record<string, LucideIcon> = {
@@ -180,6 +174,19 @@ const ITEM_STYLE: Record<string, LucideIcon> = {
   fireline: Flame,
   potentialSmc: Target,
   vantalawadi: MapPinned,
+  streams: Waves,
+  watershed: Droplets,
+  geology: Gem,
+  geomorphology: Layers3,
+  lineament: Zap,
+  dyke: Ruler,
+  treeHeight: Ruler,
+  treeCount: Hash,
+  carbonStock: Scale,
+  greenwash: Sprout,
+  forestBoundary: Trees,
+  talukaBoundary: SquareDashed,
+  districtBoundary: SquareDashed,
 };
 
 const DEFAULT_STYLE: { accent: SectionAccent; icon: LucideIcon } = {
@@ -211,37 +218,56 @@ export function geometryKindOf(type: string): SwatchGeometryKind {
 }
 
 function hasExtent(o: OverlayMeta): boolean {
-  return (
-    o.min_lon != null &&
-    o.min_lat != null &&
-    o.max_lon != null &&
-    o.max_lat != null
-  );
+  return o.min_lon != null && o.min_lat != null && o.max_lon != null && o.max_lat != null;
+}
+
+// Most per-year raster labels are the bare year ("1989"). A theme whose label
+// is a range ("1980 → 1989") isn't itself a sort key, so fall back to the
+// trailing year baked into the row's key (see init.sql's vegetation_change_*
+// keys). A single-image theme (Orthomosaic, DSM, CHM, …) has no year at all —
+// its one row falls back to its position, which is a valid if arbitrary key
+// precisely because there is nothing in that group to compare it against.
+function yearOf(o: OverlayMeta, indexFallback = NaN): number {
+  const direct = Number(o.label);
+  if (!Number.isNaN(direct)) return direct;
+  const trailing = o.key.match(/(\d{4})$/);
+  if (trailing) return Number(trailing[1]);
+  return indexFallback;
 }
 
 /**
- * Groups the API's overlay rows into sections, then appends the permissioned
- * `layers` rows as one more. Section order follows the API's own
- * `ORDER BY section, sort_order`, so re-ordering the sidebar is a seed change.
+ * Assembles the group tree and hangs each overlay off its group.
+ *
+ * Groups arrive flat with a parent link, and overlays arrive flat with a
+ * group id; both are already ordered by the API, so this is one pass to index
+ * and one recursive pass to build.
  */
-export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
-  const bySection = new Map<string, OverlayMeta[]>();
-  for (const overlay of overlays) {
-    const rows = bySection.get(overlay.section) ?? [];
-    rows.push(overlay);
-    bySection.set(overlay.section, rows);
+export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): SectionDef[] {
+  const childGroups = new globalThis.Map<number | null, LayerGroup[]>();
+  for (const group of groups) {
+    const parent = group.parent_id ?? null;
+    const siblings = childGroups.get(parent) ?? [];
+    siblings.push(group);
+    childGroups.set(parent, siblings);
   }
 
-  const sections: SectionDef[] = [];
+  const overlaysByGroup = new globalThis.Map<number, OverlayMeta[]>();
+  for (const overlay of overlays) {
+    const rows = overlaysByGroup.get(overlay.group_id) ?? [];
+    rows.push(overlay);
+    overlaysByGroup.set(overlay.group_id, rows);
+  }
 
-  for (const [label, rows] of bySection) {
-    const style = SECTION_STYLE[label] ?? DEFAULT_STYLE;
-    const rasters = rows.filter(
-      (o) => o.asset_type === "raster" && hasExtent(o),
-    );
+  function build(group: LayerGroup, depth: number): SectionDef {
+    const style = GROUP_STYLE[group.key] ?? DEFAULT_STYLE;
+    const rows = overlaysByGroup.get(group.id) ?? [];
+    const children = (childGroups.get(group.id) ?? []).map((child) => build(child, depth + 1));
 
-    // A section of per-year rasters is one layer with a year dropdown; only
-    // one year's imagery can usefully show at a time.
+    // A group holding placed rasters is one layer with a year picker. Rows
+    // without an extent can't be drawn, so they fall through to `items` and
+    // render as the pending placeholders they are.
+    const rasters = rows.filter((o) => o.asset_type === "raster" && hasExtent(o));
+
     if (rasters.length > 0) {
       const years = rasters
         .map((o, i) => ({
@@ -256,23 +282,26 @@ export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
         .filter((y) => !Number.isNaN(y.year))
         .sort((a, b) => a.year - b.year);
 
-      sections.push({
-        label,
-        id: slugify(label),
+      return {
+        label: group.label,
+        id: group.key,
         ...style,
         mode: "layer",
         items: [],
         years,
-      });
-      continue;
+        children,
+        depth,
+      };
     }
 
-    sections.push({
-      label,
-      id: slugify(label),
+    return {
+      label: group.label,
+      id: group.key,
       ...style,
       mode: "multi",
       years: [],
+      children,
+      depth,
       items: rows.map((o) => ({
         key: o.key,
         label: o.label,
@@ -282,28 +311,37 @@ export function buildSections(overlays: OverlayMeta[]): SectionDef[] {
         pending: o.status === "pending",
         icon: ITEM_STYLE[o.key],
       })),
-    });
+    };
   }
 
-  return sections;
+  return (childGroups.get(null) ?? []).map((group) => build(group, 0));
+}
+
+/** Every node in the tree, depth-first, parents before their children. */
+export function flattenSections(sections: SectionDef[]): SectionDef[] {
+  return sections.flatMap((section) => [section, ...flattenSections(section.children)]);
 }
 
 /**
- * The toggle keys a section's header switch owns — one for a raster theme,
- * one per deliverable item for a multi-layer section. Pending items are left
- * out: they have no data, so "switch the whole section on" must not claim to
- * have turned them on.
+ * Every toggle key a section's header switch owns, including its whole
+ * subtree — switching "Forest Layers" on means switching on everything under
+ * it. Pending layers are left out: they have no data, so "switch the group
+ * on" must not claim to have turned them on.
  */
 export function sectionToggleKeys(section: SectionDef): string[] {
-  if (section.mode === "layer") return [rasterToggleKey(section.id)];
-  return section.items.filter((item) => !item.pending).map((item) => item.key);
+  const own =
+    section.mode === "layer"
+      ? [rasterToggleKey(section.id)]
+      : section.items.filter((item) => !item.pending).map((item) => item.key);
+  return [...own, ...section.children.flatMap(sectionToggleKeys)];
 }
 
 /**
- * Whether a section has anything to show when expanded. A raster theme with a
- * single image and a section with a single layer are both fully expressed by
- * the header switch alone, so neither gets a disclosure chevron.
+ * Whether a section has anything to disclose. A raster theme with a single
+ * image and a group with a single layer and no children are both fully
+ * expressed by the header switch, so neither gets a chevron.
  */
 export function sectionIsExpandable(section: SectionDef): boolean {
+  if (section.children.length > 0) return true;
   return section.mode === "layer" ? section.years.length > 1 : section.items.length > 1;
 }

@@ -7,7 +7,8 @@ export interface OverlayMeta {
   id: number;
   key: string;
   label: string;
-  section: string;
+  /** The layer_groups row this overlay sits under. See fetchLayerGroups. */
+  group_id: number;
   asset_type: "vector" | "raster";
   kind?: "line" | "fill" | "point";
   color?: string;
@@ -24,6 +25,25 @@ export interface OverlayMeta {
    * invariant). Absent for a 'pending' row, which has no file.
    */
   size_bytes?: number;
+}
+
+/**
+ * A node in the sidebar's tree. Arrives flat with a parent link rather than
+ * nested — lib/sections.ts assembles the nesting. `parent_id` is absent on a
+ * top-level heading.
+ */
+export interface LayerGroup {
+  id: number;
+  key: string;
+  label: string;
+  parent_id?: number;
+  sort_order: number;
+}
+
+export async function fetchLayerGroups(): Promise<LayerGroup[]> {
+  const res = await fetch(`${API_URL}/api/layer-groups`);
+  if (!res.ok) throw new Error("failed to load layer groups");
+  return res.json();
 }
 
 export async function fetchOverlays(): Promise<OverlayMeta[]> {

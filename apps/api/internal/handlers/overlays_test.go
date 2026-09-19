@@ -28,7 +28,7 @@ func (f fakeOverlaysGetter) GetStaticOverlays(ctx context.Context) ([]models.Sta
 
 func TestOverlays(t *testing.T) {
 	overlays := []models.StaticOverlay{
-		{ID: 1, Key: "roads", Label: "Roads", Section: "Base Layers", AssetType: "vector", Kind: "line", Color: "#D18B2A"},
+		{ID: 1, Key: "roads", Label: "Roads", GroupID: 9, AssetType: "vector", Kind: "line", Color: "#D18B2A"},
 	}
 
 	cases := []struct {
@@ -158,6 +158,68 @@ func TestOverlayData(t *testing.T) {
 
 			if w.Code != tc.wantStatus {
 				t.Fatalf("status = %d, want %d, body=%s", w.Code, tc.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
+
+type fakeLayerGroupsGetter struct {
+	groups []models.LayerGroup
+	err    error
+}
+
+func (f fakeLayerGroupsGetter) GetLayerGroups(ctx context.Context) ([]models.LayerGroup, error) {
+	return f.groups, f.err
+}
+
+func TestLayerGroups(t *testing.T) {
+	forestLayers := 1
+	groups := []models.LayerGroup{
+		{ID: 1, Key: "forest-layers", Label: "Forest Layers", SortOrder: 1},
+		{ID: 2, Key: "forest-cover", Label: "Forest Cover (Yearwise)", ParentID: &forestLayers, SortOrder: 2},
+	}
+
+	cases := []struct {
+		name       string
+		repo       fakeLayerGroupsGetter
+		wantStatus int
+		wantCount  int
+	}{
+		{"repo error", fakeLayerGroupsGetter{err: errors.New("db down")}, http.StatusInternalServerError, 0},
+		{"lists groups", fakeLayerGroupsGetter{groups: groups}, http.StatusOK, 2},
+		{"no groups", fakeLayerGroupsGetter{groups: nil}, http.StatusOK, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/layer-groups", nil)
+			w := httptest.NewRecorder()
+
+			LayerGroups(tc.repo)(w, req)
+
+			if w.Code != tc.wantStatus {
+				t.Fatalf("status = %d, want %d", w.Code, tc.wantStatus)
+			}
+			if tc.wantStatus != http.StatusOK {
+				return
+			}
+
+			var got []models.LayerGroup
+			if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if len(got) != tc.wantCount {
+				t.Fatalf("len(groups) = %d, want %d", len(got), tc.wantCount)
+			}
+			// A top-level heading must serialize without a parent, so the
+			// frontend can tell a root from a child.
+			if tc.wantCount == 2 {
+				if got[0].ParentID != nil {
+					t.Errorf("root group has parent_id %v, want nil", *got[0].ParentID)
+				}
+				if got[1].ParentID == nil || *got[1].ParentID != forestLayers {
+					t.Errorf("child group parent_id = %v, want %d", got[1].ParentID, forestLayers)
+				}
 			}
 		})
 	}

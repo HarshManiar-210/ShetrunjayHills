@@ -28,15 +28,21 @@ import {
 import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
-import { fetchOverlays, overlayDataUrl, type OverlayMeta } from "@/lib/overlays-api";
+import {
+  fetchLayerGroups,
+  fetchOverlays,
+  overlayDataUrl,
+  type LayerGroup,
+  type OverlayMeta,
+} from "@/lib/overlays-api";
 import { vectorOverlayDefs } from "@/lib/static-overlays";
 import {
   buildSections,
+  flattenSections,
   isRasterToggleKey,
   layerIdOf,
   rasterToggleKey,
   sectionToggleKeys,
-  slugify,
 } from "@/lib/sections";
 import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
 import type { LegendOverlay } from "@/components/LegendCard";
@@ -76,6 +82,7 @@ export function MapDashboard() {
   const auth = useAuthState();
   const [layers, setLayers] = useState<LayerCollection | null>(null);
   const [overlayMeta, setOverlayMeta] = useState<OverlayMeta[]>([]);
+  const [layerGroups, setLayerGroups] = useState<LayerGroup[]>([]);
   const [error, setError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
@@ -127,15 +134,22 @@ export function MapDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, retryTick]);
 
-  // Sections, their order and each row's colour all come from the
-  // `static_overlays` rows — adding a layer or a section stays a seed insert.
+  // The sidebar's whole shape — the tree, its order, every row's colour —
+  // comes from these two seed-backed lists, so adding a layer or restructuring
+  // the tree stays a data change.
   useEffect(() => {
     let cancelled = false;
-    fetchOverlays()
-      .then((meta) => {
-        if (!cancelled) setOverlayMeta(meta);
+    Promise.all([fetchLayerGroups(), fetchOverlays()])
+      .then(([groups, meta]) => {
+        if (cancelled) return;
+        setLayerGroups(groups);
+        setOverlayMeta(meta);
       })
-      .catch(() => setOverlayMeta([]));
+      .catch(() => {
+        if (cancelled) return;
+        setLayerGroups([]);
+        setOverlayMeta([]);
+      });
     return () => {
       cancelled = true;
     };
@@ -159,7 +173,13 @@ export function MapDashboard() {
   // only when that fetch lands. Identity matters as much as the work does:
   // `overlayDefs` is a Map prop, and a fresh array every render would re-run
   // the effects that add sources and drive the dash animation.
-  const sections = useMemo(() => buildSections(overlayMeta), [overlayMeta]);
+  const sections = useMemo(
+    () => buildSections(layerGroups, overlayMeta),
+    [layerGroups, overlayMeta],
+  );
+  // Flattened once, because almost everything downstream asks a question of
+  // the whole tree rather than of one level of it.
+  const allSections = useMemo(() => flattenSections(sections), [sections]);
   const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
 
   // Size per toggle key, so the heavy-layer warning is driven by what the
@@ -167,20 +187,28 @@ export function MapDashboard() {
   // rather than by a hardcoded list of which layers are big.
   // A plain record rather than a Map: the dynamic import above is named
   // `Map`, so the global constructor is not reachable by that name here.
+  const groupKeyById = useMemo(() => {
+    const byId: Record<number, string> = {};
+    for (const group of layerGroups) byId[group.id] = group.key;
+    return byId;
+  }, [layerGroups]);
+
   const heavyLayers = useMemo(() => {
     const byKey: Record<string, HeavyLayer> = {};
     for (const overlay of overlayMeta) {
       const size = overlay.size_bytes ?? 0;
       if (size < HEAVY_LAYER_BYTES) continue;
       const key =
-        overlay.asset_type === "raster" ? rasterToggleKey(slugify(overlay.section)) : overlay.key;
+        overlay.asset_type === "raster"
+          ? rasterToggleKey(groupKeyById[overlay.group_id])
+          : overlay.key;
       // A raster theme is keyed by section, so its years collapse onto one
       // entry — warn with the largest of them.
       if (byKey[key] && byKey[key].sizeBytes >= size) continue;
       byKey[key] = { key, label: overlay.label, sizeBytes: size };
     }
     return byKey;
-  }, [overlayMeta]);
+  }, [overlayMeta, groupKeyById]);
 
   const setKeysVisible = useCallback((keys: string[], on: boolean) => {
     setVisible((v) => {
@@ -219,11 +247,11 @@ export function MapDashboard() {
   }, [heavyPrompt, setKeysVisible]);
 
   const toggleSection = useCallback(
-    (section: string, on: boolean) => {
-      const def = sections.find((s) => s.label === section);
+    (id: string, on: boolean) => {
+      const def = allSections.find((s) => s.id === id);
       if (def) requestKeys(sectionToggleKeys(def), on);
     },
-    [sections, requestKeys],
+    [allSections, requestKeys],
   );
 
   const toggleItem = useCallback(
@@ -231,16 +259,22 @@ export function MapDashboard() {
     [requestKeys, visible],
   );
 
-  const toggleExpanded = useCallback((section: string) => {
-    setExpanded((e) => ({ ...e, [section]: !e[section] }));
+  const toggleExpanded = useCallback((id: string) => {
+    setExpanded((e) => ({ ...e, [id]: !e[id] }));
   }, []);
 
   // Search result picked: switch that layer on and open its section so the
   // row is visible in the sidebar. Always on, never a toggle — someone who
   // searched for a layer wants to see it, not to turn off what they found.
+  // Expands every group on the path down to the layer, not just its parent —
+  // a layer three levels deep is unreachable in the sidebar otherwise.
   const revealLayer = useCallback(
-    (section: string, key: string) => {
-      setExpanded((e) => ({ ...e, [section]: true }));
+    (path: string[], key: string) => {
+      setExpanded((e) => {
+        const next = { ...e };
+        for (const id of path) next[id] = true;
+        return next;
+      });
       requestKeys([key], true);
       setMobileSheet(null);
     },
@@ -277,7 +311,7 @@ export function MapDashboard() {
   /** Every raster theme currently switched on, with the year each is showing. */
   const activeRasters = useMemo(
     () =>
-      sections
+      allSections
         .filter((section) => section.mode === "layer" && visible[rasterToggleKey(section.id)])
         .flatMap((section) => {
           // Falls back to the newest year, which is what the sidebar's own
@@ -286,7 +320,7 @@ export function MapDashboard() {
           const image = section.years.find((y) => y.year === year) ?? section.years.at(-1);
           return image ? [{ section, image }] : [];
         }),
-    [sections, visible, rasterYear],
+    [allSections, visible, rasterYear],
   );
 
   const rasterOverlays: RasterOverlay[] = useMemo(
@@ -321,11 +355,11 @@ export function MapDashboard() {
   // across every section, not just one open one.
   const legendOverlays: LegendOverlay[] = useMemo(
     () =>
-      sections
+      allSections
         .flatMap((section) => section.items)
         .filter((item) => overlays[item.key])
         .map(({ key, label, color, geometryKind }) => ({ key, label, color, geometryKind })),
-    [sections, overlays],
+    [allSections, overlays],
   );
 
   const sidebarSections = (
