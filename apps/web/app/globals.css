@@ -144,6 +144,11 @@
 }
 
 .dark {
+  /* Hands the dark ground to the browser's own UI too — native scrollbars,
+     form controls, autofill and the canvas behind the page. Without it those
+     stay light and punch holes in the theme. */
+  color-scheme: dark;
+
   --background: oklch(0.192 0.003 96.0);
   --foreground: oklch(0.974 0.002 96.0);
   --card: oklch(0.233 0.004 96.0);
@@ -226,5 +231,68 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: var(--border);
     border-radius: 9999px;
+  }
+}
+/* MapLibre ships its own light chrome — the attribution pill, popups and the
+   scale bar are all hard-coded white with dark text. They sit on the map, not
+   on a themed surface of ours, so nothing in the cascade reaches them; these
+   rules restate them against the app's own tokens. Keyed off `.dark` rather
+   than applied flat, so the light palette still works if the theme is ever
+   made switchable again (see app/layout.tsx). */
+.dark {
+  .maplibregl-ctrl-attrib,
+  .maplibregl-ctrl-attrib.maplibregl-compact {
+    background-color: color-mix(in oklab, var(--card) 85%, transparent);
+    color: var(--muted-foreground);
+  }
+
+  .maplibregl-ctrl-attrib a {
+    color: var(--foreground);
+  }
+
+  .maplibregl-ctrl-attrib-button {
+    /* The stock icon is a dark glyph baked into a background-image, invisible
+       against a dark pill — inverting the whole button is the only handle we
+       have on it short of shipping our own SVG. */
+    filter: invert(1);
+  }
+
+  .maplibregl-popup-content {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+    box-shadow: var(--elevation-3);
+  }
+
+  /* The tip is a CSS triangle built from borders, so it takes its colour from
+     whichever edge points at the anchor — each placement needs its own. */
+  .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+    border-bottom-color: var(--popover);
+  }
+  .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+    border-top-color: var(--popover);
+  }
+  .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+    border-right-color: var(--popover);
+  }
+  .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+    border-left-color: var(--popover);
+  }
+
+  .maplibregl-popup-close-button {
+    color: var(--muted-foreground);
+  }
+  .maplibregl-popup-close-button:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .maplibregl-ctrl-scale {
+    background-color: color-mix(in oklab, var(--card) 85%, transparent);
+    border-color: var(--border);
+    color: var(--foreground);
   }
 }

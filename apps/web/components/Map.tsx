@@ -23,7 +23,17 @@ const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
 const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
 
-const BACKGROUND = "#EDEDE8";
+// The ground behind the basemap tiles — all you see while they load, and in
+// any gap past the edge of coverage. Mirrors --background from globals.css's
+// dark palette (oklch(0.192 0.003 96)), so a slow tile fetch reads as the page
+// continuing rather than as a hole punched in it.
+const MAP_BACKGROUND = "#151413";
+
+// Casing under every line, and the stroke around every point: a light halo
+// that keeps hairline geometry legible over dark imagery. Deliberately *not*
+// MAP_BACKGROUND — its whole job is to stand off the basemap, so the two must
+// not track each other.
+const CASING = "#EDEDE8";
 
 const INITIAL_CENTER: [number, number] = [71.7800412, 21.4718707]; // Shetrunjay Hill Range, near Palitana
 const INITIAL_ZOOM = 11;
@@ -142,7 +152,7 @@ function mapStyle() {
       {
         id: "background",
         type: "background" as const,
-        paint: { "background-color": BACKGROUND },
+        paint: { "background-color": MAP_BACKGROUND },
       },
       {
         id: "basemap",
@@ -235,7 +245,7 @@ function addLayers(
     source: "lines",
     filter: NO_FEATURES_FILTER,
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": BACKGROUND, "line-width": LINE_CASING_WIDTH },
+    paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
   });
   map.addLayer({
     id: "lines",
@@ -255,7 +265,7 @@ function addLayers(
       "circle-color": ["get", "color"],
       "circle-radius": 6,
       "circle-stroke-width": 2,
-      "circle-stroke-color": BACKGROUND,
+      "circle-stroke-color": CASING,
     },
   });
 }
@@ -288,7 +298,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         type: "line",
         source: sourceId,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": BACKGROUND, "line-width": LINE_CASING_WIDTH },
+        paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
       });
       map.addLayer({
         id: `${sourceId}-line`,
@@ -305,7 +315,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         // into each other and the flow stops reading as movement.
         layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
         paint: {
-          "line-color": BACKGROUND,
+          "line-color": CASING,
           "line-width": LINE_WIDTH,
           "line-dasharray": DASH_SEQUENCE[0],
         },
@@ -322,7 +332,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
           "circle-color": color,
           "circle-radius": 2.5,
           "circle-stroke-width": 0.5,
-          "circle-stroke-color": BACKGROUND,
+          "circle-stroke-color": CASING,
         },
       });
     } else {
@@ -346,7 +356,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         layout: { visibility: "none" },
         paint: {
-          "line-color": BACKGROUND,
+          "line-color": CASING,
           "line-width": OUTLINE_WIDTH,
           "line-dasharray": DASH_SEQUENCE[0],
         },
