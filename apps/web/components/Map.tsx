@@ -15,6 +15,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
+import { popupHtml } from "@/lib/feature-popup";
 import {
   BASEMAP_LAYER_IDS,
   DEFAULT_BASEMAP,
@@ -223,32 +224,77 @@ function byGeometryType(
   };
 }
 
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+/** The one layer per vector overlay that should answer a click. */
+function hitLayerId(def: OverlayDef): string {
+  const sourceId = `overlay-${def.key}`;
+  if (def.kind === "line") return `${sourceId}-line`;
+  if (def.kind === "point") return `${sourceId}-circle`;
+  return `${sourceId}-fill`;
 }
 
-// Click popup: the layer's name. The API serves geometry only, so there are no
-// attribute fields to list beneath it yet.
-function attachPopups(map: MapLibreMap): Popup {
-  const layerIds = ["polygons-fill", "lines", "points"];
-  const popup = new Popup({ closeButton: true, closeOnClick: true, maxWidth: "260px" });
+/**
+ * Every layer a click should be tested against, resolved at click time rather
+ * than bound once: overlay layers are added as their metadata arrives, so a
+ * fixed list captured at map load would miss all of them.
+ *
+ * Casing and flow layers are left out deliberately — they are decoration drawn
+ * over the real layer, and including them would return the same feature twice.
+ */
+function clickableLayerIds(map: MapLibreMap, defs: OverlayDef[]): string[] {
+  const ids = ["polygons-fill", "lines", "points", ...defs.map(hitLayerId)];
+  return ids.filter((id) => map.getLayer(id));
+}
 
-  map.on("click", layerIds, (e) => {
-    const feature = e.features?.[0] as MapGeoJSONFeature | undefined;
-    if (!feature) return;
-    const props = (feature.properties ?? {}) as Record<string, string | number>;
-    const name = typeof props.name === "string" ? escapeHtml(props.name) : "";
-    popup.setLngLat(e.lngLat).setHTML(`<div class="text-sm font-medium">${name}</div>`).addTo(map);
+/** Which overlay a hit layer belongs to, so the popup can title itself. */
+function labelForLayer(layerId: string, defs: OverlayDef[]): string {
+  const def = defs.find((d) => hitLayerId(d) === layerId);
+  return def?.label ?? "Feature";
+}
+
+/**
+ * Click popups for vector features.
+ *
+ * The client reported that "any Vector Data is not showing metadata on
+ * clicking", and it was not: this only ever bound the three `layers`-table
+ * layer ids, which nothing is currently seeded into, and printed a single
+ * `name` property. The static overlays — which are everything actually drawn
+ * — had no click handler at all.
+ *
+ * Bound as one map-level handler that queries at click time, so overlays
+ * added later are covered without rebinding.
+ */
+function attachPopups(map: MapLibreMap, defsRef: { current: OverlayDef[] }): Popup {
+  const popup = new Popup({ closeButton: true, closeOnClick: true, maxWidth: "300px" });
+
+  map.on("click", (e) => {
+    const layers = clickableLayerIds(map, defsRef.current);
+    if (layers.length === 0) return;
+
+    const hits = map.queryRenderedFeatures(e.point, { layers });
+    const feature = hits[0] as MapGeoJSONFeature | undefined;
+    if (!feature) {
+      popup.remove();
+      return;
+    }
+
+    const label =
+      typeof feature.properties?.name === "string"
+        ? feature.properties.name
+        : labelForLayer(feature.layer.id, defsRef.current);
+
+    popup
+      .setLngLat(e.lngLat)
+      .setHTML(popupHtml(label, feature.properties))
+      .addTo(map);
   });
 
-  for (const id of layerIds) {
-    map.on("mouseenter", id, () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", id, () => {
-      map.getCanvas().style.cursor = "";
-    });
-  }
+  // Cursor feedback, from the same query — a per-layer mouseenter/mouseleave
+  // pair would have to be rebound every time an overlay is added.
+  map.on("mousemove", (e) => {
+    const layers = clickableLayerIds(map, defsRef.current);
+    const over = layers.length > 0 && map.queryRenderedFeatures(e.point, { layers }).length > 0;
+    map.getCanvas().style.cursor = over ? "pointer" : "";
+  });
 
   return popup;
 }
@@ -582,7 +628,7 @@ export default function Map({
     map.on("load", () => {
       render(map, dataRef.current, fitOnceRef.current);
       addOverlaySources(map, overlayDefsRef.current);
-      popupRef.current = attachPopups(map);
+      popupRef.current = attachPopups(map, overlayDefsRef);
       setMapLoaded(true);
       onReady?.(map);
     });
