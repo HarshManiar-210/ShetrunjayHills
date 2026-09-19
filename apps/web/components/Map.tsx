@@ -24,6 +24,7 @@ import {
   type BasemapId,
 } from "@/lib/basemaps";
 import { MapControls } from "@/components/MapControls";
+import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 
@@ -722,6 +723,14 @@ export default function Map({
           if (map && bounds) map.fitBounds(bounds, { padding: 40 });
           else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
         }}
+      />
+
+      {/* Bottom-centre, between the basemap switcher on the left and the
+          legend card on the right. */}
+      <CoordinateReadout
+        mapRef={mapRef}
+        mapLoaded={mapLoaded}
+        className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 md:block"
       />
 
       {!mapLoaded && (

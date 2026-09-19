@@ -9,6 +9,10 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 // geolocation prompt at a study area a user is almost never standing in, and
 // the layers button duplicated the header's menu toggle, which is on screen
 // at every breakpoint the map controls are.
+//
+// Docked top-right: the brief puts the layers panel on the left and the map
+// tools on the right. The basemap switcher moved to the bottom-left corner
+// these vacated.
 export function MapControls({
   mapRef,
   fitBounds,
@@ -19,7 +23,7 @@ export function MapControls({
   return (
     <div
       data-tour="map-controls"
-      className="absolute bottom-4 left-4 z-10 flex flex-col gap-1 rounded-xl bg-card p-1 shadow-e2 ring-1 ring-foreground/10"
+      className="absolute top-3 right-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm"
     >
       <Button
         variant="ghost"

@@ -326,10 +326,11 @@ export function MapDashboard() {
               basemap={basemap}
             />
 
+            {/* Bottom-left: the map tools took the right edge, per the brief. */}
             <BasemapSwitcher
               value={basemap}
               onChange={setBasemap}
-              className="absolute top-3 right-3 z-10"
+              className="absolute bottom-3 left-3 z-10"
             />
           </div>
 
