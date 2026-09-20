@@ -242,6 +242,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 -- renders it as a single layer with a year picker -- which is why the six
 -- drone products get a group each rather than sharing one.
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
+    ('green-cover',          'Green Cover (Yearwise)',  grp('forest-layers'), 1),
     ('forest-cover',         'Forest Cover (Yearwise)', grp('forest-layers'), 2),
     ('forest-type',          'Forest Type (Yearwise)',  grp('forest-layers'), 3),
     ('vegetation-change',    'Vegetation Change',       grp('forest-layers'), 4),
@@ -296,6 +297,17 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
     ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+
+-- Green Cover: same per-year-raster shape as Forest Cover (see
+-- legend-config.ts's Non-Forest/Forest two-class palette).
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('green_cover_1980', '1980', grp('green-cover'), 'raster', 'raster-data/green-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
+    ('green_cover_1989', '1989', grp('green-cover'), 'raster', 'raster-data/green-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('green_cover_1998', '1998', grp('green-cover'), 'raster', 'raster-data/green-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('green_cover_2008', '2008', grp('green-cover'), 'raster', 'raster-data/green-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('green_cover_2018', '2018', grp('green-cover'), 'raster', 'raster-data/green-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
+    ('green_cover_2025', '2025', grp('green-cover'), 'raster', 'raster-data/green-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
+    ('green_cover_2026', '2026', grp('green-cover'), 'raster', 'raster-data/green-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- Vegetation Change: same per-year-raster shape as Forest Cover, but each
 -- image is a from→to transition (see legend-config.ts's 25-class VDF/MDF/
@@ -427,7 +439,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- ---------------------------------------------------------------------------
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, status) VALUES
-    ('greenCover', 'Green Cover', grp('forest-layers'), 'raster', '', 1, 'pending'),
     ('forestType', 'Forest Type', grp('forest-type'),   'raster', '', 1, 'pending');
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
