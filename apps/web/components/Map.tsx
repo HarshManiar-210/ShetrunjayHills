@@ -21,6 +21,7 @@ import { popupHtml } from "@/lib/feature-popup";
 import {
   BASEMAP_LAYER_IDS,
   DEFAULT_BASEMAP,
+  MAX_MAP_ZOOM,
   basemapById,
   basemapLayers,
   basemapSources,
@@ -664,6 +665,10 @@ export default function Map({
       style: mapStyle(basemapRef.current),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
+      // Stops the camera where the basemaps stop having imagery, so nobody
+      // can zoom into Esri's "Map data not yet available" tile. See
+      // MAX_MAP_ZOOM for why this gives up no real detail.
+      maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
     });
     mapRef.current = map;
