@@ -110,7 +110,12 @@ export function YearBar({
     <div
       data-tour="year-bar"
       className={cn(
-        "flex max-w-[min(46rem,calc(100%-2rem))] flex-col gap-2 rounded-2xl bg-card/95 px-3 py-2.5 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm",
+        // Fills the band its container leaves free rather than capping at a
+        // fixed width, so the year ticks and the compare control get room
+        // instead of crowding into the middle of the map. The cap only bites
+        // on a very wide screen, where a bar spanning the whole map would be
+        // more travel than the control is worth.
+        "flex w-full max-w-[72rem] flex-col gap-2 rounded-2xl bg-card/95 px-3 py-2.5 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm",
         className,
       )}
     >
@@ -140,7 +145,7 @@ export function YearBar({
           {themes.length > 1 ? (
             <Select value={theme.id} onValueChange={onFocusChange}>
               <SelectTrigger
-                className="h-7 w-40 border-0 bg-transparent px-1 text-xs font-medium shadow-none"
+                className="h-7 w-48 border-0 bg-transparent px-1 text-xs font-medium shadow-none"
                 aria-label="Which layer the timeline controls"
               >
                 <SelectValue />
@@ -162,7 +167,7 @@ export function YearBar({
         {/* The timeline. A row of ticks rather than a slider: the years are
             unevenly spaced (1980, 1989, 1998, 2008, 2018, 2025, 2026) and a
             proportional axis would crush the recent ones together. */}
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-thin">
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto scrollbar-thin">
           {years.map((y, i) => {
             const active = i === current;
             const compared = y.year === compareYear;
@@ -173,7 +178,7 @@ export function YearBar({
                 aria-current={active}
                 onClick={() => onYearChange(y.year)}
                 className={cn(
-                  "shrink-0 rounded-md px-2 py-1 text-[11px] tabular-nums transition-colors",
+                  "shrink-0 rounded-md px-2.5 py-1 text-xs tabular-nums transition-colors",
                   active && "bg-primary font-semibold text-primary-foreground",
                   !active && compared && "bg-primary/20 font-medium text-foreground",
                   !active && !compared && "text-muted-foreground hover:bg-primary/10 hover:text-foreground",

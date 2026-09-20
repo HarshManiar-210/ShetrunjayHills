@@ -876,9 +876,8 @@ export default function Map({
         }}
       />
 
-      {/* Under the tool stack it belongs to, so the readout of a measurement
-          sits beside the button that started it. */}
-      {/* Keyed on the mode so switching tools remounts with a clean slate,
+      {/* Beside the tool stack that opens it, in the bottom-right corner.
+          Keyed on the mode so switching tools remounts with a clean slate,
           rather than an effect inside it resetting state after the fact. */}
       <MeasureTool
         key={measureMode ?? "none"}
@@ -887,7 +886,7 @@ export default function Map({
         mode={measureMode}
         onExit={() => setMeasureMode(null)}
         measuringRef={measuringRef}
-        className="absolute top-3 right-14 z-10"
+        className="absolute right-14 bottom-3 z-10"
       />
 
       {/* Bottom-centre, between the basemap switcher on the left and the

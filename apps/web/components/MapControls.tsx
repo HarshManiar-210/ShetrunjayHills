@@ -14,9 +14,9 @@ const LOCATE_ZOOM = 15;
 /**
  * The map's tool stack.
  *
- * Docked top-right: the brief puts the layers panel on the left and the map
- * tools on the right, and the basemap switcher took the bottom-left corner
- * this used to occupy.
+ * Bottom-right: still the right-hand side the brief asks for, but down in the
+ * corner so the top of that edge belongs entirely to the Legend and Statistics
+ * cards — side by side they crowded each other.
  *
  * Measure Distance, Measure Area and Show Location are all from the brief.
  * Show Location had previously been removed on the grounds that it points a
@@ -76,7 +76,7 @@ export function MapControls({
   return (
     <div
       data-tour="map-controls"
-      className="absolute top-3 right-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm"
+      className="absolute right-3 bottom-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm"
     >
       <ToolButton label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
         <Plus />

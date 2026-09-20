@@ -38,9 +38,9 @@ const STEPS: Step[] = [
     body: "Rather than scrolling the sections, type part of a layer's name here and pick it — the dashboard expands the right section and switches that layer on, leaving whatever else you have on alone.",
   },
   {
-    target: "info-panel",
+    target: "legend",
     title: "Legend and Statistics",
-    body: "Legend shows what the colours on the map mean. Statistics breaks the same layers down by class — area and share across the study area, with a year-by-year trend for multi-year themes.",
+    body: "Legend shows what the colours on the map mean, with a gradient for any theme whose classes run low to high. Statistics sits below it as its own panel — class areas and shares, measured from the imagery itself — so you can read both at once.",
   },
   {
     target: "map-controls",

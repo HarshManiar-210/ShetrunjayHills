@@ -50,6 +50,8 @@
   --color-sec-infra: var(--sec-infra);
   --color-sec-fauna: var(--sec-fauna);
   --color-sec-carbon: var(--sec-carbon);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --shadow-e1: var(--elevation-1);
   --shadow-e2: var(--elevation-2);
   --shadow-e3: var(--elevation-3);
@@ -119,6 +121,14 @@
   --nav-soft: oklch(0.960 0.003 96.0);
   --nav-line: oklch(0.858 0.004 96.0);
 
+  /* The interactive accent, from the client's mockup: a switched-on layer,
+     the selected year and "Reset view" all wear it. The one saturated colour
+     in the chrome, and deliberately not --primary — repainting every button
+     amber would make the accent mean nothing, where here it means "this is
+     what is currently on". */
+  --brand: oklch(0.700 0.145 78.0);
+  --brand-foreground: oklch(0.200 0.020 85.0);
+
   /* Section accents — the one place hue survives, because here it is
      information: each subject gets its own (greens for cover, teal for the
      tree metrics, blue for water, and so on) so the sidebar's twenty sections
@@ -184,6 +194,11 @@
   --nav-accent: oklch(0.780 0.005 96.0);
   --nav-soft: oklch(0.345 0.005 96.0);
   --nav-line: oklch(0.430 0.005 96.0);
+
+  /* The mockup's amber. Brighter here than on the light palette so it still
+     reads as the active colour against a near-black panel. */
+  --brand: oklch(0.814 0.149 84.3);
+  --brand-foreground: oklch(0.200 0.020 85.0);
 
   /* Lifted well above the dark ground; same hues, same relative order. */
   --sec-forest: oklch(0.750 0.130 152.0);

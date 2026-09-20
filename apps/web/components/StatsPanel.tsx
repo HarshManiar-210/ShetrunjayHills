@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { BarChart3, ChevronDown, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
 import { ClassDonut } from "@/components/ClassDonut";
@@ -257,5 +259,48 @@ export function StatsPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Statistics as its own panel, beside the Legend rather than behind a tab
+ * with it — so the class shares and the legend that explains their colours can
+ * be read at the same time, which the tab strip made impossible.
+ */
+export function StatsCard({
+  rasterLayers,
+  vectorFeatures,
+  className,
+}: {
+  rasterLayers: StatsRasterLayer[];
+  vectorFeatures: LayerFeature[];
+  className?: string;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <Card className={cn("shadow-e3", className)} size="sm" data-tour="info-panel">
+      <div className="flex shrink-0 items-center gap-2 px-(--card-spacing)">
+        <BarChart3 className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+        <p className="min-w-0 flex-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          Statistics
+        </p>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label={collapsed ? "Expand statistics" : "Collapse statistics"}
+          onClick={() => setCollapsed((c) => !c)}
+        >
+          <ChevronDown className={cn("transition-transform", collapsed && "-rotate-90")} />
+        </Button>
+      </div>
+
+      {!collapsed && (
+        <div className="min-h-0 flex-1 overflow-y-auto px-(--card-spacing) scrollbar-thin">
+          <StatsPanel rasterLayers={rasterLayers} vectorFeatures={vectorFeatures} />
+        </div>
+      )}
+    </Card>
   );
 }

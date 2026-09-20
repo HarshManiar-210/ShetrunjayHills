@@ -20,6 +20,18 @@ export interface RasterLegend {
   classes: LegendClass[];
   /** Present when a class's color scale is only approximately labeled (no exact numeric breakpoints were given). */
   note?: string;
+  /**
+   * Whether the classes form an ordered scale, in which case the legend also
+   * draws them as a continuous gradient (the client asked for gradient
+   * legends). True for anything that runs low→high — canopy density, canopy
+   * height, slope, elevation, fragmentation from patch to core.
+   *
+   * Left off for genuinely categorical palettes: Land Use's barren / built-up
+   * / water, Aspect's eight compass directions and Vegetation Change's
+   * transition matrix have no order to ramp along, and drawing one would
+   * assert a progression that isn't in the data.
+   */
+  ramp?: boolean;
 }
 
 // Visibly provisional — a plain 5-step grey ramp, distinct from any real
@@ -35,6 +47,9 @@ const PROVISIONAL_RAMP = [
 function provisionalLegend(layerId: string, classCount = 5): RasterLegend {
   return {
     layerId,
+    // The placeholder palette is a light→dark grey ramp, so it is ordered by
+    // construction even before the real classes arrive.
+    ramp: true,
     classes: Array.from({ length: classCount }, (_, i) => ({
       value: i + 1,
       label: `TODO — class ${i + 1} label`,
@@ -54,6 +69,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // Forest Cover theme's legend (the imagery's own palette matches it exactly).
   "forest-cover": {
     layerId: "forest-cover",
+    ramp: true,
     classes: [
       { value: 1, label: "Very Dense Forest", color: "#06660c" },
       { value: 2, label: "Moderately Dense Forest", color: "#05ba19" },
@@ -65,6 +81,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "green-cover": {
     layerId: "green-cover",
+    ramp: true,
     classes: [
       { value: 1, label: "Non-Forest", color: "#dedede" },
       { value: 2, label: "Forest", color: "#0a8d23" },
@@ -95,6 +112,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "forest-fragmentation": {
     layerId: "forest-fragmentation",
+    ramp: true,
     classes: [
       { value: "patch", label: "Patch", color: "#e07b34" },
       { value: "edge", label: "Edge", color: "#ffff00" },
@@ -263,6 +281,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   chm: {
     layerId: "chm",
+    ramp: true,
     classes: [
       { value: 1, label: "Low canopy height", color: "#28bceb" },
       { value: 2, label: "Medium-low canopy height", color: "#a4fc3c" },
@@ -273,6 +292,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   slope: {
     layerId: "slope",
+    ramp: true,
     classes: [
       { value: 1, label: "Flattest", color: "#2c7bb6" },
       { value: 2, label: "Gentle", color: "#abd9e9" },

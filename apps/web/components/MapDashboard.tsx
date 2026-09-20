@@ -19,13 +19,15 @@ import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
-import { MapInfoPanel } from "@/components/MapInfoPanel";
+import { LegendCard } from "@/components/LegendCard";
+import { StatsCard } from "@/components/StatsPanel";
 import { LayerSearch } from "@/components/LayerSearch";
 import {
   Walkthrough,
   shouldAutoRunWalkthrough,
   markWalkthroughSeen,
 } from "@/components/Walkthrough";
+import { cn } from "@/lib/utils";
 import { getToken } from "@/lib/auth";
 import { useAuthState } from "@/hooks/use-auth-state";
 import { fetchLayers, UnauthorizedError, type LayerCollection } from "@/lib/layers-api";
@@ -92,11 +94,6 @@ export function MapDashboard() {
   // any number, from any number of sections, draw at once. See lib/sections.ts
   // for the key namespace. Nothing is on by default.
   const [visible, setVisible] = useState<Record<string, boolean>>({});
-
-  // Which section boxes are expanded. Disclosure only — a collapsed section's
-  // layers keep drawing, which is the whole point of separating the two now
-  // that visibility is no longer an accordion.
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
@@ -272,22 +269,20 @@ export function MapDashboard() {
     [requestKeys, visible],
   );
 
-  const toggleExpanded = useCallback((id: string) => {
-    setExpanded((e) => ({ ...e, [id]: !e[id] }));
+  /** The sidebar's "Reset view": switch every layer off and start again. */
+  const resetLayers = useCallback(() => {
+    setVisible({});
+    setPlaying(false);
   }, []);
 
   // Search result picked: switch that layer on and open its section so the
   // row is visible in the sidebar. Always on, never a toggle — someone who
   // searched for a layer wants to see it, not to turn off what they found.
-  // Expands every group on the path down to the layer, not just its parent —
-  // a layer three levels deep is unreachable in the sidebar otherwise.
+  // Picking a search result just switches the layer on. The sidebar is a flat
+  // list now and a row expands when it is on, so there is no disclosure state
+  // left to open on the way down — which is why `path` goes unused here.
   const revealLayer = useCallback(
-    (path: string[], key: string) => {
-      setExpanded((e) => {
-        const next = { ...e };
-        for (const id of path) next[id] = true;
-        return next;
-      });
+    (_path: string[], key: string) => {
       requestKeys([key], true);
       setMobileSheet(null);
     },
@@ -457,10 +452,9 @@ export function MapDashboard() {
       <SidebarSections
         sections={sections}
         visibility={visible}
-        expanded={expanded}
-        onToggleExpanded={toggleExpanded}
         onToggleSection={toggleSection}
         onToggleItem={toggleItem}
+        onResetLayers={resetLayers}
         rasterYear={rasterYear}
         onRasterYearChange={changeRasterYear}
         rasterOpacity={rasterOpacity}
@@ -469,14 +463,30 @@ export function MapDashboard() {
     </>
   );
 
-  const infoPanel = (className: string) => (
-    <MapInfoPanel
-      layers={visibleFeatures}
-      overlays={legendOverlays}
-      rasterLayers={legendRasterLayers}
-      statsRasterLayers={statsRasterLayers}
-      className={className}
-    />
+  // Legend and Statistics are two independent cards now, not two tabs of one.
+  // The legend is what makes the map readable, so it should never be the thing
+  // you switch away from to check a number.
+  const infoPanel = (className?: string) => (
+    <div className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
+      {/* Each card scrolls its own body rather than the column scrolling as a
+          whole, so the two headers stay put and a long legend never pushes
+          the statistics out of reach.
+          `flex-1 min-h-0` lets a card give up height when the other needs it
+          — that is what makes its body scroll — while `max-h-fit` stops it
+          claiming more than its content, so a short legend does not sit in
+          half the column with empty space under it. */}
+      <LegendCard
+        layers={visibleFeatures}
+        overlays={legendOverlays}
+        rasterLayers={legendRasterLayers}
+        className="min-h-0 max-h-fit flex-1"
+      />
+      <StatsCard
+        rasterLayers={statsRasterLayers}
+        vectorFeatures={visibleFeatures}
+        className="min-h-0 max-h-fit flex-1"
+      />
+    </div>
   );
 
   return (
@@ -522,11 +532,11 @@ export function MapDashboard() {
             {temporalThemes.length > 0 && focusedTheme && (
               // Centred within the band the other floating panels leave free,
               // rather than within the map: the basemap switcher holds the
-              // bottom-left corner and the legend the bottom-right (from xl,
-              // where it appears), and centring on the map itself overlaps
-              // both once the bar is wide. The container is click-through so
-              // the empty space beside the bar does not eat map drags.
-              <div className="pointer-events-none absolute right-3 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex xl:right-[19.5rem]">
+              // bottom-left corner and the tool stack the bottom-right, and
+              // centring on the map itself runs the bar under both once it is
+              // wide. The container is click-through so the empty space beside
+              // the bar does not eat map drags.
+              <div className="pointer-events-none absolute right-14 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex">
                 <YearBar
                   themes={temporalThemes}
                   focusedId={focusedTheme}
@@ -552,7 +562,14 @@ export function MapDashboard() {
             />
           </div>
 
-          {infoPanel("absolute right-4 bottom-4 hidden max-h-[calc(100%-2rem)] w-72 xl:flex")}
+          {/* Top-right, now flush to the edge the tool stack vacated. Height
+              follows content, capped so a long legend stops clear of those
+              tools rather than running into them: the stack is a fixed 205px
+              (six 28px buttons, a separator and padding), plus its own inset
+              and a gap between the two. */}
+          {infoPanel(
+            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-17rem)] w-72 xl:flex",
+          )}
         </div>
       </div>
 
@@ -586,7 +603,7 @@ export function MapDashboard() {
       <Sheet open={mobileSheet === "legend"} onOpenChange={(o) => setMobileSheet(o ? "legend" : null)}>
         <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto scrollbar-thin">
           <SheetTitle className="sr-only">Legend and statistics</SheetTitle>
-          {infoPanel("flex ring-0 shadow-none")}
+          {infoPanel()}
         </SheetContent>
       </Sheet>
 
