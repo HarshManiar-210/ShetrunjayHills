@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,14 @@ import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { LegendCard } from "@/components/LegendCard";
 import { StatsCard } from "@/components/StatsPanel";
 import { LayerSearch } from "@/components/LayerSearch";
@@ -47,6 +55,32 @@ import type { RasterOverlay } from "@/components/Map";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
+/**
+ * Above this, switching on a layer that is *not* tiled prompts first.
+ *
+ * A tiled layer streams only the viewport, so its archive size is irrelevant
+ * and it is never gated. A whole-file GeoJSON is fetched and parsed in full,
+ * and past a certain size that takes the tab down rather than merely being
+ * slow — which is exactly what happened when the database still pointed Tree
+ * Height at its 166 MB GeoJSON after the seed had moved it to PMTiles. The
+ * largest whole-file overlay today is Streams at 20 MB, so nothing reaches
+ * this in normal operation: it is here to make data/seed drift announce
+ * itself instead of killing the browser.
+ */
+const HEAVY_LAYER_BYTES = 50 * 1024 * 1024;
+
+interface HeavyLayer {
+  key: string;
+  label: string;
+  sizeBytes: number;
+  /** Every key the confirmed action switches on — a whole group, or one row. */
+  keys: string[];
+}
+
+function formatMb(bytes: number): string {
+  return `${Math.round(bytes / 1_000_000)} MB`;
+}
+
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
 type MobileSheet = "menu" | "legend" | null;
@@ -77,6 +111,13 @@ export function MapDashboard() {
   // being switched off cannot leave the bar pointing at nothing.
   const [preferredTheme, setPreferredTheme] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+
+  // A layer big enough to be worth warning about, waiting on confirmation.
+  const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
+  // Heavy layers already accepted this session, so flipping one off and on
+  // does not re-prompt. A ref, not state: nothing renders from it, and it
+  // must not trigger a re-render when it grows.
+  const confirmedHeavyRef = useRef<Set<string>>(new Set());
   // Group id -> the year being compared against, or absent when compare mode
   // is off for that theme. Per theme, so switching the bar to another layer
   // does not carry someone else's comparison across.
@@ -157,6 +198,28 @@ export function MapDashboard() {
   const allSections = useMemo(() => flattenSections(sections), [sections]);
   const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
 
+  /**
+   * Size per toggle key for the layers that are fetched whole, so the warning
+   * is driven by what the files actually weigh (the API stats them) rather
+   * than by a hardcoded list of which layers are big.
+   */
+  const heavyLayers = useMemo(() => {
+    const byKey: Record<string, HeavyLayer> = {};
+    for (const overlay of overlayMeta) {
+      // A tiled layer never loads in full, so its size does not gate anything.
+      if (overlay.tiled) continue;
+      const size = overlay.size_bytes ?? 0;
+      if (size < HEAVY_LAYER_BYTES) continue;
+      byKey[overlay.key] = {
+        key: overlay.key,
+        label: overlay.label,
+        sizeBytes: size,
+        keys: [overlay.key],
+      };
+    }
+    return byKey;
+  }, [overlayMeta]);
+
   const setKeysVisible = useCallback((keys: string[], on: boolean) => {
     setVisible((v) => {
       const next = { ...v };
@@ -165,17 +228,45 @@ export function MapDashboard() {
     });
   }, []);
 
+  // Switching a layer *on* is the only direction that can cost anything, so
+  // that is the only direction the size warning gates. Turning things off, and
+  // anything already confirmed, goes straight through.
+  const requestKeys = useCallback(
+    (keys: string[], on: boolean) => {
+      if (!on) {
+        setKeysVisible(keys, false);
+        return;
+      }
+      const heavy = keys.map((k) => heavyLayers[k]).find(Boolean);
+      if (heavy && !confirmedHeavyRef.current.has(heavy.key)) {
+        setHeavyPrompt({ ...heavy, keys });
+        return;
+      }
+      setKeysVisible(keys, true);
+    },
+    [heavyLayers, setKeysVisible],
+  );
+
+  const confirmHeavy = useCallback(() => {
+    if (!heavyPrompt) return;
+    // Remembered for the session: having said yes once, flipping the same
+    // layer off and on again should not ask a second time.
+    confirmedHeavyRef.current.add(heavyPrompt.key);
+    setKeysVisible(heavyPrompt.keys, true);
+    setHeavyPrompt(null);
+  }, [heavyPrompt, setKeysVisible]);
+
   const toggleSection = useCallback(
     (id: string, on: boolean) => {
       const def = allSections.find((s) => s.id === id);
-      if (def) setKeysVisible(sectionToggleKeys(def), on);
+      if (def) requestKeys(sectionToggleKeys(def), on);
     },
-    [allSections, setKeysVisible],
+    [allSections, requestKeys],
   );
 
   const toggleItem = useCallback(
-    (key: string) => setKeysVisible([key], !visible[key]),
-    [setKeysVisible, visible],
+    (key: string) => requestKeys([key], !visible[key]),
+    [requestKeys, visible],
   );
 
   /** The sidebar's "Reset view": switch every layer off and start again. */
@@ -192,10 +283,10 @@ export function MapDashboard() {
   // left to open on the way down — which is why `path` goes unused here.
   const revealLayer = useCallback(
     (_path: string[], key: string) => {
-      setKeysVisible([key], true);
+      requestKeys([key], true);
       setMobileSheet(null);
     },
-    [setKeysVisible],
+    [requestKeys],
   );
 
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
@@ -515,6 +606,28 @@ export function MapDashboard() {
           {infoPanel()}
         </SheetContent>
       </Sheet>
+
+      {/* A warning, not a block: someone who knows what they are asking for
+          should be able to ask for it. This only fires for a layer fetched
+          whole — a tiled layer streams and is never gated. */}
+      <Dialog open={heavyPrompt !== null} onOpenChange={(o) => !o && setHeavyPrompt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{heavyPrompt?.label} is a large layer</DialogTitle>
+            <DialogDescription>
+              This layer is about {heavyPrompt ? formatMb(heavyPrompt.sizeBytes) : ""} and is
+              loaded in one piece, so the map may be unresponsive until it finishes — and on a
+              file this size the tab can run out of memory. Switch it on anyway?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHeavyPrompt(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmHeavy}>Switch it on</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <LoginDialog
         open={auth.loginOpen}
