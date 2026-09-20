@@ -21,6 +21,7 @@ import { popupHtml } from "@/lib/feature-popup";
 import {
   BASEMAP_LAYER_IDS,
   DEFAULT_BASEMAP,
+  MAX_MAP_ZOOM,
   basemapById,
   basemapLayers,
   basemapSources,
@@ -255,9 +256,8 @@ function clickableLayerIds(map: MapLibreMap, defs: OverlayDef[]): string[] {
 }
 
 /** Which overlay a hit layer belongs to, so the popup can title itself. */
-function labelForLayer(layerId: string, defs: OverlayDef[]): string {
-  const def = defs.find((d) => hitLayerId(d) === layerId);
-  return def?.label ?? "Feature";
+function overlayForLayer(layerId: string, defs: OverlayDef[]): OverlayDef | undefined {
+  return defs.find((d) => hitLayerId(d) === layerId);
 }
 
 /**
@@ -293,14 +293,15 @@ function attachPopups(
       return;
     }
 
+    const def = overlayForLayer(feature.layer.id, defsRef.current);
     const label =
       typeof feature.properties?.name === "string"
         ? feature.properties.name
-        : labelForLayer(feature.layer.id, defsRef.current);
+        : (def?.label ?? "Feature");
 
     popup
       .setLngLat(e.lngLat)
-      .setHTML(popupHtml(label, feature.properties))
+      .setHTML(popupHtml(label, feature.properties, def?.color))
       .addTo(map);
   });
 
@@ -664,6 +665,10 @@ export default function Map({
       style: mapStyle(basemapRef.current),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
+      // Stops the camera where the basemaps stop having imagery, so nobody
+      // can zoom into Esri's "Map data not yet available" tile. See
+      // MAX_MAP_ZOOM for why this gives up no real detail.
+      maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
     });
     mapRef.current = map;

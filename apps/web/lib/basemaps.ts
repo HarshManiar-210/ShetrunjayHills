@@ -24,17 +24,34 @@ const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 /**
- * Highest zoom the providers actually publish. Past this MapLibre overzooms
- * the last real tile rather than requesting one that would 404 — which is
- * what keeps the imagery present (if soft) when someone zooms right in on a
- * drone layer.
+ * Highest zoom each provider actually has data for *over this study area*.
+ * Past it MapLibre upscales the deepest real tile instead of requesting one
+ * that does not exist, which is what keeps the imagery present — soft, but
+ * continuous — when someone zooms right in on a drone layer.
+ *
+ * These are measured, not assumed, and they differ per provider, which is why
+ * there is no single constant:
+ *
+ *   Esri World Imagery  real tiles to z18. From z19 it answers 200 with an
+ *                       identical 2,521-byte "Map data not yet available"
+ *                       placeholder rather than a 404, so nothing errors —
+ *                       the grey tile simply gets drawn. Capping at 18 is the
+ *                       only way to stop it.
+ *   Esri reference      same ceiling. Both are fully transparent out here
+ *                       anyway, so this only saves pointless requests.
+ *   OpenStreetMap       real tiles to z19, then HTTP 400.
+ *
+ * Coverage is per-region: somewhere denser than rural Gujarat, Esri may well
+ * publish deeper. Re-measure before treating these as global truths.
  */
-const MAX_ZOOM = 19;
+const ESRI_MAX_ZOOM = 18;
+const OSM_MAX_ZOOM = 19;
 
 interface TileSourceDef {
   id: string;
   tiles: string[];
   attribution: string;
+  maxZoom: number;
 }
 
 /**
@@ -49,6 +66,7 @@ const SOURCES: TileSourceDef[] = [
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     ],
     attribution: ESRI_ATTRIBUTION,
+    maxZoom: ESRI_MAX_ZOOM,
   },
   {
     // Roads. Transparent, and by far the denser of the two reference layers —
@@ -60,6 +78,7 @@ const SOURCES: TileSourceDef[] = [
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
     ],
     attribution: ESRI_ATTRIBUTION,
+    maxZoom: ESRI_MAX_ZOOM,
   },
   {
     // Place names and administrative boundaries, also transparent. Sparse out
@@ -69,11 +88,13 @@ const SOURCES: TileSourceDef[] = [
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     ],
     attribution: ESRI_ATTRIBUTION,
+    maxZoom: ESRI_MAX_ZOOM,
   },
   {
     id: "osm",
     tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
     attribution: OSM_ATTRIBUTION,
+    maxZoom: OSM_MAX_ZOOM,
   },
 ];
 
@@ -148,6 +169,25 @@ export function basemapById(id: BasemapId): BasemapDef {
   return BASEMAPS.find((b) => b.id === id) ?? BASEMAPS[0];
 }
 
+/**
+ * How far in the map lets anyone zoom.
+ *
+ * Capping each source stops the placeholder being *fetched* — MapLibre then
+ * upscales its deepest real tile instead. That is honest, but it still lets
+ * someone zoom to a blurry z22 and wonder what is broken, so the camera stops
+ * where the imagery does.
+ *
+ * Taken as the shallowest ceiling across the providers, so the limit holds
+ * whichever basemap is showing rather than lurching when someone switches.
+ * The cost is one level on OSM, which does publish a real z19 here.
+ *
+ * 18 gives up no real detail: at this latitude it is about 0.56 m per pixel,
+ * and the sharpest overlay served — the drone orthomosaic, 4096 px across
+ * roughly 8.9 km — is about 2.2 m per pixel, so it is already upscaled well
+ * before this point.
+ */
+export const MAX_MAP_ZOOM = Math.min(...SOURCES.map((s) => s.maxZoom));
+
 /** Every basemap layer id, so the visibility pass can hide the ones that are off. */
 export const BASEMAP_LAYER_IDS: string[] = LAYERS.map((l) => l.id);
 
@@ -167,7 +207,7 @@ export function basemapSources() {
         type: "raster" as const,
         tiles: s.tiles,
         tileSize: 256,
-        maxzoom: MAX_ZOOM,
+        maxzoom: s.maxZoom,
         attribution: s.attribution,
       },
     ]),

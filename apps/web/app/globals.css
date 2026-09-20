@@ -276,6 +276,28 @@
     background-color: var(--popover);
     color: var(--popover-foreground);
     box-shadow: var(--elevation-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    /* Extra room on the right so the title never runs under the close button,
+       which MapLibre positions absolutely over this box. */
+    padding: 10px 12px;
+    padding-right: 30px;
+  }
+
+  .maplibregl-popup-close-button {
+    /* Stock is a bare glyph hanging in the corner, overlapping the content.
+       Sized and inset into a proper hit target instead. */
+    top: 5px;
+    right: 5px;
+    display: flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    padding: 0;
+    font-size: 15px;
+    line-height: 1;
   }
 
   /* The tip is a CSS triangle built from borders, so it takes its colour from
@@ -300,7 +322,8 @@
   .maplibregl-popup-close-button {
     color: var(--muted-foreground);
   }
-  .maplibregl-popup-close-button:hover {
+  .maplibregl-popup-close-button:hover,
+  .maplibregl-popup-close-button:focus-visible {
     background-color: var(--accent);
     color: var(--accent-foreground);
   }
