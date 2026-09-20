@@ -156,6 +156,7 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   chm: { accent: "canopy", icon: TreePine },
 
   "drone-analysis": { accent: "canopy", icon: Sprout },
+  "tree-density": { accent: "canopy", icon: TreePine },
   hydrogeology: { accent: "water", icon: Droplets },
   "existing-water-conservation": { accent: "water", icon: Dam },
   "proposed-conservation-sites": { accent: "water", icon: Target },

@@ -261,6 +261,12 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('toposheet',   'Toposheet',                   grp('reference'), 2);
 
+-- Tree Density is a raster, so it gets its own group under Drone Analysis: a
+-- group holding placed rasters becomes a single layer, which would swallow
+-- Tree Height next to it.
+INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
+    ('tree-density', 'Tree Density', grp('drone-analysis'), 1);
+
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
 -- file_path is relative to DATA_ROOT (see apps/api/cmd/api/main.go), which
@@ -418,6 +424,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
+-- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
+-- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591);
+
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
@@ -437,7 +448,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
     -- Drone Analysis. Tree Height and Tree Species are seeded above; these
     -- are the rest of the brief's list for that group.
-    ('treeDensity',         'Tree Density',                grp('drone-analysis'), 'vector', NULL, NULL, '', 3, 'pending'),
     ('treeCount',           'Tree Count',                  grp('drone-analysis'), 'vector', NULL, NULL, '', 4, 'pending'),
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
     ('growingStock',        'Growing Stock',               grp('drone-analysis'), 'vector', NULL, NULL, '', 6, 'pending'),
