@@ -256,9 +256,8 @@ function clickableLayerIds(map: MapLibreMap, defs: OverlayDef[]): string[] {
 }
 
 /** Which overlay a hit layer belongs to, so the popup can title itself. */
-function labelForLayer(layerId: string, defs: OverlayDef[]): string {
-  const def = defs.find((d) => hitLayerId(d) === layerId);
-  return def?.label ?? "Feature";
+function overlayForLayer(layerId: string, defs: OverlayDef[]): OverlayDef | undefined {
+  return defs.find((d) => hitLayerId(d) === layerId);
 }
 
 /**
@@ -294,14 +293,15 @@ function attachPopups(
       return;
     }
 
+    const def = overlayForLayer(feature.layer.id, defsRef.current);
     const label =
       typeof feature.properties?.name === "string"
         ? feature.properties.name
-        : labelForLayer(feature.layer.id, defsRef.current);
+        : (def?.label ?? "Feature");
 
     popup
       .setLngLat(e.lngLat)
-      .setHTML(popupHtml(label, feature.properties))
+      .setHTML(popupHtml(label, feature.properties, def?.color))
       .addTo(map);
   });
 
