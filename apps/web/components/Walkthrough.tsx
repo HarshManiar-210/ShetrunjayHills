@@ -19,7 +19,7 @@ interface Step {
 // theme, narrow it down, read it back off the map, then the tools around it.
 const STEPS: Step[] = [
   {
-    title: "Welcome to Shetrunjay Hills",
+    title: "Welcome to Shatrunjay Hills",
     body: "A quick tour of the GIS dashboard — where the layers live, how to read the map, and what the panels around it do. Two minutes, and you can leave at any point.",
   },
   {

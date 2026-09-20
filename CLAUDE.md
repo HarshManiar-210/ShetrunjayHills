@@ -1,6 +1,6 @@
 ## Project Architecture
 
-Shetrunjay Hills is a monorepo Web GIS dashboard: Next.js/MapLibre frontend, Go API, PostGIS
+Shatrunjay Hills is a monorepo Web GIS dashboard: Next.js/MapLibre frontend, Go API, PostGIS
 database, with database-driven role-based access control (RBAC).
 
 - **`apps/web`** — Next.js 14+ (App Router), TypeScript strict, Tailwind CSS, shadcn/ui. Node 24,

@@ -1,6 +1,6 @@
-# Shetrunjay Hills — Web GIS Dashboard
+# Shatrunjay Hills — Web GIS Dashboard
 
-A monorepo GIS dashboard for Shetrunjay Hills: a Next.js/MapLibre frontend backed by a Go API,
+A monorepo GIS dashboard for Shatrunjay Hills: a Next.js/MapLibre frontend backed by a Go API,
 serving map layers from PostGIS with database-driven role-based access control (RBAC).
 
 No roles, layers, or permissions are hardcoded in the API or frontend — they're all rows in
@@ -26,11 +26,11 @@ one of the mock users below.
 
 **Mock credentials** (password `password123` for all three):
 
-| Username        | Role            | Sees layers                              |
-|-----------------|-----------------|-------------------------------------------|
-| `regular_user`  | `regular_user`  | `city_border`, `roads`                     |
-| `admin_user`    | `admin`         | `city_border`, `roads`, `metro_train`      |
-| `support_user`  | `support_team`  | `city_border`, `roads`, `metro_train`      |
+| Username       | Role           | Sees layers                           |
+| -------------- | -------------- | ------------------------------------- |
+| `regular_user` | `regular_user` | `city_border`, `roads`                |
+| `admin_user`   | `admin`        | `city_border`, `roads`, `metro_train` |
+| `support_user` | `support_team` | `city_border`, `roads`, `metro_train` |
 
 To run the API's Go test suite, including the RBAC repository integration test, against the
 running `db` container:
@@ -42,12 +42,12 @@ DATABASE_URL=postgres://shetrunjay:shetrunjay@localhost:5433/shetrunjay go test 
 
 ### API environment
 
-| Variable       | Required | Default (when unset)                    |
-|----------------|----------|-----------------------------------------|
-| `DATABASE_URL` | no       | `postgres://…@localhost:5433/shetrunjay` |
-| `JWT_SECRET`   | **yes**  | none — the API exits if it's not set     |
-| `CORS_ORIGIN`  | no       | `http://localhost:3000`                  |
-| `PORT`         | no       | `8080`                                   |
+| Variable       | Required | Default (when unset)                                                   |
+| -------------- | -------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL` | no       | `postgres://…@localhost:5433/shetrunjay`                               |
+| `JWT_SECRET`   | **yes**  | none — the API exits if it's not set                                   |
+| `CORS_ORIGIN`  | no       | `http://localhost:3000`                                                |
+| `PORT`         | no       | `8080`                                                                 |
 | `DATA_ROOT`    | no       | `../../apps` (assumes running from `apps/api` against a repo checkout) |
 
 `JWT_SECRET` has no built-in fallback on purpose: a default would mean any deployment that forgot
@@ -131,7 +131,7 @@ Gotchas and non-obvious decisions worth knowing before touching the correspondin
   `output: "standalone"` for a lean runtime image.
 - `NEXT_PUBLIC_API_URL` is passed as a build `ARG`/`ENV`, not a runtime env var — Next.js inlines
   `NEXT_PUBLIC_*` vars into the client bundle at build time. It's set to
-  `http://localhost:8080` (not an internal service DNS name) because the *browser*, running on
+  `http://localhost:8080` (not an internal service DNS name) because the _browser_, running on
   the host, calls the API directly via its published port — same reasoning as the hardcoded CORS
   origin above. Only `api → db` uses container-internal DNS (`db:5432`).
 

@@ -79,7 +79,7 @@ export function Header({
             navigation sheet carries the wordmark in full. */}
         <div className="hidden min-w-0 sm:block">
           <p className="truncate text-sm font-semibold tracking-tight text-foreground leading-tight">
-            Shetrunjay Hills
+            Shatrunjay Hills
           </p>
           <p className="truncate text-[11px] tracking-wide leading-tight text-muted-foreground">
             Web GIS Dashboard

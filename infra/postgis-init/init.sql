@@ -1,4 +1,4 @@
--- Shetrunjay Hills — Web GIS Dashboard
+-- Shatrunjay Hills — Web GIS Dashboard
 -- PostGIS schema + database-driven RBAC + mock data.
 -- Runs automatically on first container start via docker-entrypoint-initdb.d.
 

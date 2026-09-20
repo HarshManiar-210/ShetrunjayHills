@@ -1,4 +1,4 @@
-# Shetrunjay Hills — Spec-Kit Files
+# Shatrunjay Hills — Spec-Kit Files
 
 This is a spec-kit-style (`.specify/` + `specs/`) breakdown of the Web GIS Dashboard, split by
 app as requested: database, backend, frontend. Drop this into the root of the monorepo — it's

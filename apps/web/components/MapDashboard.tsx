@@ -511,7 +511,7 @@ export function MapDashboard() {
             <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
           </div>
           <p className="shrink-0 border-t border-border/60 bg-panel-deep px-4 py-2.5 text-center text-[11px] tracking-wide text-muted-foreground">
-            © Shetrunjay Hills {new Date().getFullYear()}
+            © Shatrunjay Hills {new Date().getFullYear()}
           </p>
         </aside>
 

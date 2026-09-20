@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Shetrunjay Hills",
-  description: "Shetrunjay Hills Web GIS Dashboard",
+  title: "Shatrunjay Hills",
+  description: "Shatrunjay Hills Web GIS Dashboard",
 };
 
 export default function RootLayout({

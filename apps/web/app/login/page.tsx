@@ -16,7 +16,7 @@ export default function LoginPage() {
             <Mountain className="size-6 text-primary" strokeWidth={1.75} />
             <div>
               <p className="text-base font-semibold leading-tight">
-                Shetrunjay Hills
+                Shatrunjay Hills
               </p>
               <p className="text-xs text-muted-foreground leading-tight">
                 Web GIS Dashboard
@@ -33,7 +33,7 @@ export default function LoginPage() {
 
       <div className="hidden flex-col items-center justify-center bg-sidebar p-12 md:flex md:w-1/2">
         <p className="max-w-md text-center text-xl font-medium text-foreground">
-          Shetrunjay Hills Web GIS Dashboard
+          Shatrunjay Hills Web GIS Dashboard
         </p>
       </div>
     </div>

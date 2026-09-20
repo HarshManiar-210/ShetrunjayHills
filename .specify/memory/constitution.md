@@ -17,12 +17,12 @@ Sync Impact Report
   this repository as of this writing.
 -->
 
-# Shetrunjay Hills Constitution
+# Shatrunjay Hills Constitution
 
 ## Core Mission
 
-Shetrunjay Hills is a Web GIS dashboard presenting ecological and historical layer data over
-Shetrunjay Hills, gated by database-driven role-based access control. Every principle below
+Shatrunjay Hills is a Web GIS dashboard presenting ecological and historical layer data over
+Shatrunjay Hills, gated by database-driven role-based access control. Every principle below
 exists to protect one property: **who can see what, and what a layer looks like, is data — never
 a code path.**
 

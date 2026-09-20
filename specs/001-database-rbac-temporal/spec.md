@@ -10,7 +10,7 @@ shape, year coverage, or role list. Proceed with schema design.
 The database currently models `roles`, `users`, `layers`, and `role_layer_permissions` as static,
 non-temporal rows for three mock roles and three mock layers around Ahmedabad. This spec covers
 the schema evolution required to support (a) a real anonymous/public access tier enforced at the
-data layer, (b) the real Shetrunjay Hills role set (**3 roles**: `public`, `regular_user`,
+data layer, (b) the real Shatrunjay Hills role set (**3 roles**: `public`, `regular_user`,
 `admin` — `support_team` dropped) and the **14-theme layer catalog** (FRD §6.8: Forest Cover,
 Forest Type, Vegetation Change, Fragmentation, LULC, Forest Status, Cadastral Map, Tree Count,
 Tree Species, Tree Height, Watershed, Wildlife Corridor, Habitat Suitability, Carbon Stock, plus
@@ -23,6 +23,7 @@ shapes defined here.
 ## User Scenarios & Testing
 
 ### Scenario 1 — Anonymous read of public layers
+
 An unauthenticated caller queries layers and receives only rows whose permission chain includes
 the anonymous/public role, with no code path capable of returning a restricted layer to that
 caller regardless of query parameters supplied.
@@ -32,12 +33,14 @@ public layer set; the same query with `admin` returns the full set; no test requ
 application code to add or remove a layer from either result — only seed/migration data.
 
 ### Scenario 2 — Admin adds a new role without a deploy
+
 An admin inserts a new row into `roles` and corresponding `role_layer_permissions` rows. On the
 next request, a user with that role sees exactly the layers granted, with zero code changes.
 
 **Acceptance**: Verified via the repository integration test suite, not manual code inspection.
 
 ### Scenario 3 — Querying a layer at a specific year
+
 A caller requests a time-enabled layer (e.g. forest density) for year 2005. The query returns
 only that year's geometries/attributes, not a blended or most-recent-year fallback, and returns
 an explicit "no data for this year" result (not an error) if 2005 has no assessment.
@@ -45,6 +48,7 @@ an explicit "no data for this year" result (not an error) if 2005 has no assessm
 **Acceptance**: Repository test asserts empty-but-successful result for an off-year query.
 
 ### Scenario 4 — Layer styling is data, not code
+
 A layer's line/fill colour and opacity are read from the `layers` table (or its year-scoped
 equivalent), never matched by name in application code.
 
@@ -52,6 +56,7 @@ equivalent), never matched by name in application code.
 query result feature's properties.
 
 ### Edge Cases
+
 - A layer exists but has zero permission rows (not even for `admin`) — must not error, must
   return empty, and should be flagge-able as a data-hygiene issue (out of scope to auto-detect
   in v1, but must not crash).
@@ -72,13 +77,13 @@ query result feature's properties.
   or a year-scoped equivalent, not derivable only in application code.
 - **FR-005**: The system MUST version time-enabled layer data by year/date such that a later
   correction to one year's data does not silently overwrite or become indistinguishable from a
-  prior year's published record. *(Exact mechanism — append-only snapshot vs. update-with-audit —
+  prior year's published record. _(Exact mechanism — append-only snapshot vs. update-with-audit —
   is an implementation choice now, not a blocked Open Item; the year column itself is a real
-  date/year type supporting arbitrary values, per FR-005a.)*
+  date/year type supporting arbitrary values, per FR-005a.)_
 - **FR-005a**: The year/date column MUST support **continuous** values (any year in range), not an
   enum of discrete assessment years — resolved per FRD §11 item 2. Years without data return an
   explicit empty result (Scenario 3), never a nearest-year fallback or an enum constraint error.
-- **FR-006**: The system MUST support the real Shetrunjay Hills role set (3 roles: `public`,
+- **FR-006**: The system MUST support the real Shatrunjay Hills role set (3 roles: `public`,
   `regular_user`, `admin`) and the 14-theme layer catalog + base/reference layers (FRD §6.8)
   replacing the Ahmedabad mock data as seed/migration rows, without altering table shapes
   established for the mock data where those shapes already generalize (e.g. `roles`,
@@ -103,22 +108,22 @@ This is the concrete data the FRD §6.8 summary and Theme entity below were plac
 Every row is seed data (FR-006, migration `006_real_themes_and_layers.sql`) — no theme name,
 filter name, or output name appears in application code (Principle I).
 
-| # | Theme | `filter_config` keys | Auto-display source (togglable) | `data_format` | Outputs (feeds `theme_statistics`) |
-|---|---|---|---|---|---|
-| 1 | Forest Cover | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster | Zonal/grid stats, area summary, % change |
-| 2 | Forest Type | *(none — no year filter)* | Drone | raster | Area-wise distribution stats |
-| 3 | Vegetation Change | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster | Gain/loss stats, change analysis |
-| 4 | Fragmentation | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster | Fragmentation stats, patch analysis |
-| 5 | LULC | `year`, `satellite` | Satellite/Drone, linked to chosen year | raster + vector | Area-wise classification stats |
-| 6 | Forest Status | `raster_toggle`, `vector_toggle` | — (FSI & other categories, both formats) | raster + vector | Category-wise stats |
-| 7 | Cadastral Map | `village` | — | vector | Survey boundaries, village-wise display |
-| 8 | Tree Count | `zone`, `grid` | Drone | point | Total count, zone-wise + grid-wise stats |
-| 9 | Tree Species | `zone`, `grid` | Drone | point | Family-wise (NDDB classification) species stats, zone/grid-wise |
-| 10 | Tree Height | `zone`, `grid` | Drone/LiDAR | point | Height-class distribution, zone/grid-wise |
-| 11 | Watershed | `sub_theme` (Streams \| Geology \| Potential SMC), `zone`, `grid` | Drone | vector (mixed: line/polygon/point per sub-theme) | Potential SMC stats (Mati Pala, Check Dam, Pond), structure-wise analysis |
-| 12 | Wildlife Corridor | `fauna` (Lion, Leopard — expandable) | Drone | vector + point | Corridor map, wildlife locations |
-| 13 | Habitat Suitability Model | `fauna`, `raster_toggle` | Drone + separate raster on/off | raster + point | Suitability map, wildlife observation locations |
-| 14 | Carbon Stock | `zone`, `grid` | — | vector | Zone-wise + overall carbon stock, summary stats |
+| #   | Theme                     | `filter_config` keys                                              | Auto-display source (togglable)          | `data_format`                                    | Outputs (feeds `theme_statistics`)                                        |
+| --- | ------------------------- | ----------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------- |
+| 1   | Forest Cover              | `year`, `satellite`                                               | Satellite/Drone, linked to chosen year   | raster                                           | Zonal/grid stats, area summary, % change                                  |
+| 2   | Forest Type               | _(none — no year filter)_                                         | Drone                                    | raster                                           | Area-wise distribution stats                                              |
+| 3   | Vegetation Change         | `year`, `satellite`                                               | Satellite/Drone, linked to chosen year   | raster                                           | Gain/loss stats, change analysis                                          |
+| 4   | Fragmentation             | `year`, `satellite`                                               | Satellite/Drone, linked to chosen year   | raster                                           | Fragmentation stats, patch analysis                                       |
+| 5   | LULC                      | `year`, `satellite`                                               | Satellite/Drone, linked to chosen year   | raster + vector                                  | Area-wise classification stats                                            |
+| 6   | Forest Status             | `raster_toggle`, `vector_toggle`                                  | — (FSI & other categories, both formats) | raster + vector                                  | Category-wise stats                                                       |
+| 7   | Cadastral Map             | `village`                                                         | —                                        | vector                                           | Survey boundaries, village-wise display                                   |
+| 8   | Tree Count                | `zone`, `grid`                                                    | Drone                                    | point                                            | Total count, zone-wise + grid-wise stats                                  |
+| 9   | Tree Species              | `zone`, `grid`                                                    | Drone                                    | point                                            | Family-wise (NDDB classification) species stats, zone/grid-wise           |
+| 10  | Tree Height               | `zone`, `grid`                                                    | Drone/LiDAR                              | point                                            | Height-class distribution, zone/grid-wise                                 |
+| 11  | Watershed                 | `sub_theme` (Streams \| Geology \| Potential SMC), `zone`, `grid` | Drone                                    | vector (mixed: line/polygon/point per sub-theme) | Potential SMC stats (Mati Pala, Check Dam, Pond), structure-wise analysis |
+| 12  | Wildlife Corridor         | `fauna` (Lion, Leopard — expandable)                              | Drone                                    | vector + point                                   | Corridor map, wildlife locations                                          |
+| 13  | Habitat Suitability Model | `fauna`, `raster_toggle`                                          | Drone + separate raster on/off           | raster + point                                   | Suitability map, wildlife observation locations                           |
+| 14  | Carbon Stock              | `zone`, `grid`                                                    | —                                        | vector                                           | Zone-wise + overall carbon stock, summary stats                           |
 
 **Watershed sub-themes** (theme 11 only): Streams, Geology, and Potential SMC — the latter itself
 covering Mati Pala, Check Dam, and Pond structures. Modeled as `layers` rows sharing
@@ -150,6 +155,7 @@ Tool, Zoom to Layer, Identify Feature Tool.
   (JSONB) — backs FR-010's per-theme statistics output.
 
 ## Non-Goals (this spec)
+
 - The specific raster storage/serving mechanism (tile server, `ST_AsMVT` vs. a dedicated raster
   pipeline) for raster-format themes — schema only needs a reference/pointer column; the serving
   mechanism is a Backend spec (002) / infra decision.
@@ -158,6 +164,7 @@ Tool, Zoom to Layer, Identify Feature Tool.
   confirmed in scope — FRD FR-7.2).
 
 ## Open Items — resolved (FRD v0.2 §11)
+
 1. ~~**Data shape**~~ — resolved: mixed raster/vector/point, varies per theme (`Theme.data_format`,
    FRD §6.8).
 2. ~~**Year coverage**~~ — resolved: continuous (FR-005a).
