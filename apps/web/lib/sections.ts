@@ -23,6 +23,7 @@ import {
   Gem,
   Layers3,
   Sprout,
+  Leaf,
   Square,
   Zap,
   ScrollText,
@@ -135,6 +136,7 @@ export interface SectionDef {
  */
 const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> = {
   "forest-layers": { accent: "forest", icon: Trees },
+  "green-cover": { accent: "forest", icon: Leaf },
   "forest-cover": { accent: "forest", icon: Trees },
   "forest-type": { accent: "canopy", icon: TreePine },
   "vegetation-change": { accent: "change", icon: TrendingUp },
