@@ -232,11 +232,9 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('drone-data',                  'Drone Data',                  NULL, 3),
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
-    ('existing-water-conservation', 'Existing Water Conservation', NULL, 6),
-    ('proposed-conservation-sites', 'Proposed Conservation Sites', NULL, 7),
-    ('biodiversity-data',           'Biodiversity Data',           NULL, 8),
-    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 9),
-    ('reference',                   'Reference',                   NULL, 10);
+    ('biodiversity-data',           'Biodiversity Data',           NULL, 6),
+    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 7),
+    ('reference',                   'Reference',                   NULL, 8);
 
 -- Second level. Each of these holds one theme's rasters, so the frontend
 -- renders it as a single layer with a year picker -- which is why the six
@@ -259,7 +257,10 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('aspect',      'Aspect',                      grp('drone-data'), 5),
     ('chm',         'Canopy Height Model (CHM)',   grp('drone-data'), 6),
 
-    ('toposheet',   'Toposheet',                   grp('reference'), 2);
+    ('toposheet',   'Toposheet',                   grp('reference'), 2),
+
+    ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 1),
+    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 2);
 
 -- Tree Density is a raster, so it gets its own group under Drone Analysis: a
 -- group holding placed rasters becomes a single layer, which would swallow
