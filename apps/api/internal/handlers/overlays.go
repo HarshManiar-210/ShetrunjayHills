@@ -31,6 +31,10 @@ type overlayFilePathGetter interface {
 	GetStaticOverlayFilePath(ctx context.Context, key string) (string, error)
 }
 
+// A vector overlay delivered as a tile archive rather than as one GeoJSON
+// file. Matched case-insensitively against the seeded file_path.
+const pmtilesExt = ".pmtiles"
+
 // Overlays lists every static overlay's display metadata — never a
 // filesystem path, only what the frontend needs to render a switch and, by
 // key, ask OverlayData for the underlying asset.
@@ -52,6 +56,7 @@ func Overlays(repo overlaysGetter, dataRoot string) http.HandlerFunc {
 		root := filepath.Clean(dataRoot)
 		for i := range overlays {
 			overlays[i].SizeBytes = assetSize(root, overlays[i].FilePath)
+			overlays[i].Tiled = strings.EqualFold(filepath.Ext(overlays[i].FilePath), pmtilesExt)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -101,11 +106,17 @@ func OverlayData(repo overlayFilePathGetter, dataRoot string) http.HandlerFunc {
 		// revalidation once max-age lapses is a 304 rather than a re-send.
 		w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
 
-		// Go's mime table has no .geojson entry, so ServeFile would otherwise
-		// sniff these to text/plain. ServeFile leaves an already-set
-		// Content-Type alone.
-		if strings.EqualFold(filepath.Ext(full), ".geojson") {
+		// Go's mime table has no .geojson or .pmtiles entry, so ServeFile
+		// would otherwise sniff these to text/plain. ServeFile leaves an
+		// already-set Content-Type alone.
+		switch strings.ToLower(filepath.Ext(full)) {
+		case ".geojson":
 			w.Header().Set("Content-Type", "application/geo+json")
+		case pmtilesExt:
+			// The pmtiles client reads the archive with Range requests, so
+			// the browser has to be allowed to send Range and to read back
+			// where in the file it landed. ServeFile itself handles 206s.
+			w.Header().Set("Content-Type", "application/vnd.pmtiles")
 		}
 
 		http.ServeFile(w, r, full)

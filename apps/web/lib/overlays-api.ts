@@ -30,6 +30,14 @@ export interface OverlayMeta {
    * invariant). Absent for a 'pending' row, which has no file.
    */
   size_bytes?: number;
+  /**
+   * The asset is a PMTiles archive, not a whole GeoJSON file: MapLibre adds
+   * it as a vector-tile source and streams only the current viewport. Stamped
+   * by the API from the file's extension (see handlers.Overlays), so which
+   * layers are tiled is a fact about the delivered data rather than a list of
+   * keys in the frontend.
+   */
+  tiled?: boolean;
 }
 
 /**

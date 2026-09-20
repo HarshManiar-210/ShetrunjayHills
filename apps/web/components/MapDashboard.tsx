@@ -1,18 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { ListTree, Menu as MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -59,26 +51,6 @@ const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
 type MobileSheet = "menu" | "legend" | null;
 
-/**
- * Above this, switching a layer on prompts first. The study's tree survey is
- * ~166 MB of GeoJSON and will stall a tab for a while; Streams and Watersheds
- * at ~20 MB are slow but fine, so the line sits above them. Sizes come from
- * the API, which stats the files, so no layer is named here.
- */
-const HEAVY_LAYER_BYTES = 50 * 1024 * 1024;
-
-interface HeavyLayer {
-  key: string;
-  label: string;
-  sizeBytes: number;
-  /** Every key the confirmed action should switch on — a whole section, or one row. */
-  keys?: string[];
-}
-
-function formatMb(bytes: number): string {
-  return `${Math.round(bytes / 1_000_000)} MB`;
-}
-
 export function MapDashboard() {
   const auth = useAuthState();
   const [layers, setLayers] = useState<LayerCollection | null>(null);
@@ -110,13 +82,6 @@ export function MapDashboard() {
   // does not carry someone else's comparison across.
   const [compareYear, setCompareYear] = useState<Record<string, number>>({});
   const [blend, setBlend] = useState(0.5);
-
-  // A layer big enough to be worth warning about, waiting on confirmation.
-  const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
-  // Heavy layers the user has already accepted this session, so flipping one
-  // off and on again does not re-prompt. A ref, not state: nothing renders
-  // from it, and it must not trigger a re-render when it grows.
-  const confirmedHeavyRef = useRef<Set<string>>(new Set());
 
   const token = getToken();
 
@@ -192,34 +157,6 @@ export function MapDashboard() {
   const allSections = useMemo(() => flattenSections(sections), [sections]);
   const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
 
-  // Size per toggle key, so the heavy-layer warning is driven by what the
-  // files actually weigh (the API stats them — see handlers/overlays.go)
-  // rather than by a hardcoded list of which layers are big.
-  // A plain record rather than a Map: the dynamic import above is named
-  // `Map`, so the global constructor is not reachable by that name here.
-  const groupKeyById = useMemo(() => {
-    const byId: Record<number, string> = {};
-    for (const group of layerGroups) byId[group.id] = group.key;
-    return byId;
-  }, [layerGroups]);
-
-  const heavyLayers = useMemo(() => {
-    const byKey: Record<string, HeavyLayer> = {};
-    for (const overlay of overlayMeta) {
-      const size = overlay.size_bytes ?? 0;
-      if (size < HEAVY_LAYER_BYTES) continue;
-      const key =
-        overlay.asset_type === "raster"
-          ? rasterToggleKey(groupKeyById[overlay.group_id])
-          : overlay.key;
-      // A raster theme is keyed by section, so its years collapse onto one
-      // entry — warn with the largest of them.
-      if (byKey[key] && byKey[key].sizeBytes >= size) continue;
-      byKey[key] = { key, label: overlay.label, sizeBytes: size };
-    }
-    return byKey;
-  }, [overlayMeta, groupKeyById]);
-
   const setKeysVisible = useCallback((keys: string[], on: boolean) => {
     setVisible((v) => {
       const next = { ...v };
@@ -228,45 +165,17 @@ export function MapDashboard() {
     });
   }, []);
 
-  // Switching a layer *on* is the only direction that can cost anything, so
-  // that is the only direction the size warning gates. Turning things off,
-  // and anything already confirmed, goes straight through.
-  const requestKeys = useCallback(
-    (keys: string[], on: boolean) => {
-      if (!on) {
-        setKeysVisible(keys, false);
-        return;
-      }
-      const heavy = keys.map((k) => heavyLayers[k]).find(Boolean);
-      if (heavy && !confirmedHeavyRef.current.has(heavy.key)) {
-        setHeavyPrompt({ ...heavy, keys });
-        return;
-      }
-      setKeysVisible(keys, true);
-    },
-    [heavyLayers, setKeysVisible],
-  );
-
-  const confirmHeavy = useCallback(() => {
-    if (!heavyPrompt) return;
-    // Remembered for the session: having said yes once, flipping the same
-    // layer off and on again should not ask a second time.
-    confirmedHeavyRef.current.add(heavyPrompt.key);
-    setKeysVisible(heavyPrompt.keys ?? [heavyPrompt.key], true);
-    setHeavyPrompt(null);
-  }, [heavyPrompt, setKeysVisible]);
-
   const toggleSection = useCallback(
     (id: string, on: boolean) => {
       const def = allSections.find((s) => s.id === id);
-      if (def) requestKeys(sectionToggleKeys(def), on);
+      if (def) setKeysVisible(sectionToggleKeys(def), on);
     },
-    [allSections, requestKeys],
+    [allSections, setKeysVisible],
   );
 
   const toggleItem = useCallback(
-    (key: string) => requestKeys([key], !visible[key]),
-    [requestKeys, visible],
+    (key: string) => setKeysVisible([key], !visible[key]),
+    [setKeysVisible, visible],
   );
 
   /** The sidebar's "Reset view": switch every layer off and start again. */
@@ -283,10 +192,10 @@ export function MapDashboard() {
   // left to open on the way down — which is why `path` goes unused here.
   const revealLayer = useCallback(
     (_path: string[], key: string) => {
-      requestKeys([key], true);
+      setKeysVisible([key], true);
       setMobileSheet(null);
     },
-    [requestKeys],
+    [setKeysVisible],
   );
 
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
@@ -612,27 +521,6 @@ export function MapDashboard() {
         onOpenChange={auth.setLoginOpen}
         onSuccess={auth.onLoginSuccess}
       />
-
-      {/* Heavy layers are worth a warning, not a block: the client wants the
-          real survey data shown, and someone who knows what they are asking
-          for should be able to ask for it. */}
-      <Dialog open={heavyPrompt !== null} onOpenChange={(o) => !o && setHeavyPrompt(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{heavyPrompt?.label} is a large layer</DialogTitle>
-            <DialogDescription>
-              This layer is about {heavyPrompt ? formatMb(heavyPrompt.sizeBytes) : ""} and can take
-              a while to load — the map may be unresponsive until it finishes. Switch it on anyway?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setHeavyPrompt(null)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmHeavy}>Switch it on</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Mounted only while running: the tour always starts at step 1, so
           replaying it from the header needs no reset of its own. */}

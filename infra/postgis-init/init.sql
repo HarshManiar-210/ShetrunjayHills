@@ -230,8 +230,8 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('forest-layers',               'Forest Layers',               NULL, 1),
     ('landuse',                     'Landuse',                     NULL, 2),
     ('drone-data',                  'Drone Data',                  NULL, 3),
-    ('drone-analysis',              'Drone Analysis',              NULL, 4),
-    ('hydrogeology',                'Hydrogeology',                NULL, 5),
+    ('hydrogeology',                'Hydrogeology',                NULL, 4),
+    ('drone-analysis',              'Drone Analysis',              NULL, 5),
     ('existing-water-conservation', 'Existing Water Conservation', NULL, 6),
     ('proposed-conservation-sites', 'Proposed Conservation Sites', NULL, 7),
     ('biodiversity-data',           'Biodiversity Data',           NULL, 8),
@@ -261,6 +261,12 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('toposheet',   'Toposheet',                   grp('reference'), 2);
 
+-- Tree Density is a raster, so it gets its own group under Drone Analysis: a
+-- group holding placed rasters becomes a single layer, which would swallow
+-- Tree Height next to it.
+INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
+    ('tree-density', 'Tree Density', grp('drone-analysis'), 1);
+
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
 -- file_path is relative to DATA_ROOT (see apps/api/cmd/api/main.go), which
@@ -269,8 +275,8 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 -- ---------------------------------------------------------------------------
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('streams',        'Stream Network',            grp('hydrogeology'), 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           1, 71.728181, 21.451841, 71.822926, 21.512506),
-    ('watershed',      'Watershed',          grp('hydrogeology'), 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         2, 71.728179, 21.451808, 71.822433, 21.512483),
+    ('streams',        'Stream Network',            grp('hydrogeology'), 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           5, 71.728181, 21.451841, 71.822926, 21.512506),
+    ('watershed',      'Watershed',          grp('hydrogeology'), 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         6, 71.728179, 21.451808, 71.822433, 21.512483),
     ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
     ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
     ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
@@ -279,14 +285,21 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
     ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
 
--- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
--- client's full 856,700-point survey, served as-is (client wants the real
--- data shown, not a thinned stand-in — a slow first load is accepted).
+-- Tree Inventory: per-tree survey attributes. Tree Height is the client's
+-- full 856,700-point survey, every point of it — but served as PMTiles
+-- rather than as the 166 MB GeoJSON it was delivered as. Handed over whole it
+-- became 856,700 objects in MapLibre's worker and killed the tab; tiled, the
+-- browser holds only what is on screen. The .geojson stays in the repo as the
+-- source the archive is rebuilt from (tools/prepare-vector-tiles.sh).
+--
+-- Nothing here says "this layer is tiled": the API stamps that from the file
+-- extension, so switching a layer to tiles is this one path edit.
+--
 -- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
 -- file_path stay unset until a follow-up row update supplies real data, no
 -- code change required either way.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
+    ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
     ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
@@ -412,11 +425,16 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- pattern as Forest Boundary/Cadastral Map above) - no handler or component
 -- code needed.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          1, 71.753944, 21.453344, 71.819504, 21.498314),
-    ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       1, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
+    ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
+
+-- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
+-- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
@@ -437,7 +455,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
     -- Drone Analysis. Tree Height and Tree Species are seeded above; these
     -- are the rest of the brief's list for that group.
-    ('treeDensity',         'Tree Density',                grp('drone-analysis'), 'vector', NULL, NULL, '', 3, 'pending'),
     ('treeCount',           'Tree Count',                  grp('drone-analysis'), 'vector', NULL, NULL, '', 4, 'pending'),
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
     ('growingStock',        'Growing Stock',               grp('drone-analysis'), 'vector', NULL, NULL, '', 6, 'pending'),

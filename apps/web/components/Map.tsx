@@ -13,6 +13,8 @@ import {
   type MapGeoJSONFeature,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { addProtocol } from "maplibre-gl";
+import { Protocol } from "pmtiles";
 import { Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
 import { popupHtml } from "@/lib/feature-popup";
@@ -29,6 +31,12 @@ import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
 import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
+
+// Teaches MapLibre to resolve `pmtiles://<url>` by reading the archive with
+// Range requests instead of downloading it. Module scope, so it is registered
+// once before any map exists — safe here because this component is only ever
+// loaded client-side (dynamic(..., { ssr: false }) in MapDashboard).
+addProtocol("pmtiles", new Protocol().tile);
 
 const POLYGON_TYPES = new Set(["Polygon", "MultiPolygon"]);
 const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
@@ -390,16 +398,33 @@ function flowLayerIds(defs: OverlayDef[]): string[] {
 // repeatedly with a growing def list (e.g. once the overlay-metadata fetch
 // lands after the map has already loaded) — an existing source is skipped.
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color } of defs) {
+  for (const { key, kind, color, tiled, url } of defs) {
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
-    map.addSource(sourceId, { type: "geojson", data: EMPTY_FC });
+
+    // A tiled overlay points at its archive up front — there is no separate
+    // "load" step for it below, because MapLibre only ever fetches the tiles
+    // the viewport actually needs. A whole-file overlay starts empty and has
+    // its URL pushed in on first use.
+    map.addSource(
+      sourceId,
+      tiled
+        ? { type: "vector", url: `pmtiles://${url}` }
+        : { type: "geojson", data: EMPTY_FC },
+    );
+
+    // Vector-tile layers must name the layer inside the archive; a geojson
+    // source has none, and MapLibre rejects the property outright. The
+    // conversion names it after the overlay key precisely so this needs no
+    // per-layer lookup — see tools/prepare-vector-tiles.sh.
+    const from = tiled ? { "source-layer": key } : {};
 
     if (kind === "line") {
       map.addLayer({
         id: `${sourceId}-casing`,
         type: "line",
         source: sourceId,
+        ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
         paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
       });
@@ -407,6 +432,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         id: `${sourceId}-line`,
         type: "line",
         source: sourceId,
+        ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
         paint: { "line-color": color, "line-width": LINE_WIDTH },
       });
@@ -414,6 +440,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         id: `${sourceId}-flow`,
         type: "line",
         source: sourceId,
+        ...from,
         // Butt caps, not round: a round cap on every dash bleeds the dashes
         // into each other and the flow stops reading as movement.
         layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
@@ -430,6 +457,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         id: `${sourceId}-circle`,
         type: "circle",
         source: sourceId,
+        ...from,
         layout: { visibility: "none" },
         paint: {
           "circle-color": color,
@@ -447,6 +475,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         id: `${sourceId}-fill`,
         type: "fill",
         source: sourceId,
+        ...from,
         layout: { visibility: "none" },
         paint: { "fill-color": color, "fill-opacity": kind === "outline" ? 0 : 0.15 },
       });
@@ -454,6 +483,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         id: `${sourceId}-outline`,
         type: "line",
         source: sourceId,
+        ...from,
         layout: { visibility: "none" },
         paint: { "line-color": color, "line-width": OUTLINE_WIDTH },
       });
@@ -461,6 +491,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         id: `${sourceId}-flow`,
         type: "line",
         source: sourceId,
+        ...from,
         layout: { visibility: "none" },
         paint: {
           "line-color": CASING,
@@ -785,7 +816,10 @@ export default function Map({
       const visible = Boolean(overlays[def.key]);
       const justShown = visible && !shownKeysRef.current.has(def.key);
 
-      if (visible && !loadedKeysRef.current.has(def.key)) {
+      // A tiled overlay has nothing to load on demand: its source already
+      // points at the archive, and MapLibre pulls tiles for the viewport as
+      // the camera moves. Only whole-file overlays have a one-shot fetch.
+      if (visible && !def.tiled && !loadedKeysRef.current.has(def.key)) {
         // Marked before the load rather than after, so a re-render mid-load
         // doesn't start the same fetch a second time.
         loadedKeysRef.current.add(def.key);

@@ -64,6 +64,26 @@ GeoJSON in `apps/vector-data`, Forest Cover raster in `apps/raster-data`) resolv
 `GET /api/overlays/{key}/data` serves whatever's on disk there. Compose mounts both folders
 read-only into the `api` container at `/data` and sets `DATA_ROOT` to match.
 
+### Vector tiles for oversized layers
+
+A vector layer is normally one GeoJSON file, handed to MapLibre whole. That stops working when
+the feature count gets large: the Tree Height survey is 856,700 points, and parsing it produced
+enough objects in MapLibre's worker to kill the tab regardless of how the fetch was done.
+
+Such a layer is instead served as a PMTiles archive, so the browser only ever holds the features
+in the current viewport. To convert one:
+
+```
+tools/prepare-vector-tiles.sh <overlay-key> apps/vector-data/<file>.geojson
+```
+
+Then point that overlay's `file_path` at the `.pmtiles` file. Nothing else changes: the API
+stamps `tiled` on the row from the file extension, and the frontend switches to a vector-tile
+source off that flag — so no code names which layers are tiled. The MVT layer inside the archive
+is named after the overlay key, which is what the frontend uses as `source-layer`; the script
+enforces that, so don't run `ogr2ogr` by hand without `-nln`. The source `.geojson` stays in the
+repo as the thing the archive is rebuilt from.
+
 ## Folder Tree (target)
 
 ```
@@ -137,5 +157,7 @@ Gotchas and non-obvious decisions worth knowing before touching the correspondin
 
 ## Future Enhancements (out of scope for now)
 
-- Real PMTiles basemap (protocol handler + hosted `.pmtiles` file) under the GeoJSON layers
+- Real PMTiles _basemap_ under the GeoJSON layers. The PMTiles protocol handler itself is no
+  longer future work — it ships, because the tree survey needed it (see below); what's still
+  missing is a basemap archive to point it at.
 - Real ecological/historical data replacing the Ahmedabad mock geometries

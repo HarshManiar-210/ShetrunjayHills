@@ -50,6 +50,13 @@ type StaticOverlay struct {
 	// (the tree survey is ~166 MB) without hardcoding which keys are heavy.
 	// 0 for a 'pending' row, which has no file.
 	SizeBytes int64 `json:"size_bytes,omitempty"`
+	// Tiled reports that the asset is a PMTiles archive rather than a whole
+	// GeoJSON file, so the frontend adds it as a vector-tile source and lets
+	// MapLibre stream only the current viewport. Derived from the file
+	// extension here, not seeded, for the same reason as SizeBytes: it is a
+	// fact about the delivered file, and this keeps "which layers are tiled"
+	// out of the frontend as a hardcoded key list (CLAUDE.md's invariant).
+	Tiled bool `json:"tiled,omitempty"`
 }
 
 // LayerGroup is a node in the sidebar's tree. ParentID is nil for a
