@@ -277,13 +277,13 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('streams',        'Stream Network',            grp('hydrogeology'), 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           5, 71.728181, 21.451841, 71.822926, 21.512506),
     ('watershed',      'Watershed',          grp('hydrogeology'), 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         6, 71.728179, 21.451808, 71.822433, 21.512483),
-    ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
-    ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
-    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
-    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'outline', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
-    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
-    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
+    ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              2, 71.713590, 21.445225, 71.841080, 21.525549),
+    ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             3, 71.711555, 21.433928, 71.841029, 21.525711),
+    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           5, 71.697710, 21.426989, 71.855530, 21.553063),
+    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'outline', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   7, 68.149498, 20.119593, 74.476251, 24.712427),
+    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#5AA469', 'vector-data/StudyArea.geojson',          1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     8, 71.758100, 21.466484, 71.821988, 21.512142),
+    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       4, 71.697740, 21.427782, 71.855416, 21.552918);
 
 -- Tree Inventory: per-tree survey attributes. Tree Height is the client's
 -- full 856,700-point survey, every point of it — but served as PMTiles
@@ -428,7 +428,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
     ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
     ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
+    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
