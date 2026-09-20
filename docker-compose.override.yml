@@ -1,0 +1,29 @@
+# Dev overrides, merged automatically by `docker compose up`. Source is
+# bind-mounted and both services hot-reload, so edits show up without a
+# rebuild. For a production-style run: `docker compose -f docker-compose.yml up --build`.
+services:
+  api:
+    build: !reset null
+    image: golang:1.26-alpine
+    working_dir: /src
+    command: go run github.com/air-verse/air@latest --build.cmd "go build -o /tmp/api ./cmd/api" --build.bin /tmp/api
+    volumes:
+      - ./apps/api:/src
+      - go-cache:/go
+  web:
+    build: !reset null
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm --filter web dev"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - .:/app
+      # keep the container's linux node_modules/.next off the host's macOS ones
+      - /app/node_modules
+      - /app/apps/web/node_modules
+      - /app/apps/web/.next
+
+volumes:
+  go-cache:
