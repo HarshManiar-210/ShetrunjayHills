@@ -21,6 +21,14 @@ export interface OverlayDef {
    * where it is. Undefined for a row seeded without an extent.
    */
   bounds?: [[number, number], [number, number]];
+  /**
+   * Served as a PMTiles archive rather than as one GeoJSON file. The map adds
+   * a vector-tile source for these and lets MapLibre fetch only the tiles the
+   * viewport needs, which is what keeps a 856k-point survey from having to
+   * exist in memory all at once. The MVT layer inside the archive is named
+   * after `key` — see tools/prepare-vector-tiles.sh.
+   */
+  tiled: boolean;
 }
 
 export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
@@ -35,6 +43,7 @@ export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
       url: overlayDataUrl(o.key),
       color: o.color ?? "#6B7280",
       kind: o.kind,
+      tiled: o.tiled ?? false,
       bounds:
         o.min_lon != null && o.min_lat != null && o.max_lon != null && o.max_lat != null
           ? ([

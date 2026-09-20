@@ -112,6 +112,34 @@ func TestOverlaysStampsAssetSize(t *testing.T) {
 	}
 }
 
+// Whether a layer is tiled is derived from the delivered file's extension
+// rather than seeded, so the frontend never needs a list of which keys are
+// tiled. Case-insensitive, and false for a row with no file at all.
+func TestOverlaysStampsTiled(t *testing.T) {
+	repo := fakeOverlaysGetter{overlays: []models.StaticOverlay{
+		{Key: "treeHeight", FilePath: "vector-data/tree-height.pmtiles"},
+		{Key: "shouty", FilePath: "vector-data/Other.PMTiles"},
+		{Key: "roads", FilePath: "vector-data/Roads.geojson"},
+		{Key: "pending", FilePath: ""},
+	}}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/overlays", nil)
+	w := httptest.NewRecorder()
+	Overlays(repo, t.TempDir())(w, req)
+
+	var got []models.StaticOverlay
+	if err := json.NewDecoder(w.Body).Decode(&got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	want := map[string]bool{"treeHeight": true, "shouty": true, "roads": false, "pending": false}
+	for _, o := range got {
+		if o.Tiled != want[o.Key] {
+			t.Errorf("%s tiled = %v, want %v", o.Key, o.Tiled, want[o.Key])
+		}
+	}
+}
+
 type fakeOverlayFilePathGetter struct {
 	path string
 	err  error

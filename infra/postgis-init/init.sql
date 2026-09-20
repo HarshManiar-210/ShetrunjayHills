@@ -285,14 +285,21 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
     ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
 
--- Tree Inventory: per-tree survey attributes. Tree Height is delivered as the
--- client's full 856,700-point survey, served as-is (client wants the real
--- data shown, not a thinned stand-in — a slow first load is accepted).
+-- Tree Inventory: per-tree survey attributes. Tree Height is the client's
+-- full 856,700-point survey, every point of it — but served as PMTiles
+-- rather than as the 166 MB GeoJSON it was delivered as. Handed over whole it
+-- became 856,700 objects in MapLibre's worker and killed the tab; tiled, the
+-- browser holds only what is on screen. The .geojson stays in the repo as the
+-- source the archive is rebuilt from (tools/prepare-vector-tiles.sh).
+--
+-- Nothing here says "this layer is tiled": the API stamps that from the file
+-- extension, so switching a layer to tiles is this one path edit.
+--
 -- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
 -- file_path stay unset until a follow-up row update supplies real data, no
 -- code change required either way.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.geojson', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
+    ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
     ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES

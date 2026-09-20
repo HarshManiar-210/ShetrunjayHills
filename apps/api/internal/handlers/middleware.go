@@ -30,7 +30,12 @@ func CORS(origin string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			// Range/Accept-Ranges: the pmtiles client reads a tile archive
+			// with Range requests and needs to see the 206's range headers
+			// back. Range is safelisted in newer browsers but not all, and
+			// Content-Range is never exposed unless asked for.
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Range")
+			w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return
