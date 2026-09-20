@@ -98,16 +98,15 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 5, label: "Waterbody", color: "#1200ef" },
     ],
   },
-  // Drone-sourced LULC classification — a separate delivery from the
-  // satellite `lulc` theme above, with its own (different) palette.
+  // Drone-sourced 2026 LULC — same palette as the satellite series above.
   "current-land-use": {
     layerId: "current-land-use",
     classes: [
-      { value: 1, label: "Barren", color: "#947a54" },
-      { value: 2, label: "Builtup", color: "#dc1010" },
-      { value: 3, label: "Dense Vegetation", color: "#0e3c28" },
-      { value: 4, label: "Sparse/Scrub Vegetation", color: "#0a5b1c" },
-      { value: 5, label: "Waterbodies", color: "#0000ff" },
+      { value: 1, label: "Barren", color: "#816c65" },
+      { value: 2, label: "Builtup", color: "#ff0025" },
+      { value: 3, label: "Dense Vegetation", color: "#00570b" },
+      { value: 4, label: "Scrub / Sparse Vegetation", color: "#96ef4d" },
+      { value: 5, label: "Waterbody", color: "#1200ef" },
     ],
   },
   "forest-fragmentation": {

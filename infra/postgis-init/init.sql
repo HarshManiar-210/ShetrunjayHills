@@ -249,8 +249,8 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('forest-fragmentation', 'Forest Fragmentation',    grp('forest-layers'), 5),
     ('satellite-imagery',    'Satellite Imagery',       grp('forest-layers'), 6),
 
-    ('historical-land-use',  'Historical Land Use (Satellite)', grp('landuse'), 1),
-    ('current-land-use',     'Current Land Use (Drone)',        grp('landuse'), 2),
+    ('historical-land-use',  'Historical Land Use (Satellite: 1978–2025)', grp('landuse'), 1),
+    ('current-land-use',     'Current Land Use (Drone: 2026)',           grp('landuse'), 2),
 
     ('orthomosaic', 'Orthomosaic',                 grp('drone-data'), 1),
     ('dsm',         'Digital Surface Model (DSM)', grp('drone-data'), 2),
@@ -332,7 +332,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
     ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
     ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('lulc_2026', '2026', grp('historical-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
@@ -385,13 +385,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
     ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4551430, 71.8234229, 21.5120913),
     ('chm',   'Canopy Height Model (CHM)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4558151, 71.8229114, 21.5120633);
-
--- LULC-Drone: legend and extent were delivered, but the actual raster image
--- wasn't among the new files — seeded 'pending' like Mati Pala/Tree Species
--- above. Flip to 'available' and fill in file_path/extent once it arrives,
--- no other row or code change needed.
-INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, status) VALUES
-    ('lulcDrone', 'LULC-Drone', grp('current-land-use'), 'raster', '', 1, 'pending');
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
