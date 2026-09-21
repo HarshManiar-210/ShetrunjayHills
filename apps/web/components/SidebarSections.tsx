@@ -22,9 +22,10 @@ import { cn } from "@/lib/utils";
  * layers someone is actually working with, so it stays short enough to sit on
  * the map, and the map gets the full width of the window.
  *
- * Selecting is the picker's job; this panel switches on, picks a year, and
- * sets opacity. A row's × takes it back out of the selection, so the panel
- * can be tidied where the clutter is rather than only from the picker.
+ * Selecting is the picker's job, and a layer arrives here already switched
+ * on; this panel is where you switch it back off, pick a year and set
+ * opacity. A row's × takes it out of the selection, so the panel can be
+ * tidied where the clutter is rather than only from the picker.
  */
 
 /**
@@ -288,7 +289,10 @@ function SidebarSectionsImpl({
                 </span>
               </div>
 
-              <div className="flex flex-col gap-0.5">
+              {/* Spaced rather than stacked flush: a switched-on row is a
+                  card with its own controls inside it, and two of those
+                  touching read as one box with a seam. */}
+              <div className="flex flex-col gap-2">
                 {rows.map((row) => (
                   <LayerRow
                     key={row.key}

@@ -277,23 +277,33 @@ export function MapDashboard() {
   /**
    * Pick a layer into the panel, or take it back out.
    *
-   * Deselecting also switches the layer off: a layer that has left the panel
-   * must not carry on drawing, because there would no longer be a control
-   * anywhere that could switch it off. Selecting deliberately does *not*
-   * switch anything on — that is the panel's decision, so picking a whole
-   * group's worth of layers never stacks them all on the map at once.
+   * Both directions carry visibility with them. Selecting switches the layer
+   * on, because picking a layer out of the menu is already the act of asking
+   * to see it — arriving in the panel switched off would make every layer a
+   * two-click affair. Deselecting switches it off, because a layer that has
+   * left the panel must not carry on drawing with no control left anywhere
+   * that could stop it.
+   *
+   * Switching on still goes through requestKeys, so the size warning gates a
+   * layer picked from the menu exactly as it gates one switched on in the
+   * panel.
    */
-  const toggleSelected = useCallback((key: string, picked: boolean) => {
-    setSelected((sel) => ({ ...sel, [key]: picked }));
-    if (!picked) {
+  const toggleSelected = useCallback(
+    (key: string, picked: boolean) => {
+      setSelected((sel) => ({ ...sel, [key]: picked }));
+      if (picked) {
+        requestKeys([key], true);
+        return;
+      }
       setVisible((v) => {
         if (!v[key]) return v;
         const next = { ...v };
         delete next[key];
         return next;
       });
-    }
-  }, []);
+    },
+    [requestKeys],
+  );
 
   const deselectLayer = useCallback(
     (key: string) => toggleSelected(key, false),

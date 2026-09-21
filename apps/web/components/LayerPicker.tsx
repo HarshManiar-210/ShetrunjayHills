@@ -11,11 +11,11 @@ import { cn } from "@/lib/utils";
 /**
  * The navbar's layer picker: which layers you are working with.
  *
- * This is the first of two stages. Ticking a layer here puts it in the map's
- * layers panel; whether it actually draws is that panel's decision. The split
- * keeps the panel down to the handful of layers someone is working on instead
- * of all fifty-odd at once, which is what made the old always-complete column
- * a wall to scroll.
+ * Ticking a layer here draws it and puts it in the map's layers panel, which
+ * is where it is switched off again, given a year, or faded. The split keeps
+ * the panel down to the handful of layers someone is working on instead of
+ * all fifty-odd at once, which is what made the old always-complete column a
+ * wall to scroll.
  *
  * A group's checkbox reveals its layers and selects none of them. Drone Data
  * is six rasters and Administrative Boundaries ten layers, so a group tick
@@ -172,7 +172,7 @@ export function LayerPicker({
         </div>
 
         <p className="border-t border-border px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-          Selected layers appear in the panel on the map, where you switch them on.
+          Selected layers draw on the map and appear in its layers panel.
         </p>
       </PopoverContent>
     </Popover>

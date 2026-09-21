@@ -25,12 +25,12 @@ const STEPS: Step[] = [
   {
     target: "layer-picker",
     title: "Choose your layers",
-    body: "Every layer lives in a section — Forest Layers, Landuse, Drone Data and so on. Tick a section to see what is in it, then tick the layers you want to work with. A layer marked “Coming soon” has no data delivered yet.",
+    body: "Every layer lives in a section — Forest Layers, Landuse, Drone Data and so on. Tick a section to see what is in it, then tick the layers you want: each one draws on the map as you pick it. A layer marked “Coming soon” has no data delivered yet.",
   },
   {
     target: "sections",
     title: "Your layers panel",
-    body: "The layers you chose are listed here, grouped by section. Tick one to draw it on the map — as many at once as you like, with vector layers always above raster imagery. The × beside a layer takes it back out, and the panel folds away when you want the map clear.",
+    body: "The layers you chose are listed here, grouped by section, and drawing — as many at once as you like, with vector layers always above raster imagery. Untick one to hide it without losing your place, the × beside it takes it back out altogether, and the panel folds away when you want the map clear.",
   },
   {
     target: "section-theme",
