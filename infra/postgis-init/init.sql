@@ -233,8 +233,9 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
     ('biodiversity-data',           'Biodiversity Data',           NULL, 6),
-    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 7),
-    ('reference',                   'Reference',                   NULL, 8);
+    ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
+    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
+    ('reference',                   'Reference',                   NULL, 9);
 
 -- Second level. Each of these holds one theme's rasters, so the frontend
 -- renders it as a single layer with a year picker -- which is why the six
@@ -475,9 +476,8 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     -- and switched independently once the data lands.
     ('fieldPlots',         'Field Plots and Statistics', grp('biodiversity-data'), 'vector', NULL, NULL, '', 1, 'pending'),
     ('rareSpecies',        'Rare Species',               grp('biodiversity-data'), 'vector', NULL, NULL, '', 2, 'pending'),
-    ('wildlifeMovement',   'Wildlife Movement',          grp('biodiversity-data'), 'vector', NULL, NULL, '', 3, 'pending'),
-    ('habitatSuitability', 'Habitat Suitability',        grp('biodiversity-data'), 'vector', NULL, NULL, '', 4, 'pending'),
-    ('wildlifeCorridors',  'Wildlife Corridors',         grp('biodiversity-data'), 'vector', NULL, NULL, '', 5, 'pending'),
+    ('habitatSuitability', 'Habitat Suitability',        grp('wildlife-movement'), 'vector', NULL, NULL, '', 1, 'pending'),
+    ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
 
     ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
 
