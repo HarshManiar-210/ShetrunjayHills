@@ -337,5 +337,61 @@ export function flattenSections(sections: SectionDef[]): SectionDef[] {
   return sections.flatMap((section) => [section, ...flattenSections(section.children)]);
 }
 
+/**
+ * One switchable layer, flattened out of the tree.
+ *
+ * Both places that list layers — the navbar picker and the map's layers panel
+ * — work from this, so a layer appears under the same heading, with the same
+ * label and colour, in both. They differ only in what they do with a row.
+ */
+export interface SectionLayer {
+  /** Toggle key, in the visibility namespace described at the top of this file. */
+  key: string;
+  label: string;
+  /** No data delivered, so it is listed but cannot be switched on. */
+  pending: boolean;
+  /** The colour it draws in, when it has one of its own. */
+  color?: string;
+  icon: LucideIcon;
+  /** The subject colour of the group it came from. */
+  accent: SectionAccent;
+  /** Set when this layer *is* a raster theme, whose years and opacity it owns. */
+  raster?: SectionDef;
+}
+
+/**
+ * Every layer under a group, flattened to one level.
+ *
+ * A raster theme is one layer even though it holds an image per year, and a
+ * nested group contributes its rows rather than a second level of headings:
+ * however deep the seeded tree goes, a group's layers are a flat list.
+ */
+export function sectionLayers(section: SectionDef): SectionLayer[] {
+  const own: SectionLayer[] =
+    section.mode === "layer"
+      ? [
+          {
+            key: rasterToggleKey(section.id),
+            label: section.label,
+            pending: false,
+            icon: section.icon,
+            accent: section.accent,
+            raster: section,
+          },
+        ]
+      : section.items.map((item) => ({
+          key: item.key,
+          label: item.label,
+          pending: Boolean(item.pending),
+          color: item.color,
+          icon: item.icon ?? iconForGeometry(item.geometryKind),
+          accent: section.accent,
+        }));
+
+  // Children are walked either way: a raster theme can still have groups
+  // seeded beneath it.
+  return [...own, ...section.children.flatMap(sectionLayers)];
+}
+
 /** What a raster theme draws at until its opacity slider is touched. */
 export const DEFAULT_RASTER_OPACITY = 0.75;

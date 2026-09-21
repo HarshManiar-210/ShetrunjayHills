@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Layers, type LucideIcon } from "lucide-react";
+import { ChevronDown, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { iconForGeometry, rasterToggleKey, type SectionDef } from "@/lib/sections";
+import { sectionLayers, type SectionDef, type SectionLayer } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,48 +22,6 @@ import { cn } from "@/lib/utils";
  * that selected everything would be a heavy accident — and on the raster
  * groups, six full-extent images stacked at once.
  */
-
-/** One switchable thing in the picker — a layer, never a heading. */
-interface PickableLayer {
-  /** Toggle key, in the same namespace as visibility. See lib/sections.ts. */
-  key: string;
-  label: string;
-  /** No data delivered, so it is listed but cannot be picked. */
-  pending: boolean;
-  /** The colour it draws in, when it has one of its own. */
-  color?: string;
-  icon: LucideIcon;
-}
-
-/**
- * Every layer under a group, flattened. A raster theme is one layer even
- * though it holds a year per image, and a nested group contributes its rows
- * rather than a second level of headings — the picker is two levels deep by
- * design, however deep the tree happens to be.
- */
-export function pickableLayers(section: SectionDef): PickableLayer[] {
-  const own: PickableLayer[] =
-    section.mode === "layer"
-      ? [
-          {
-            key: rasterToggleKey(section.id),
-            label: section.label,
-            pending: false,
-            icon: section.icon,
-          },
-        ]
-      : section.items.map((item) => ({
-          key: item.key,
-          label: item.label,
-          pending: Boolean(item.pending),
-          color: item.color,
-          icon: item.icon ?? iconForGeometry(item.geometryKind),
-        }));
-
-  // A raster theme can still have child groups seeded under it, so children
-  // are walked either way rather than only in the `multi` branch.
-  return [...own, ...section.children.flatMap(pickableLayers)];
-}
 
 export function LayerPicker({
   sections,
@@ -83,7 +41,7 @@ export function LayerPicker({
 
   const pickedCount = Object.values(selected).filter(Boolean).length;
 
-  function setPicked(layers: PickableLayer[], picked: boolean) {
+  function setPicked(layers: SectionLayer[], picked: boolean) {
     for (const layer of layers) {
       if (layer.pending) continue;
       if (Boolean(selected[layer.key]) !== picked) onToggleLayer(layer.key, picked);
@@ -118,7 +76,7 @@ export function LayerPicker({
           <button
             type="button"
             disabled={pickedCount === 0}
-            onClick={() => sections.forEach((s) => setPicked(pickableLayers(s), false))}
+            onClick={() => sections.forEach((s) => setPicked(sectionLayers(s), false))}
             className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
           >
             Clear all
@@ -127,7 +85,7 @@ export function LayerPicker({
 
         <div className="max-h-[min(28rem,60vh)] overflow-y-auto p-1.5 scrollbar-thin">
           {sections.map((section) => {
-            const layers = pickableLayers(section);
+            const layers = sectionLayers(section);
             const pickedHere = layers.filter((l) => selected[l.key]).length;
             // A group with picks inside it stays open regardless: closing it
             // would hide rows that are in the panel and possibly drawing.

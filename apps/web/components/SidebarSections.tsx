@@ -1,14 +1,14 @@
 import { memo } from "react";
-import { PanelLeftClose, X, type LucideIcon } from "lucide-react";
+import { PanelLeftClose, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DEFAULT_RASTER_OPACITY,
-  iconForGeometry,
-  rasterToggleKey,
+  sectionLayers,
   type RasterYear,
   type SectionAccent,
   type SectionDef,
+  type SectionLayer,
 } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
@@ -45,54 +45,12 @@ const ACCENT_TEXT: Record<SectionAccent, string> = {
 };
 
 /**
- * One selected layer, ready to draw as a row. A raster theme keeps a pointer
- * back to its section, because its row expands into that theme's years and
- * opacity; a vector layer has nothing to expand.
+ * The selected layers under one top-level group, in the same flattened order
+ * the picker lists them in — so a row sits under the same heading in both.
+ * Pending layers can't be selected, so they never reach here.
  */
-interface PanelRow {
-  /** Toggle key, in the visibility namespace. See lib/sections.ts. */
-  key: string;
-  label: string;
-  icon: LucideIcon;
-  /** The exact colour the layer draws in, when it has one. */
-  color?: string;
-  /** Subject tint, used when the layer has no colour of its own. */
-  accentClass?: string;
-  /** Set when this row *is* a raster theme, whose controls it then owns. */
-  raster?: SectionDef;
-}
-
-/**
- * The selected layers under one top-level group, flattened.
- *
- * Mirrors the picker's own flattening (LayerPicker.pickableLayers), so a row
- * appears under the same heading in both places. Pending layers can't be
- * selected, so they never reach here.
- */
-function panelRows(section: SectionDef, selected: Record<string, boolean>): PanelRow[] {
-  const own: PanelRow[] =
-    section.mode === "layer"
-      ? [
-          {
-            key: rasterToggleKey(section.id),
-            label: section.label,
-            icon: section.icon,
-            accentClass: ACCENT_TEXT[section.accent],
-            raster: section,
-          },
-        ]
-      : section.items.map((item) => ({
-          key: item.key,
-          label: item.label,
-          icon: item.icon ?? iconForGeometry(item.geometryKind),
-          color: item.color,
-          accentClass: ACCENT_TEXT[section.accent],
-        }));
-
-  return [
-    ...own.filter((row) => selected[row.key]),
-    ...section.children.flatMap((child) => panelRows(child, selected)),
-  ];
+function panelRows(section: SectionDef, selected: Record<string, boolean>): SectionLayer[] {
+  return sectionLayers(section).filter((layer) => selected[layer.key]);
 }
 
 /**
@@ -171,7 +129,7 @@ function LayerRow({
   onRemove,
   children,
 }: {
-  row: PanelRow;
+  row: SectionLayer;
   checked: boolean;
   onToggle: () => void;
   onRemove: () => void;
@@ -208,7 +166,7 @@ function LayerRow({
         <Icon
           className={cn(
             "size-3.5 shrink-0",
-            !row.color && (row.accentClass ?? "text-muted-foreground"),
+            !row.color && ACCENT_TEXT[row.accent],
           )}
           style={row.color ? { color: row.color } : undefined}
           strokeWidth={2}
