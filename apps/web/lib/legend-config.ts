@@ -21,17 +21,34 @@ export interface RasterLegend {
   /** Present when a class's color scale is only approximately labeled (no exact numeric breakpoints were given). */
   note?: string;
   /**
-   * Whether the classes form an ordered scale, in which case the legend also
-   * draws them as a continuous gradient (the client asked for gradient
-   * legends). True for anything that runs low→high — canopy density, canopy
-   * height, slope, elevation, fragmentation from patch to core.
+   * Set when the classes form an ordered scale, in which case the legend
+   * leads with them as a gradient bar (the client asked for gradient
+   * legends). The value says which way round the class list runs, because
+   * the delivered colour docs list some themes densest-first and some
+   * sparsest-first, and the bar always has to draw low on the left.
    *
-   * Left off for genuinely categorical palettes: Land Use's barren / built-up
-   * / water, Aspect's eight compass directions and Vegetation Change's
-   * transition matrix have no order to ramp along, and drawing one would
-   * assert a progression that isn't in the data.
+   * Left off for genuinely categorical palettes: Land Use's barren /
+   * built-up / water and Vegetation Change's transition matrix have no order
+   * to ramp along, and a photographic raster's R/G/B key is not a scale at
+   * all. Drawing a bar for those would assert a progression that isn't in
+   * the data.
    */
-  ramp?: boolean;
+  ramp?: "low-to-high" | "high-to-low";
+  /**
+   * What to write under the two ends of the bar. Defaults to the lowest and
+   * highest class's own label, which is usually what you want; set it where
+   * the end of the scale is better named than its end class — e.g. Slope,
+   * whose real range in degrees is known even though its intermediate
+   * breakpoints were never supplied.
+   */
+  rampLabels?: [string, string];
+  /**
+   * Tick labels along the bar, one per class, evenly spaced. Only for a
+   * theme whose classes really do divide the scale evenly — Aspect's eight
+   * 45° compass sectors do; nothing else delivered so far does, and spacing
+   * ticks evenly over unequal classes would misreport where the breaks are.
+   */
+  rampTicks?: string[];
 }
 
 // Visibly provisional — a plain 5-step grey ramp, distinct from any real
@@ -49,7 +66,7 @@ function provisionalLegend(layerId: string, classCount = 5): RasterLegend {
     layerId,
     // The placeholder palette is a light→dark grey ramp, so it is ordered by
     // construction even before the real classes arrive.
-    ramp: true,
+    ramp: "low-to-high",
     classes: Array.from({ length: classCount }, (_, i) => ({
       value: i + 1,
       label: `TODO — class ${i + 1} label`,
@@ -69,7 +86,9 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // Forest Cover theme's legend (the imagery's own palette matches it exactly).
   "forest-cover": {
     layerId: "forest-cover",
-    ramp: true,
+    // Densest first, as the client's colour doc lists them.
+    ramp: "high-to-low",
+    rampLabels: ["Non forest", "Very dense forest"],
     classes: [
       { value: 1, label: "Very Dense Forest", color: "#06660c" },
       { value: 2, label: "Moderately Dense Forest", color: "#05ba19" },
@@ -81,7 +100,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "green-cover": {
     layerId: "green-cover",
-    ramp: true,
+    ramp: "low-to-high",
     classes: [
       { value: 1, label: "Non-Forest", color: "#dedede" },
       { value: 2, label: "Forest", color: "#0a8d23" },
@@ -111,7 +130,9 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "forest-fragmentation": {
     layerId: "forest-fragmentation",
-    ramp: true,
+    // Patch through to core: most fragmented to least.
+    ramp: "low-to-high",
+    rampLabels: ["Most fragmented", "Least fragmented"],
     classes: [
       { value: "patch", label: "Patch", color: "#e07b34" },
       { value: "edge", label: "Edge", color: "#ffff00" },
@@ -280,7 +301,8 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   chm: {
     layerId: "chm",
-    ramp: true,
+    ramp: "low-to-high",
+    rampLabels: ["Low canopy", "High canopy"],
     classes: [
       { value: 1, label: "Low canopy height", color: "#28bceb" },
       { value: 2, label: "Medium-low canopy height", color: "#a4fc3c" },
@@ -291,7 +313,10 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   slope: {
     layerId: "slope",
-    ramp: true,
+    ramp: "low-to-high",
+    // The range is the one number the delivered data does pin down, so the
+    // ends of the bar carry it even though the breaks between are unknown.
+    rampLabels: ["Flat · 0°", "Steep · 88°"],
     classes: [
       { value: 1, label: "Flattest", color: "#2c7bb6" },
       { value: 2, label: "Gentle", color: "#abd9e9" },
@@ -303,6 +328,13 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   aspect: {
     layerId: "aspect",
+    // Azimuth is continuous and the palette runs along it, so this does get a
+    // bar — and uniquely, its eight classes are eight equal 45° sectors, so
+    // ticks can sit evenly under it and still be telling the truth about
+    // where the breaks are.
+    ramp: "low-to-high",
+    rampTicks: ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+    rampLabels: ["North · 0°", "North west · 360°"],
     classes: [
       { value: "N", label: "North (337.5°–22.5°)", color: "#30123b" },
       { value: "NE", label: "North East (22.5°–67.5°)", color: "#466be3" },
@@ -329,6 +361,14 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // shows Near Infrared reflectance most years, but the literal Red band in
   // 1980); that per-year mapping isn't modeled anywhere in this app, so it
   // isn't shown here.
+  // A scanned Survey of India sheet. It carries its own printed key inside
+  // the image, so there is nothing to reproduce here — but an entry with a
+  // note beats a bare theme name with silence under it.
+  toposheet: {
+    layerId: "toposheet",
+    classes: [],
+    note: "Scanned survey sheet — it carries its own printed legend in the image.",
+  },
   "satellite-imagery": {
     layerId: "satellite-imagery",
     classes: [
@@ -354,6 +394,7 @@ const PROVISIONAL_IDS = [
   "carbon-stock",
   "dsm",
   "dtm",
+  "tree-density",
 ];
 
 export const LEGEND_CONFIG: Record<string, RasterLegend> = {

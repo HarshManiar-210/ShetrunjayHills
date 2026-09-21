@@ -451,7 +451,14 @@ export function MapDashboard() {
   );
 
   const legendRasterLayers = useMemo(
-    () => activeRasters.map(({ section }) => ({ id: section.id, name: section.label })),
+    () =>
+      activeRasters.map(({ section, image }) => ({
+        id: section.id,
+        name: section.label,
+        // A single-image theme labels its one row with the theme's own name,
+        // so repeating it would read "Orthomosaic · Orthomosaic".
+        yearLabel: image.label === section.label ? undefined : image.label,
+      })),
     [activeRasters],
   );
 
