@@ -85,6 +85,12 @@ function formatMb(bytes: number): string {
   return `${Math.round(bytes / 1_000_000)} MB`;
 }
 
+// The layers panel's fold-away control is hidden for now — flip this to true
+// to bring it back. The panel then gains a chevron and, once folded, a small
+// "Layers" button in its place. Everything behind it still works; only the
+// two controls are withheld.
+const SHOW_PANEL_COLLAPSE = false;
+
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
 type MobileSheet = "menu" | "legend" | null;
@@ -119,7 +125,8 @@ export function MapDashboard() {
   const [visible, setVisible] = useState<Record<string, boolean>>({});
 
   // The floating panel can be folded away to clear the map. Open by default:
-  // it is the way into the dashboard.
+  // it is the way into the dashboard. While SHOW_PANEL_COLLAPSE is off it
+  // stays open whatever this says.
   const [panelOpen, setPanelOpen] = useState(true);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
@@ -691,11 +698,11 @@ export function MapDashboard() {
               Capped short of the bottom so a long selection stops clear of the
               basemap switcher and the year bar rather than running under them,
               and it scrolls inside that cap. */}
-          {panelOpen ? (
+          {panelOpen || !SHOW_PANEL_COLLAPSE ? (
             <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-8rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
               {/* Null for everyone but admins, who get the users link here. */}
               <Sidebar variant="combined" user={auth.user} />
-              {layersPanel(() => setPanelOpen(false))}
+              {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
               <p className="shrink-0 border-t border-border/60 px-3 py-2 text-center text-[10px] tracking-wide text-muted-foreground">
                 © Shatrunjay Hills {new Date().getFullYear()}
               </p>
