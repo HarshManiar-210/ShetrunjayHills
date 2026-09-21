@@ -439,9 +439,8 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    -- Habitat Suitability: no georeferencing supplied. Bounds are the Study
-    -- Area's, which match the image's aspect ratio (10799x6936 ~ 1.557).
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.728476, 21.451971, 71.821823, 21.512008);
+    -- Habitat Suitability: extent supplied with the raster.
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
