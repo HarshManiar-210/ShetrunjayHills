@@ -253,6 +253,17 @@
     background-color: var(--border);
     border-radius: 9999px;
   }
+
+  /* No scrollbar at all, for a row that scrolls sideways and is short enough
+     to read as one: the filter chips above the layers panel. A 6px track
+     under a 24px row of pills is most of a second row of chrome. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 }
 /* MapLibre ships its own light chrome — the attribution pill, popups and the
    scale bar are all hard-coded white with dark text. They sit on the map, not

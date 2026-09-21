@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { PanelLeftClose, X } from "lucide-react";
+import { memo, useState } from "react";
+import { PanelLeftClose, RotateCcw, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LayerDot } from "@/components/LayerDot";
@@ -7,6 +7,7 @@ import {
   DEFAULT_RASTER_OPACITY,
   sectionLayers,
   type RasterYear,
+  type SectionAccent,
   type SectionDef,
   type SectionLayer,
 } from "@/lib/sections";
@@ -31,6 +32,36 @@ import { cn } from "@/lib/utils";
  * geometry: matching a row to what is on the map is the question a legend
  * row has to answer, and a point-or-polygon glyph never answered it.
  */
+
+/**
+ * Subject filters for the panel.
+ *
+ * These cut across the seed's sections on purpose: forest cover lives in
+ * Forest Layers but canopy height lives in Drone Analysis, and someone
+ * looking at forest wants both. So the buckets are built from the subject
+ * accent each section already carries (GROUP_STYLE in lib/sections.ts) rather
+ * than from the section tree — which also means a new group picks up a
+ * filter from its accent alone, with no edit here.
+ *
+ * Presentation only: no layer is named, and a section whose accent is not
+ * listed falls under "Other" — which keeps a new subject colour visible in
+ * the panel while filtered, rather than vanishing from every bucket.
+ */
+const FILTERS: { id: string; label: string; accents: SectionAccent[] }[] = [
+  { id: "forest", label: "Forest", accents: ["forest", "change"] },
+  { id: "trees", label: "Trees", accents: ["canopy", "carbon"] },
+  { id: "land-water", label: "Land & water", accents: ["land", "water"] },
+  { id: "imagery", label: "Imagery", accents: ["imagery"] },
+  { id: "boundaries", label: "Boundaries", accents: ["infra"] },
+  { id: "wildlife", label: "Wildlife", accents: ["fauna"] },
+];
+
+const FILTER_OF: Partial<Record<SectionAccent, string>> = Object.fromEntries(
+  FILTERS.flatMap((f) => f.accents.map((accent) => [accent, f.id])),
+);
+
+const OTHER = { id: "other", label: "Other" };
+const ALL = "all";
 
 /**
  * The selected layers under one top-level group, in the same flattened order
@@ -173,6 +204,33 @@ function LayerRow({
   );
 }
 
+/** One subject filter. "All" is always first and always present. */
+function FilterChip({
+  label,
+  active,
+  onSelect,
+}: {
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={cn(
+        "h-6 shrink-0 rounded-full px-2.5 text-[11px] font-medium whitespace-nowrap transition-colors",
+        active
+          ? "bg-brand text-brand-foreground"
+          : "bg-foreground/5 text-muted-foreground ring-1 ring-border hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
 function SidebarSectionsImpl({
   sections,
   selected,
@@ -205,32 +263,70 @@ function SidebarSectionsImpl({
   rasterOpacity: Record<string, number>;
   onRasterOpacityChange: (sectionId: string, opacity: number) => void;
 }) {
+  const [filter, setFilter] = useState(ALL);
+
   // Only the groups that have something selected in them are drawn, so the
   // panel is exactly as tall as the work in progress.
-  const groups = sections
+  const all = sections
     .map((section) => ({ section, rows: panelRows(section, selected) }))
     .filter(({ rows }) => rows.length > 0);
 
-  const total = groups.reduce((sum, g) => sum + g.rows.length, 0);
-  const onCount = groups.reduce(
+  // The counts describe the whole selection, not the filtered view: the header
+  // is there to say what is on, and a filter is a way of looking rather than a
+  // change to what is drawn.
+  const total = all.reduce((sum, g) => sum + g.rows.length, 0);
+  const onCount = all.reduce(
     (sum, g) => sum + g.rows.filter((row) => visibility[row.key]).length,
     0,
   );
 
+  // Only the filters that have something behind them, and only when there is
+  // more than one — a filter offering a single choice is noise.
+  const present = new Set(
+    all.flatMap(({ rows }) => rows.map((row) => FILTER_OF[row.accent] ?? "other")),
+  );
+  const chips = [...FILTERS.map(({ id, label }) => ({ id, label })), OTHER].filter((f) =>
+    present.has(f.id),
+  );
+  const showChips = chips.length > 1;
+
+  // Derived rather than stored: deselecting the last forest layer would
+  // otherwise leave the panel filtered to a subject that no longer exists,
+  // showing nothing, with no effect needed to repair it.
+  const active = showChips && chips.some((f) => f.id === filter) ? filter : ALL;
+
+  const groups =
+    active === ALL
+      ? all
+      : all
+          .map(({ section, rows }) => ({
+            section,
+            rows: rows.filter((row) => (FILTER_OF[row.accent] ?? OTHER.id) === active),
+          }))
+          .filter(({ rows }) => rows.length > 0);
+
   return (
     <div data-tour="sections" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
-        <p className="min-w-0 truncate text-[11px] font-medium tracking-wide text-muted-foreground">
-          {total === 0 ? "Layers" : `Layers · ${onCount} of ${total} on`}
-        </p>
-        <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 px-3 pt-2 pb-1.5">
+        <p className="text-[13px] font-semibold">Layers</p>
+        {total > 0 && (
+          <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+            {onCount} of {total} on
+          </p>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {/* Reduced to its icon so the header can carry the count as well.
+              A third piece of text beside "Layers" and "1 of 17 on" left the
+              row too tight to read in a panel this narrow. */}
           <button
             type="button"
             onClick={onResetLayers}
             disabled={onCount === 0}
-            className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
+            aria-label="Switch every layer off"
+            title="Switch every layer off"
+            className="text-muted-foreground/60 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
           >
-            Reset view
+            <RotateCcw className="size-3.5" strokeWidth={2} />
           </button>
           {onCollapse && (
             <button
@@ -244,6 +340,27 @@ function SidebarSectionsImpl({
           )}
         </div>
       </div>
+
+      {showChips && (
+        // Scrolls sideways rather than wrapping: wrapping costs the panel a
+        // whole row of height for one overflowing chip, and this sits on top
+        // of the map.
+        <div
+          role="group"
+          aria-label="Filter layers by subject"
+          className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2 scrollbar-none"
+        >
+          <FilterChip label="All" active={active === ALL} onSelect={() => setFilter(ALL)} />
+          {chips.map((f) => (
+            <FilterChip
+              key={f.id}
+              label={f.label}
+              active={active === f.id}
+              onSelect={() => setFilter(f.id)}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 scrollbar-thin">
         {groups.length === 0 ? (
