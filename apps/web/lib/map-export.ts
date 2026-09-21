@@ -263,11 +263,16 @@ function gradientBar(
   c.y += 13;
 }
 
-/** The legend's shape vocabulary, drawn rather than styled. */
+/**
+ * The legend's shape vocabulary, drawn rather than styled — the canvas
+ * counterpart of LayerSwatch, and deliberately the same five shapes, so a
+ * sheet reads the same as the screen it came from.
+ */
 function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchGeometryKind) {
   ctx.save();
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
+
   if (kind === "point") {
     ctx.beginPath();
     ctx.arc(x + SWATCH / 2, y + SWATCH / 2, SWATCH / 2 - 0.5, 0, Math.PI * 2);
@@ -281,10 +286,20 @@ function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchG
   } else if (kind === "polygon-outline") {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(x + 0.75, y + 0.75, SWATCH - 1.5, SWATCH - 1.5);
+  } else if (kind === "polygon") {
+    // A wash inside a solid edge, as the map paints it. Opaque it would be
+    // the same block a raster class gets, and a legend carrying both a
+    // boundary and a cover class would show one colour twice.
+    ctx.globalAlpha = 0.32;
+    ctx.fillRect(x, y, SWATCH, SWATCH);
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x + 0.75, y + 0.75, SWATCH - 1.5, SWATCH - 1.5);
   } else {
-    // polygon and raster: a solid block, per the brief.
+    // A raster class: opaque pixels, so an opaque block.
     ctx.fillRect(x, y, SWATCH, SWATCH);
   }
+
   ctx.restore();
 }
 
