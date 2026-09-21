@@ -35,6 +35,7 @@ export function Header({
   onLogoutClick,
   onHelpClick,
   search,
+  layerPicker,
 }: {
   user: AuthUser | null;
   onMenuClick: () => void;
@@ -48,6 +49,12 @@ export function Header({
    * pass nothing and the right-hand controls keep their place.
    */
   search?: React.ReactNode;
+  /**
+   * The layer picker — which layers the map's panel lists. It lives in the bar
+   * rather than in the panel because it is what fills the panel, and because
+   * the panel now floats over the map with only the selection in it.
+   */
+  layerPicker?: React.ReactNode;
 }) {
   return (
     <header className="relative z-30 flex items-center gap-2 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 xl:gap-0 xl:py-2.5 xl:pr-3 xl:pl-0">
@@ -68,10 +75,10 @@ export function Header({
         <Menu />
       </Button>
 
-      {/* On xl this occupies exactly the sidebar's column (w-[18%] in
-          MapDashboard), so whatever follows it in the bar lines up with the
-          map column that starts below it. Keep the two widths in step. */}
-      <div className="flex min-w-0 shrink-0 items-center gap-2 xl:w-[18%] xl:px-4">
+      {/* Natural width now: the sidebar column this used to mirror is gone,
+          so the brand takes the space it needs and the picker, search and
+          controls follow directly after it. */}
+      <div className="flex min-w-0 shrink-0 items-center gap-2 xl:pl-4">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-nav-soft to-nav-line/40 shadow-e1 ring-1 ring-nav-line">
           <Mountain className="size-5 text-nav-accent" strokeWidth={2.25} />
         </span>
@@ -87,8 +94,10 @@ export function Header({
         </div>
       </div>
 
+      {layerPicker && <div className="ml-2 shrink-0 xl:ml-4">{layerPicker}</div>}
+
       {search && (
-        <div className="min-w-0 flex-1 xl:pl-4">
+        <div className="min-w-0 flex-1 pl-2">
           <div className="w-full max-w-md">{search}</div>
         </div>
       )}

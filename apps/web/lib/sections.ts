@@ -337,30 +337,5 @@ export function flattenSections(sections: SectionDef[]): SectionDef[] {
   return sections.flatMap((section) => [section, ...flattenSections(section.children)]);
 }
 
-/**
- * Every toggle key a section's header switch owns, including its whole
- * subtree — switching "Forest Layers" on means switching on everything under
- * it. Pending layers are left out: they have no data, so "switch the group
- * on" must not claim to have turned them on.
- */
-export function sectionToggleKeys(section: SectionDef): string[] {
-  const own =
-    section.mode === "layer"
-      ? [rasterToggleKey(section.id)]
-      : section.items.filter((item) => !item.pending).map((item) => item.key);
-  return [...own, ...section.children.flatMap(sectionToggleKeys)];
-}
-
 /** What a raster theme draws at until its opacity slider is touched. */
 export const DEFAULT_RASTER_OPACITY = 0.75;
-
-/**
- * Whether a section has anything to disclose. Every raster theme does — it
- * has an opacity slider even when it is a single image with no year to pick.
- * A group with one layer and no children is fully expressed by its header
- * switch, so it gets no chevron.
- */
-export function sectionIsExpandable(section: SectionDef): boolean {
-  if (section.children.length > 0) return true;
-  return section.mode === "layer" ? true : section.items.length > 1;
-}

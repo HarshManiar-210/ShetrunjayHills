@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ListTree, Menu as MenuIcon } from "lucide-react";
+import { ListTree, Menu as MenuIcon, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
+import { LayerPicker } from "@/components/LayerPicker";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import {
@@ -45,7 +46,6 @@ import {
   isRasterToggleKey,
   layerIdOf,
   rasterToggleKey,
-  sectionToggleKeys,
   DEFAULT_RASTER_OPACITY,
 } from "@/lib/sections";
 import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
@@ -96,10 +96,23 @@ export function MapDashboard() {
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
   const [tourOpen, setTourOpen] = useState(false);
 
-  // One flat map of toggle key → on, covering every layer in the sidebar:
-  // any number, from any number of sections, draw at once. See lib/sections.ts
-  // for the key namespace. Nothing is on by default.
+  // Layers are chosen in two stages, and these are the two maps.
+  //
+  // `selected` is the navbar picker's answer to "which layers am I working
+  // with" — everything it holds is listed in the map's layers panel. `visible`
+  // is that panel's answer to "which of those are drawing", so it is always a
+  // subset: deselecting a layer switches it off on the way out. Both use the
+  // same toggle-key namespace (see lib/sections.ts), and both start empty.
+  //
+  // The split exists because the panel now floats over the map. A panel
+  // carrying every layer in the seed could only ever be a docked column;
+  // carrying the handful someone picked, it fits on the map.
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
+
+  // The floating panel can be folded away to clear the map. Open by default:
+  // it is the way into the dashboard.
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
@@ -256,33 +269,52 @@ export function MapDashboard() {
     setHeavyPrompt(null);
   }, [heavyPrompt, setKeysVisible]);
 
-  const toggleSection = useCallback(
-    (id: string, on: boolean) => {
-      const def = allSections.find((s) => s.id === id);
-      if (def) requestKeys(sectionToggleKeys(def), on);
-    },
-    [allSections, requestKeys],
-  );
-
   const toggleItem = useCallback(
     (key: string) => requestKeys([key], !visible[key]),
     [requestKeys, visible],
   );
 
-  /** The sidebar's "Reset view": switch every layer off and start again. */
+  /**
+   * Pick a layer into the panel, or take it back out.
+   *
+   * Deselecting also switches the layer off: a layer that has left the panel
+   * must not carry on drawing, because there would no longer be a control
+   * anywhere that could switch it off. Selecting deliberately does *not*
+   * switch anything on — that is the panel's decision, so picking a whole
+   * group's worth of layers never stacks them all on the map at once.
+   */
+  const toggleSelected = useCallback((key: string, picked: boolean) => {
+    setSelected((sel) => ({ ...sel, [key]: picked }));
+    if (!picked) {
+      setVisible((v) => {
+        if (!v[key]) return v;
+        const next = { ...v };
+        delete next[key];
+        return next;
+      });
+    }
+  }, []);
+
+  const deselectLayer = useCallback(
+    (key: string) => toggleSelected(key, false),
+    [toggleSelected],
+  );
+
+  /** The panel's "Reset view": switch every layer off, keeping the selection. */
   const resetLayers = useCallback(() => {
     setVisible({});
     setPlaying(false);
   }, []);
 
-  // Search result picked: switch that layer on and open its section so the
-  // row is visible in the sidebar. Always on, never a toggle — someone who
-  // searched for a layer wants to see it, not to turn off what they found.
-  // Picking a search result just switches the layer on. The sidebar is a flat
-  // list now and a row expands when it is on, so there is no disclosure state
-  // left to open on the way down — which is why `path` goes unused here.
+  // Search result picked: select it into the panel *and* switch it on. Always
+  // on, never a toggle — someone who searched for a layer wants to see it, not
+  // to turn off what they found. Search is the one route that skips the
+  // picker, which is the point of it: naming a layer should not require
+  // knowing which section holds it, so `path` goes unused here.
   const revealLayer = useCallback(
     (_path: string[], key: string) => {
+      setSelected((sel) => ({ ...sel, [key]: true }));
+      setPanelOpen(true);
       requestKeys([key], true);
       setMobileSheet(null);
     },
@@ -439,10 +471,10 @@ export function MapDashboard() {
     [allSections, overlays],
   );
 
-  const sidebarSections = (
+  const layersPanel = (onCollapse?: () => void) => (
     <>
       {error && (
-        <div className="flex flex-col items-start gap-2 px-4 py-3">
+        <div className="flex flex-col items-start gap-2 px-3 py-3">
           <p className="text-sm text-destructive">Could not load layers.</p>
           <Button size="sm" variant="outline" onClick={() => setRetryTick((t) => t + 1)}>
             Retry
@@ -451,10 +483,12 @@ export function MapDashboard() {
       )}
       <SidebarSections
         sections={sections}
+        selected={selected}
         visibility={visible}
-        onToggleSection={toggleSection}
-        onToggleItem={toggleItem}
+        onToggleLayer={toggleItem}
+        onDeselectLayer={deselectLayer}
         onResetLayers={resetLayers}
+        onCollapse={onCollapse}
         rasterYear={rasterYear}
         onRasterYearChange={changeRasterYear}
         rasterOpacity={rasterOpacity}
@@ -497,24 +531,21 @@ export function MapDashboard() {
         onLoginClick={auth.openLogin}
         onLogoutClick={auth.logout}
         onHelpClick={() => setTourOpen(true)}
+        layerPicker={
+          <LayerPicker
+            sections={sections}
+            selected={selected}
+            onToggleLayer={toggleSelected}
+          />
+        }
         search={
           <LayerSearch sections={sections} visibility={visible} onSelect={revealLayer} />
         }
       />
 
+      {/* No docked column any more: the layers panel floats over the map's
+          top-left corner, so the map has the full width of the window. */}
       <div className="flex min-h-0 flex-1">
-        {/* Header mirrors this width for its brand block, so the search bar
-            above lines up with the map column — keep the two in step. */}
-        <aside className="hidden w-[18%] shrink-0 flex-col border-r border-border bg-sidebar xl:flex">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">
-            <Sidebar variant="combined" user={auth.user} />
-            <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
-          </div>
-          <p className="shrink-0 border-t border-border/60 bg-panel-deep px-4 py-2.5 text-center text-[11px] tracking-wide text-muted-foreground">
-            © Shatrunjay Hills {new Date().getFullYear()}
-          </p>
-        </aside>
-
         <div className="relative min-w-0 flex-1 p-4">
           <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
             <Map
@@ -562,7 +593,32 @@ export function MapDashboard() {
             />
           </div>
 
-          {/* Top-right, now flush to the edge the tool stack vacated. Height
+          {/* Top-left, mirroring the info panel's inset on the other edge.
+              Capped short of the bottom so a long selection stops clear of the
+              basemap switcher and the year bar rather than running under them,
+              and it scrolls inside that cap. */}
+          {panelOpen ? (
+            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-8rem)] w-72 flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
+              {/* Null for everyone but admins, who get the users link here. */}
+              <Sidebar variant="combined" user={auth.user} />
+              {layersPanel(() => setPanelOpen(false))}
+              <p className="shrink-0 border-t border-border/60 px-3 py-2 text-center text-[10px] tracking-wide text-muted-foreground">
+                © Shatrunjay Hills {new Date().getFullYear()}
+              </p>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute top-3 left-3 z-10 hidden gap-2 shadow-e2 md:flex"
+              onClick={() => setPanelOpen(true)}
+            >
+              <PanelLeftOpen className="size-3.5" strokeWidth={2} />
+              Layers
+            </Button>
+          )}
+
+          {/* Top-right, flush to the edge the tool stack vacated. Height
               follows content, capped so a long legend stops clear of those
               tools rather than running into them: the stack is a fixed 205px
               (six 28px buttons, a separator and padding), plus its own inset
@@ -596,7 +652,9 @@ export function MapDashboard() {
         <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 pt-12 scrollbar-thin">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar variant="combined" user={auth.user} />
-          <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
+          <div className="flex flex-1 flex-col bg-linear-to-b from-panel to-panel-deep">
+            {layersPanel()}
+          </div>
         </SheetContent>
       </Sheet>
 

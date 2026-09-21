@@ -1,7 +1,7 @@
 import { memo } from "react";
-import { type LucideIcon } from "lucide-react";
+import { PanelLeftClose, X, type LucideIcon } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DEFAULT_RASTER_OPACITY,
   iconForGeometry,
@@ -13,25 +13,24 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * The layers column, built to the client's mockup.
+ * The layers panel, floating over the map's top-left corner.
  *
- * The shape it replaces stacked every group in its own raised, hue-washed card
- * — legible at a dozen layers, a wall of competing boxes at eighty. The
- * mockup's answer is a flat list: a plain heading per group with a count, then
- * one quiet row per layer, and chrome only around whichever layer is switched
- * on and expanded. That inverts what carries emphasis, so the eye lands on
- * what is drawing rather than on the container it sits in.
+ * It lists only what has been selected in the navbar's picker, which is the
+ * change that makes a floating panel viable at all: the docked column had to
+ * carry every layer in the seed, eighty-odd rows that no float could hold
+ * without covering the map it annotates. Here the panel holds the handful of
+ * layers someone is actually working with, so it stays short enough to sit on
+ * the map, and the map gets the full width of the window.
  *
- * The tree from the API still drives it. A group becomes a heading; a raster
- * theme (which is one layer with years) and a vector layer both become rows,
- * so the two-level structure flattens to exactly the heading-and-rows the
- * mockup draws.
+ * Selecting is the picker's job; this panel switches on, picks a year, and
+ * sets opacity. A row's × takes it back out of the selection, so the panel
+ * can be tidied where the clutter is rather than only from the picker.
  */
 
 /**
  * Subject colour per group, resolved to the --sec-* tokens in globals.css.
- * Now only tints a row's icon rather than washing a whole card, so the column
- * still scans by subject without the hue doing the shouting.
+ * Tints a row's icon rather than washing a whole card, so the panel still
+ * scans by subject without the hue doing the shouting.
  */
 const ACCENT_TEXT: Record<SectionAccent, string> = {
   forest: "text-sec-forest",
@@ -45,86 +44,61 @@ const ACCENT_TEXT: Record<SectionAccent, string> = {
   carbon: "text-sec-carbon",
 };
 
-/** Switched-on rows wear the amber accent, matching the mockup. */
-const BRAND_SWITCH = "data-checked:bg-brand";
-
-function LayerRow({
-  label,
-  icon: Icon,
-  accentClass,
-  iconColor,
-  checked,
-  onToggle,
-  children,
-}: {
+/**
+ * One selected layer, ready to draw as a row. A raster theme keeps a pointer
+ * back to its section, because its row expands into that theme's years and
+ * opacity; a vector layer has nothing to expand.
+ */
+interface PanelRow {
+  /** Toggle key, in the visibility namespace. See lib/sections.ts. */
+  key: string;
   label: string;
   icon: LucideIcon;
-  /** Subject tint for the icon, when the row has no colour of its own. */
+  /** The exact colour the layer draws in, when it has one. */
+  color?: string;
+  /** Subject tint, used when the layer has no colour of its own. */
   accentClass?: string;
-  /** The exact colour this layer draws in, so the row doubles as a key. */
-  iconColor?: string;
-  checked: boolean;
-  onToggle: () => void;
-  /** Expanded controls — only rendered for the layer that is switched on. */
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg transition-colors",
-        // Chrome appears only around the active layer, so it reads as the one
-        // thing currently in play rather than one card among eighty.
-        checked && "bg-card/70 ring-1 ring-border/70",
-      )}
-    >
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-foreground/5"
-      >
-        <Icon
-          className={cn("size-3.5 shrink-0", !iconColor && (accentClass ?? "text-muted-foreground"))}
-          style={iconColor ? { color: iconColor } : undefined}
-          strokeWidth={2}
-        />
-        <span className={cn("min-w-0 flex-1 leading-tight", checked && "font-medium")}>
-          {label}
-        </span>
-        <Switch
-          size="sm"
-          checked={checked}
-          className={BRAND_SWITCH}
-          aria-label={`Toggle ${label} layer`}
-          tabIndex={-1}
-        />
-      </div>
-      {checked && children && <div className="px-2.5 pb-2.5">{children}</div>}
-    </div>
-  );
-}
-
-/** A layer the client has listed but not delivered data for. */
-function PendingRow({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground/40" strokeWidth={2} />
-      <span className="min-w-0 flex-1 leading-tight text-muted-foreground/50">{label}</span>
-      <span className="shrink-0 text-[10px] font-medium text-brand/70">Coming soon</span>
-    </div>
-  );
+  /** Set when this row *is* a raster theme, whose controls it then owns. */
+  raster?: SectionDef;
 }
 
 /**
- * Years as chips rather than a dropdown, per the mockup: the whole series is
- * visible at once, so how many years a theme has — and which are missing — is
- * readable without opening anything.
+ * The selected layers under one top-level group, flattened.
+ *
+ * Mirrors the picker's own flattening (LayerPicker.pickableLayers), so a row
+ * appears under the same heading in both places. Pending layers can't be
+ * selected, so they never reach here.
+ */
+function panelRows(section: SectionDef, selected: Record<string, boolean>): PanelRow[] {
+  const own: PanelRow[] =
+    section.mode === "layer"
+      ? [
+          {
+            key: rasterToggleKey(section.id),
+            label: section.label,
+            icon: section.icon,
+            accentClass: ACCENT_TEXT[section.accent],
+            raster: section,
+          },
+        ]
+      : section.items.map((item) => ({
+          key: item.key,
+          label: item.label,
+          icon: item.icon ?? iconForGeometry(item.geometryKind),
+          color: item.color,
+          accentClass: ACCENT_TEXT[section.accent],
+        }));
+
+  return [
+    ...own.filter((row) => selected[row.key]),
+    ...section.children.flatMap((child) => panelRows(child, selected)),
+  ];
+}
+
+/**
+ * Years as chips rather than a dropdown: the whole series is visible at once,
+ * so how many years a theme has — and which are missing — is readable without
+ * opening anything.
  */
 function YearChips({
   label,
@@ -190,135 +164,102 @@ function OpacityControl({
   );
 }
 
-/**
- * One row per switchable thing under a heading. A raster theme is a single
- * layer with years, so it collapses to a row that expands into its chips and
- * opacity; a vector layer is a row with nothing to expand.
- */
-function GroupRows({
-  section,
-  visibility,
-  onToggleSection,
-  onToggleItem,
-  rasterYear,
-  onRasterYearChange,
-  rasterOpacity,
-  onRasterOpacityChange,
+function LayerRow({
+  row,
+  checked,
+  onToggle,
+  onRemove,
+  children,
 }: {
-  section: SectionDef;
-  visibility: Record<string, boolean>;
-  onToggleSection: (id: string, on: boolean) => void;
-  onToggleItem: (key: string) => void;
-  rasterYear: Record<string, number>;
-  onRasterYearChange: (sectionId: string, year: number) => void;
-  rasterOpacity: Record<string, number>;
-  onRasterOpacityChange: (sectionId: string, opacity: number) => void;
+  row: PanelRow;
+  checked: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+  /** Expanded controls — only rendered while the layer is switched on. */
+  children?: React.ReactNode;
 }) {
+  const Icon = row.icon;
   return (
-    <>
-      {section.items.map((item) =>
-        item.pending ? (
-          <PendingRow
-            key={item.key}
-            label={item.label}
-            icon={item.icon ?? iconForGeometry(item.geometryKind)}
-          />
-        ) : (
-          <LayerRow
-            key={item.key}
-            label={item.label}
-            icon={item.icon ?? iconForGeometry(item.geometryKind)}
-            iconColor={item.color}
-            checked={Boolean(visibility[item.key])}
-            onToggle={() => onToggleItem(item.key)}
-          />
-        ),
+    <div
+      className={cn(
+        "group/row rounded-lg transition-colors",
+        // Chrome appears only around what is drawing, so the eye lands on the
+        // layers in play rather than on the containers they sit in.
+        checked && "bg-foreground/6 ring-1 ring-border/70",
       )}
-
-      {section.children.map((child) => {
-        if (child.mode === "layer") {
-          const key = rasterToggleKey(child.id);
-          const on = Boolean(visibility[key]);
-          return (
-            <LayerRow
-              key={child.id}
-              label={child.label}
-              icon={child.icon}
-              accentClass={ACCENT_TEXT[child.accent]}
-              checked={on}
-              onToggle={() => onToggleSection(child.id, !on)}
-            >
-              <div className="flex flex-col gap-2">
-                {child.years.length > 1 && (
-                  <YearChips
-                    label={child.label}
-                    years={child.years}
-                    year={rasterYear[child.id] ?? child.years.at(-1)?.year ?? null}
-                    onChange={(year) => onRasterYearChange(child.id, year)}
-                  />
-                )}
-                <OpacityControl
-                  label={child.label}
-                  opacity={rasterOpacity[child.id] ?? DEFAULT_RASTER_OPACITY}
-                  onChange={(opacity) => onRasterOpacityChange(child.id, opacity)}
-                />
-              </div>
-            </LayerRow>
-          );
-        }
-
-        // A nested group of vector layers: its rows join this heading's list
-        // rather than opening a second level of headings, which is what keeps
-        // the column as flat as the mockup draws it.
-        return (
-          <GroupRows
-            key={child.id}
-            section={child}
-            visibility={visibility}
-            onToggleSection={onToggleSection}
-            onToggleItem={onToggleItem}
-            rasterYear={rasterYear}
-            onRasterYearChange={onRasterYearChange}
-            rasterOpacity={rasterOpacity}
-            onRasterOpacityChange={onRasterOpacityChange}
-          />
-        );
-      })}
-
-      {/* A heading with no rows at all would otherwise be a bare label. */}
-      {section.items.length === 0 && section.children.length === 0 && (
-        <p className="px-2.5 py-2 text-xs text-muted-foreground/50 italic">No layers yet</p>
-      )}
-    </>
-  );
-}
-
-/** How many switchable layers a heading covers, for the count beside it. */
-function layerCount(section: SectionDef): number {
-  if (section.mode === "layer") return 1;
-  return (
-    section.items.length + section.children.reduce((sum, child) => sum + layerCount(child), 0)
+    >
+      {/* The whole row is the hit target — the checkbox is the indicator, not
+          a separate control, so there is one tab stop and one click path. */}
+      <div
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`Show ${row.label} on the map`}
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors hover:bg-foreground/5"
+      >
+        <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
+        <Icon
+          className={cn(
+            "size-3.5 shrink-0",
+            !row.color && (row.accentClass ?? "text-muted-foreground"),
+          )}
+          style={row.color ? { color: row.color } : undefined}
+          strokeWidth={2}
+        />
+        <span className={cn("min-w-0 flex-1 truncate leading-tight", checked && "font-medium")}>
+          {row.label}
+        </span>
+        {/* Deselect. Kept quiet until the row is hovered or focused, so the
+            panel does not read as a column of close buttons. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          aria-label={`Remove ${row.label} from the panel`}
+          className="shrink-0 rounded text-muted-foreground/0 transition-colors group-hover/row:text-muted-foreground/60 hover:text-foreground! focus-visible:text-muted-foreground focus-visible:outline-none"
+        >
+          <X className="size-3.5" strokeWidth={2.25} />
+        </button>
+      </div>
+      {checked && children && <div className="px-2 pb-2">{children}</div>}
+    </div>
   );
 }
 
 function SidebarSectionsImpl({
   sections,
+  selected,
   visibility,
-  onToggleSection,
-  onToggleItem,
+  onToggleLayer,
+  onDeselectLayer,
   onResetLayers,
+  onCollapse,
   rasterYear,
   onRasterYearChange,
   rasterOpacity,
   onRasterOpacityChange,
 }: {
   sections: SectionDef[];
-  /** Toggle key → on, across every group at once. See lib/sections.ts. */
+  /** Toggle key → selected in the navbar picker, i.e. listed in this panel. */
+  selected: Record<string, boolean>;
+  /** Toggle key → drawing on the map. A subset of `selected`. */
   visibility: Record<string, boolean>;
-  onToggleSection: (id: string, on: boolean) => void;
-  onToggleItem: (key: string) => void;
-  /** Switches everything off — the mockup's "Reset view". */
+  onToggleLayer: (key: string) => void;
+  /** Takes a layer back out of the selection, and off the map with it. */
+  onDeselectLayer: (key: string) => void;
+  /** Switches every selected layer off, without deselecting any. */
   onResetLayers: () => void;
+  /** Folds the panel away. Omitted where there is nothing to fold into. */
+  onCollapse?: () => void;
   /** Group id → selected year. */
   rasterYear: Record<string, number>;
   onRasterYearChange: (sectionId: string, year: number) => void;
@@ -326,61 +267,103 @@ function SidebarSectionsImpl({
   rasterOpacity: Record<string, number>;
   onRasterOpacityChange: (sectionId: string, opacity: number) => void;
 }) {
-  const total = sections.reduce((sum, section) => sum + layerCount(section), 0);
-  const onCount = Object.values(visibility).filter(Boolean).length;
+  // Only the groups that have something selected in them are drawn, so the
+  // panel is exactly as tall as the work in progress.
+  const groups = sections
+    .map((section) => ({ section, rows: panelRows(section, selected) }))
+    .filter(({ rows }) => rows.length > 0);
+
+  const total = groups.reduce((sum, g) => sum + g.rows.length, 0);
+  const onCount = groups.reduce(
+    (sum, g) => sum + g.rows.filter((row) => visibility[row.key]).length,
+    0,
+  );
 
   return (
     <div data-tour="sections" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
-        <p className="text-[11px] font-medium tracking-wide text-muted-foreground">
-          Layers · {total}
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
+        <p className="min-w-0 truncate text-[11px] font-medium tracking-wide text-muted-foreground">
+          {total === 0 ? "Layers" : `Layers · ${onCount} of ${total} on`}
         </p>
-        <button
-          type="button"
-          onClick={onResetLayers}
-          disabled={onCount === 0}
-          className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
-        >
-          Reset view
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onResetLayers}
+            disabled={onCount === 0}
+            className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
+          >
+            Reset view
+          </button>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              aria-label="Hide the layers panel"
+              className="text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              <PanelLeftClose className="size-3.5" strokeWidth={2} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 scrollbar-thin">
-        {sections.map((section, i) => (
-          <section key={section.id} data-tour={i === 0 ? "section-theme" : undefined}>
-            <div className="flex items-center justify-between gap-2 px-2.5 pt-3 pb-1">
-              <h3 className="min-w-0 truncate text-[11px] font-medium text-muted-foreground/70">
-                {section.label}
-              </h3>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/40">
-                {layerCount(section)}
-              </span>
-            </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 scrollbar-thin">
+        {groups.length === 0 ? (
+          <p className="px-2.5 py-3 text-xs leading-relaxed text-muted-foreground">
+            No layers selected yet. Open{" "}
+            <span className="font-medium text-foreground">Layers</span> in the top bar and tick a
+            section to choose from it.
+          </p>
+        ) : (
+          groups.map(({ section, rows }, i) => (
+            <section key={section.id} data-tour={i === 0 ? "section-theme" : undefined}>
+              <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
+                <h3 className="min-w-0 truncate text-[11px] font-medium text-muted-foreground/70">
+                  {section.label}
+                </h3>
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/40">
+                  {rows.length}
+                </span>
+              </div>
 
-            <div className="flex flex-col gap-0.5">
-              <GroupRows
-                section={section}
-                visibility={visibility}
-                onToggleSection={onToggleSection}
-                onToggleItem={onToggleItem}
-                rasterYear={rasterYear}
-                onRasterYearChange={onRasterYearChange}
-                rasterOpacity={rasterOpacity}
-                onRasterOpacityChange={onRasterOpacityChange}
-              />
-            </div>
-          </section>
-        ))}
+              <div className="flex flex-col gap-0.5">
+                {rows.map((row) => (
+                  <LayerRow
+                    key={row.key}
+                    row={row}
+                    checked={Boolean(visibility[row.key])}
+                    onToggle={() => onToggleLayer(row.key)}
+                    onRemove={() => onDeselectLayer(row.key)}
+                  >
+                    {row.raster && (
+                      <div className="flex flex-col gap-2">
+                        {row.raster.years.length > 1 && (
+                          <YearChips
+                            label={row.label}
+                            years={row.raster.years}
+                            year={rasterYear[row.raster.id] ?? row.raster.years.at(-1)?.year ?? null}
+                            onChange={(year) => onRasterYearChange(row.raster!.id, year)}
+                          />
+                        )}
+                        <OpacityControl
+                          label={row.label}
+                          opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
+                          onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
+                        />
+                      </div>
+                    )}
+                  </LayerRow>
+                ))}
+              </div>
+            </section>
+          ))
+        )}
       </div>
-
-      <p className="shrink-0 border-t border-border/60 px-4 py-2.5 text-[11px] text-muted-foreground">
-        {onCount === 0 ? "No layers visible" : `${onCount} layer${onCount === 1 ? "" : "s"} visible`}
-      </p>
     </div>
   );
 }
 
-// Memoised because the dashboard re-renders on state this column has nothing
+// Memoised because the dashboard re-renders on state this panel has nothing
 // to do with — opening the mobile sheet, running the walkthrough — and its
 // props are all stable across those.
 export const SidebarSections = memo(SidebarSectionsImpl);

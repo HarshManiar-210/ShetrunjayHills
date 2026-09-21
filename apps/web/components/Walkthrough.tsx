@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Bumped when the steps change enough that returning users should see it again. */
-const SEEN_KEY = "shetrunjay.walkthrough.v2";
+const SEEN_KEY = "shetrunjay.walkthrough.v3";
 
 interface Step {
   /** Value of the data-tour attribute to spotlight. Omitted = centred card. */
@@ -23,19 +23,24 @@ const STEPS: Step[] = [
     body: "A quick tour of the GIS dashboard — where the layers live, how to read the map, and what the panels around it do. Two minutes, and you can leave at any point.",
   },
   {
+    target: "layer-picker",
+    title: "Choose your layers",
+    body: "Every layer lives in a section — Forest Layers, Landuse, Drone Data and so on. Tick a section to see what is in it, then tick the layers you want to work with. A layer marked “Coming soon” has no data delivered yet.",
+  },
+  {
     target: "sections",
-    title: "Themes and layers",
-    body: "Every layer lives in a section — Forest Cover, Watershed Analysis, Base Layers and so on. Switch on as many as you like: they all draw together, with vector layers always above raster imagery.",
+    title: "Your layers panel",
+    body: "The layers you chose are listed here, grouped by section. Tick one to draw it on the map — as many at once as you like, with vector layers always above raster imagery. The × beside a layer takes it back out, and the panel folds away when you want the map clear.",
   },
   {
     target: "section-theme",
-    title: "Switch a section on",
-    body: "The switch turns a section's layers on; clicking its name expands it, so you can reach a multi-year theme's Year dropdown or a group's individual layers without changing what is drawn. A layer marked “Pending” has no data delivered yet.",
+    title: "Years and opacity",
+    body: "Switch on a raster theme and its controls open underneath: the years it was captured in, and how strongly it draws so you can see what is beneath it.",
   },
   {
     target: "search",
     title: "Find a layer fast",
-    body: "Rather than scrolling the sections, type part of a layer's name here and pick it — the dashboard expands the right section and switches that layer on, leaving whatever else you have on alone.",
+    body: "Rather than working through the sections, type part of a layer's name here and pick it — the dashboard adds it to your panel and switches it on, leaving whatever else you have on alone.",
   },
   {
     target: "legend",
