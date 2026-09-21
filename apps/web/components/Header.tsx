@@ -44,20 +44,21 @@ export function Header({
   /** Replays the dashboard walkthrough. Omitted on pages that have no tour. */
   onHelpClick?: () => void;
   /**
-   * Layer search, left-aligned to sit directly above the map's left edge.
-   * Only the dashboard has layers to search, so pages without them simply
-   * pass nothing and the right-hand controls keep their place.
+   * Layer search. Only the dashboard has layers to search, so pages without
+   * them simply pass nothing and the right-hand controls keep their place.
    */
   search?: React.ReactNode;
   /**
    * The layer picker — which layers the map's panel lists. It lives in the bar
    * rather than in the panel because it is what fills the panel, and because
-   * the panel now floats over the map with only the selection in it.
+   * the panel now floats over the map with only the selection in it. It sits
+   * after the search field: both are ways into the same set of layers, and
+   * search is the faster one when you already know the name.
    */
   layerPicker?: React.ReactNode;
 }) {
   return (
-    <header className="relative z-30 flex items-center gap-2 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 xl:gap-0 xl:py-2.5 xl:pr-3 xl:pl-0">
+    <header className="relative z-30 flex items-center gap-3 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 xl:px-4 xl:py-2.5">
       {/* Rule along the bottom edge, fading out to the right so it frames the
           band rather than underlining it. */}
       <span
@@ -76,9 +77,8 @@ export function Header({
       </Button>
 
       {/* Natural width now: the sidebar column this used to mirror is gone,
-          so the brand takes the space it needs and the picker, search and
-          controls follow directly after it. */}
-      <div className="flex min-w-0 shrink-0 items-center gap-2 xl:pl-4">
+          so the brand takes the space it needs and the controls follow. */}
+      <div className="flex min-w-0 shrink-0 items-center gap-2">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-nav-soft to-nav-line/40 shadow-e1 ring-1 ring-nav-line">
           <Mountain className="size-5 text-nav-accent" strokeWidth={2.25} />
         </span>
@@ -94,13 +94,18 @@ export function Header({
         </div>
       </div>
 
-      {layerPicker && <div className="ml-2 shrink-0 xl:ml-4">{layerPicker}</div>}
-
-      {search && (
-        <div className="min-w-0 flex-1 pl-2">
-          <div className="w-full max-w-md">{search}</div>
-        </div>
+      {/* Separates the wordmark from the controls, so the bar reads as an
+          identity and a toolbar rather than one undifferentiated row. */}
+      {(search || layerPicker) && (
+        <span aria-hidden className="hidden h-7 w-px shrink-0 bg-nav-line sm:block" />
       )}
+
+      {/* Capped rather than free-growing: past about 28rem a search field
+          stops looking like a field and starts looking like a gap. What it
+          does not take stays as space before the controls on the right. */}
+      {search && <div className="min-w-0 max-w-md flex-1">{search}</div>}
+
+      {layerPicker}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {/* Theme toggle disabled for now */}

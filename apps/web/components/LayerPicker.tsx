@@ -51,20 +51,30 @@ export function LayerPicker({
   return (
     <Popover>
       <PopoverTrigger asChild>
+        {/* Built to match the search field beside it — same height, same
+            pill, same inset shading — so the two read as one toolbar rather
+            than as a control that wandered in from somewhere else. */}
         <Button
           variant="outline"
-          size="sm"
           data-tour="layer-picker"
-          className={cn("gap-2", className)}
+          className={cn(
+            "h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium",
+            "shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)]",
+            "transition-[color,box-shadow,background-color,border-color]",
+            "hover:border-nav-accent/45 hover:bg-nav-soft",
+            "data-[state=open]:border-nav-accent/60 data-[state=open]:bg-card",
+            "data-[state=open]:ring-[3px] data-[state=open]:ring-nav-accent/20",
+            className,
+          )}
         >
-          <Layers className="size-3.5" strokeWidth={2} />
+          <Layers className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
           <span className="hidden sm:inline">Layers</span>
           {pickedCount > 0 && (
-            <span className="rounded-full bg-brand px-1.5 text-[10px] font-semibold tabular-nums text-brand-foreground">
+            <span className="rounded-full bg-brand px-1.5 py-px text-[10px] font-semibold tabular-nums text-brand-foreground">
               {pickedCount}
             </span>
           )}
-          <ChevronDown className="size-3.5 opacity-60" strokeWidth={2} />
+          <ChevronDown className="size-3.5 shrink-0 opacity-50" strokeWidth={2} />
         </Button>
       </PopoverTrigger>
 
