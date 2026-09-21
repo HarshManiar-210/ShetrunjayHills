@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Layers } from "lucide-react";
+import { ChevronDown, FolderTree, Layers, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,182 +8,292 @@ import { sectionLayers, type SectionDef, type SectionLayer } from "@/lib/section
 import { cn } from "@/lib/utils";
 
 /**
- * The navbar's layer picker: which layers you are working with.
+ * Choosing layers, in two steps and two dropdowns.
  *
- * Ticking a layer here draws it and puts it in the map's layers panel, which
- * is where it is switched off again, given a year, or faded. The split keeps
- * the panel down to the handful of layers someone is working on instead of
- * all fifty-odd at once, which is what made the old always-complete column a
- * wall to scroll.
+ * Sections first — Forest Layers, Landuse, Drone Data and the rest — then the
+ * layers inside whichever of them are picked. One nested dropdown did both
+ * jobs before, and that made the common case worse: the list of ten sections
+ * pushed itself apart as soon as one was opened, so scanning the sections and
+ * picking within one fought each other inside the same 20rem column. Split,
+ * each dropdown does one thing at its own length.
  *
- * A group's checkbox reveals its layers and selects none of them. Drone Data
- * is six rasters and Administrative Boundaries ten layers, so a group tick
- * that selected everything would be a heavy accident — and on the raster
- * groups, six full-extent images stacked at once.
+ * Ticking a layer draws it and puts it in the map's layers panel, which is
+ * where it is switched off again, given a year, or faded.
  */
 
+/** Trigger for either picker: an icon, a name, and how many are ticked. */
+function PickerTrigger({
+  icon: Icon,
+  label,
+  count,
+  tour,
+  className,
+}: {
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  tour?: string;
+  className?: string;
+}) {
+  return (
+    <PopoverTrigger asChild>
+      {/* Built to match the search field beside it — same height, same pill,
+          same inset shading — so the bar reads as one toolbar. */}
+      <Button
+        variant="outline"
+        data-tour={tour}
+        className={cn(
+          "h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium",
+          "shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)]",
+          "transition-[color,box-shadow,background-color,border-color]",
+          "hover:border-nav-accent/45 hover:bg-nav-soft",
+          "data-[state=open]:border-nav-accent/60 data-[state=open]:bg-card",
+          "data-[state=open]:ring-[3px] data-[state=open]:ring-nav-accent/20",
+          className,
+        )}
+      >
+        <Icon className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
+        <span className="hidden sm:inline">{label}</span>
+        {count > 0 && (
+          <span className="rounded-full bg-brand px-1.5 py-px text-[10px] font-semibold tabular-nums text-brand-foreground">
+            {count}
+          </span>
+        )}
+        <ChevronDown className="size-3.5 shrink-0 opacity-50" strokeWidth={2} />
+      </Button>
+    </PopoverTrigger>
+  );
+}
+
+/** Popover chrome shared by both pickers: a titled header, a body, a footer. */
+function PickerBody({
+  title,
+  onClear,
+  clearable,
+  footer,
+  children,
+}: {
+  title: string;
+  onClear: () => void;
+  clearable: boolean;
+  footer: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <PopoverContent className="w-80 p-0">
+      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          {title}
+        </p>
+        <button
+          type="button"
+          disabled={!clearable}
+          onClick={onClear}
+          className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
+        >
+          Clear all
+        </button>
+      </div>
+
+      <div className="max-h-[min(28rem,60vh)] overflow-y-auto p-1.5 scrollbar-thin">
+        {children}
+      </div>
+
+      <p className="border-t border-border px-3 py-2 text-[10px] leading-snug text-muted-foreground">
+        {footer}
+      </p>
+    </PopoverContent>
+  );
+}
+
+/**
+ * The first dropdown: which sections you are working in.
+ *
+ * Picking a section makes its layers available in the layer picker and
+ * selects none of them. Drone Data is six full-extent rasters and
+ * Administrative Boundaries ten layers, so a section tick that drew
+ * everything would be a heavy accident to undo.
+ */
+export function SectionPicker({
+  sections,
+  active,
+  onToggleSection,
+  className,
+}: {
+  sections: SectionDef[];
+  /** Section id → picked. */
+  active: Record<string, boolean>;
+  onToggleSection: (id: string, on: boolean) => void;
+  className?: string;
+}) {
+  const count = sections.filter((s) => active[s.id]).length;
+
+  return (
+    <Popover>
+      <PickerTrigger
+        icon={FolderTree}
+        label="Sections"
+        count={count}
+        tour="section-picker"
+        className={className}
+      />
+      <PickerBody
+        title="Select sections"
+        clearable={count > 0}
+        onClear={() => {
+          for (const section of sections) {
+            if (active[section.id]) onToggleSection(section.id, false);
+          }
+        }}
+        footer="Pick a section to choose layers from it."
+      >
+        {sections.map((section) => (
+          <label
+            key={section.id}
+            className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-foreground/5"
+          >
+            <Checkbox
+              checked={Boolean(active[section.id])}
+              onCheckedChange={(next) => onToggleSection(section.id, next === true)}
+            />
+            <section.icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+              {section.label}
+            </span>
+            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+              {sectionLayers(section).length}
+            </span>
+          </label>
+        ))}
+      </PickerBody>
+    </Popover>
+  );
+}
+
+/**
+ * The second dropdown: the layers inside the picked sections.
+ *
+ * Every row names the section it came from. The list is ordered by section
+ * and ruled where one ends, but the name on the row is what makes it
+ * unambiguous once the list is long enough to scroll — and sections do repeat
+ * layer names, Existing and Proposed Conservation each having a Matipala, a
+ * Vantalavadi and a Checkdam.
+ */
 export function LayerPicker({
   sections,
+  active,
   selected,
   onToggleLayer,
   className,
 }: {
   sections: SectionDef[];
-  /** Toggle key → picked. Independent of what is actually drawing. */
+  /** Section id → picked in the section dropdown. */
+  active: Record<string, boolean>;
+  /** Toggle key → selected. */
   selected: Record<string, boolean>;
   onToggleLayer: (key: string, picked: boolean) => void;
   className?: string;
 }) {
-  // Which groups have their layers showing. Purely local: revealing a group
-  // changes nothing about the map, so it is not worth lifting.
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const groups = sections
+    .filter((section) => active[section.id])
+    .map((section) => ({ section, layers: sectionLayers(section) }));
 
-  const pickedCount = Object.values(selected).filter(Boolean).length;
-
-  function setPicked(layers: SectionLayer[], picked: boolean) {
-    for (const layer of layers) {
-      if (layer.pending) continue;
-      if (Boolean(selected[layer.key]) !== picked) onToggleLayer(layer.key, picked);
-    }
-  }
+  const count = groups.reduce(
+    (sum, g) => sum + g.layers.filter((l) => selected[l.key]).length,
+    0,
+  );
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        {/* Built to match the search field beside it — same height, same
-            pill, same inset shading — so the two read as one toolbar rather
-            than as a control that wandered in from somewhere else. */}
-        <Button
-          variant="outline"
-          data-tour="layer-picker"
-          className={cn(
-            "h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium",
-            "shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)]",
-            "transition-[color,box-shadow,background-color,border-color]",
-            "hover:border-nav-accent/45 hover:bg-nav-soft",
-            "data-[state=open]:border-nav-accent/60 data-[state=open]:bg-card",
-            "data-[state=open]:ring-[3px] data-[state=open]:ring-nav-accent/20",
-            className,
-          )}
-        >
-          <Layers className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
-          <span className="hidden sm:inline">Layers</span>
-          {pickedCount > 0 && (
-            <span className="rounded-full bg-brand px-1.5 py-px text-[10px] font-semibold tabular-nums text-brand-foreground">
-              {pickedCount}
-            </span>
-          )}
-          <ChevronDown className="size-3.5 shrink-0 opacity-50" strokeWidth={2} />
-        </Button>
-      </PopoverTrigger>
-
-      <PopoverContent className="w-80 p-0">
-        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            Select layers
+      <PickerTrigger
+        icon={Layers}
+        label="Layers"
+        count={count}
+        tour="layer-picker"
+        className={className}
+      />
+      <PickerBody
+        title="Select layers"
+        clearable={count > 0}
+        onClear={() => {
+          for (const { layers } of groups) {
+            for (const layer of layers) {
+              if (selected[layer.key]) onToggleLayer(layer.key, false);
+            }
+          }
+        }}
+        footer="Selected layers draw on the map and appear in its layers panel."
+      >
+        {groups.length === 0 ? (
+          <p className="px-2.5 py-3 text-xs leading-relaxed text-muted-foreground">
+            No sections picked yet. Open{" "}
+            <span className="font-medium text-foreground">Sections</span> and tick one to choose
+            layers from it.
           </p>
-          <button
-            type="button"
-            disabled={pickedCount === 0}
-            onClick={() => sections.forEach((s) => setPicked(sectionLayers(s), false))}
-            className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
-          >
-            Clear all
-          </button>
-        </div>
-
-        <div className="max-h-[min(28rem,60vh)] overflow-y-auto p-1.5 scrollbar-thin">
-          {sections.map((section) => {
-            const layers = sectionLayers(section);
-            const pickedHere = layers.filter((l) => selected[l.key]).length;
-            // A group with picks inside it stays open regardless: closing it
-            // would hide rows that are in the panel and possibly drawing.
-            const open = Boolean(revealed[section.id]) || pickedHere > 0;
-
-            const reveal = (next: boolean) => {
-              setRevealed((r) => ({ ...r, [section.id]: next }));
-              // Closing a group takes its layers out of the panel with it, so
-              // the two controls never disagree about what is in play.
-              if (!next) setPicked(layers, false);
-            };
-
-            return (
-              <div key={section.id} className="mb-0.5">
-                <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-foreground/5">
-                  <Checkbox
-                    checked={open}
-                    aria-label={`Show the layers in ${section.label}`}
-                    onCheckedChange={(next) => reveal(next === true)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => reveal(!open)}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  >
-                    <section.icon
-                      className="size-3.5 shrink-0 text-muted-foreground"
-                      strokeWidth={2}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-                      {section.label}
-                    </span>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                      {pickedHere > 0 ? `${pickedHere}/${layers.length}` : layers.length}
-                    </span>
-                  </button>
-                </div>
-
-                {open && (
-                  <div className="mb-1 ml-3.5 border-l border-border/70 pl-2">
-                    {layers.map((layer) =>
-                      layer.pending ? (
-                        <div
-                          key={layer.key}
-                          className="flex items-center gap-2.5 px-2 py-1.5 text-[13px]"
-                        >
-                          <Checkbox checked={false} disabled aria-hidden tabIndex={-1} />
-                          <layer.icon
-                            className="size-3.5 shrink-0 text-muted-foreground/40"
-                            strokeWidth={2}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-muted-foreground/50">
-                            {layer.label}
-                          </span>
-                          <span className="shrink-0 text-[10px] font-medium text-brand/70">
-                            Coming soon
-                          </span>
-                        </div>
-                      ) : (
-                        <label
-                          key={layer.key}
-                          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors hover:bg-foreground/5"
-                        >
-                          <Checkbox
-                            checked={Boolean(selected[layer.key])}
-                            onCheckedChange={(next) => onToggleLayer(layer.key, next === true)}
-                          />
-                          {/* Tinted to the colour it draws in, so the picker
-                              already reads as a key to the map. */}
-                          <layer.icon
-                            className={cn("size-3.5 shrink-0", !layer.color && "text-muted-foreground")}
-                            style={layer.color ? { color: layer.color } : undefined}
-                            strokeWidth={2}
-                          />
-                          <span className="min-w-0 flex-1 truncate">{layer.label}</span>
-                        </label>
-                      ),
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <p className="border-t border-border px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-          Selected layers draw on the map and appear in its layers panel.
-        </p>
-      </PopoverContent>
+        ) : (
+          groups.map(({ section, layers }, i) => (
+            <div key={section.id} className={cn(i > 0 && "mt-1 border-t border-border/60 pt-1")}>
+              {layers.map((layer) => (
+                <LayerOption
+                  key={layer.key}
+                  layer={layer}
+                  section={section.label}
+                  checked={Boolean(selected[layer.key])}
+                  onToggle={(next) => onToggleLayer(layer.key, next)}
+                />
+              ))}
+            </div>
+          ))
+        )}
+      </PickerBody>
     </Popover>
+  );
+}
+
+function LayerOption({
+  layer,
+  section,
+  checked,
+  onToggle,
+}: {
+  layer: SectionLayer;
+  /** The section this layer belongs to, named under it on the row. */
+  section: string;
+  checked: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  const Icon = layer.icon;
+
+  if (layer.pending) {
+    return (
+      <div className="flex items-center gap-2.5 px-2 py-1.5">
+        <Checkbox checked={false} disabled aria-hidden tabIndex={-1} />
+        <Icon className="size-3.5 shrink-0 text-muted-foreground/40" strokeWidth={2} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] text-muted-foreground/50">
+            {layer.label}
+          </span>
+          <span className="block truncate text-[10px] text-muted-foreground/40">{section}</span>
+        </span>
+        <span className="shrink-0 text-[10px] font-medium text-brand/70">Coming soon</span>
+      </div>
+    );
+  }
+
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-foreground/5">
+      <Checkbox checked={checked} onCheckedChange={(next) => onToggle(next === true)} />
+      {/* Tinted to the colour it draws in, so the picker already reads as a
+          key to the map. */}
+      <Icon
+        className={cn("size-3.5 shrink-0", !layer.color && "text-muted-foreground")}
+        style={layer.color ? { color: layer.color } : undefined}
+        strokeWidth={2}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px]">{layer.label}</span>
+        <span className="block truncate text-[10px] text-muted-foreground">{section}</span>
+      </span>
+    </label>
   );
 }

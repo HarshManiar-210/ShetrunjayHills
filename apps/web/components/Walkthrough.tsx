@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Bumped when the steps change enough that returning users should see it again. */
-const SEEN_KEY = "shetrunjay.walkthrough.v3";
+const SEEN_KEY = "shetrunjay.walkthrough.v4";
 
 interface Step {
   /** Value of the data-tour attribute to spotlight. Omitted = centred card. */
@@ -23,9 +23,14 @@ const STEPS: Step[] = [
     body: "A quick tour of the GIS dashboard — where the layers live, how to read the map, and what the panels around it do. Two minutes, and you can leave at any point.",
   },
   {
+    target: "section-picker",
+    title: "Start with a section",
+    body: "Every layer lives in a section — Forest Layers, Landuse, Drone Data and so on. Tick the ones you are working in; the number beside each says how many layers it holds. Nothing is drawn yet by picking a section.",
+  },
+  {
     target: "layer-picker",
-    title: "Choose your layers",
-    body: "Every layer lives in a section — Forest Layers, Landuse, Drone Data and so on. Tick a section to see what is in it, then tick the layers you want: each one draws on the map as you pick it. A layer marked “Coming soon” has no data delivered yet.",
+    title: "Then pick the layers",
+    body: "This lists the layers inside the sections you picked, each one naming the section it came from. Tick a layer and it draws on the map straight away. A layer marked “Coming soon” has no data delivered yet.",
   },
   {
     target: "sections",

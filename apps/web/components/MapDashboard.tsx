@@ -9,7 +9,7 @@ import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
-import { LayerPicker } from "@/components/LayerPicker";
+import { LayerPicker, SectionPicker } from "@/components/LayerPicker";
 import { ExportButton } from "@/components/ExportButton";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
@@ -47,6 +47,7 @@ import {
   isRasterToggleKey,
   layerIdOf,
   rasterToggleKey,
+  sectionLayers,
   DEFAULT_RASTER_OPACITY,
 } from "@/lib/sections";
 import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
@@ -110,6 +111,10 @@ export function MapDashboard() {
   // The split exists because the panel now floats over the map. A panel
   // carrying every layer in the seed could only ever be a docked column;
   // carrying the handful someone picked, it fits on the map.
+  // Which sections the first dropdown has picked. Its only job is to decide
+  // what the layer dropdown lists, so it holds section ids rather than toggle
+  // keys and never reaches the map.
+  const [activeSections, setActiveSections] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
 
@@ -319,6 +324,24 @@ export function MapDashboard() {
     [toggleSelected],
   );
 
+  /**
+   * Pick a section into the layer dropdown, or take it back out.
+   *
+   * Dropping a section drops its layers with it: they would otherwise stay
+   * selected and drawing with no dropdown left that lists them, and so no way
+   * to switch them off except the panel.
+   */
+  const toggleSectionActive = useCallback(
+    (id: string, on: boolean) => {
+      setActiveSections((a) => ({ ...a, [id]: on }));
+      if (on) return;
+      const section = sections.find((s) => s.id === id);
+      if (!section) return;
+      for (const layer of sectionLayers(section)) toggleSelected(layer.key, false);
+    },
+    [sections, toggleSelected],
+  );
+
   /** The panel's "Reset view": switch every layer off, keeping the selection. */
   const resetLayers = useCallback(() => {
     setVisible({});
@@ -332,12 +355,20 @@ export function MapDashboard() {
   // knowing which section holds it, so `path` goes unused here.
   const revealLayer = useCallback(
     (_path: string[], key: string) => {
+      // Search is the one route that skips both dropdowns, so it opens the
+      // layer's own section on the way past: without that the layer would be
+      // in the panel and on the map but missing from the dropdown that is
+      // supposed to list it.
+      const owner = sections.find((section) =>
+        sectionLayers(section).some((layer) => layer.key === key),
+      );
+      if (owner) setActiveSections((a) => ({ ...a, [owner.id]: true }));
       setSelected((sel) => ({ ...sel, [key]: true }));
       setPanelOpen(true);
       requestKeys([key], true);
       setMobileSheet(null);
     },
-    [requestKeys],
+    [requestKeys, sections],
   );
 
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
@@ -570,6 +601,27 @@ export function MapDashboard() {
     };
   }, [basemap, visibleFeatures, legendOverlays, legendRasterLayers, statsRasterLayers]);
 
+  // The two dropdowns, shared between the bar and the mobile sheet. Below md
+  // the bar cannot hold them: the brand, search, export and help controls
+  // already fill a phone's width, and two more would squeeze the search field
+  // to nothing. They move into the menu sheet instead, above the panel they
+  // fill.
+  const pickers = (
+    <>
+      <SectionPicker
+        sections={sections}
+        active={activeSections}
+        onToggleSection={toggleSectionActive}
+      />
+      <LayerPicker
+        sections={sections}
+        active={activeSections}
+        selected={selected}
+        onToggleLayer={toggleSelected}
+      />
+    </>
+  );
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header
@@ -580,11 +632,7 @@ export function MapDashboard() {
         onHelpClick={() => setTourOpen(true)}
         actions={<ExportButton input={exportInput} />}
         layerPicker={
-          <LayerPicker
-            sections={sections}
-            selected={selected}
-            onToggleLayer={toggleSelected}
-          />
+          <div className="hidden shrink-0 items-center gap-2 md:flex">{pickers}</div>
         }
         search={
           <LayerSearch sections={sections} visibility={visible} onSelect={revealLayer} />
@@ -697,6 +745,9 @@ export function MapDashboard() {
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
         <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 pt-12 scrollbar-thin">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pb-3 md:hidden">
+            {pickers}
+          </div>
           <Sidebar variant="combined" user={auth.user} />
           <div className="flex flex-1 flex-col bg-linear-to-b from-panel to-panel-deep">
             {layersPanel()}
