@@ -2,11 +2,11 @@ import { memo } from "react";
 import { PanelLeftClose, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LayerDot } from "@/components/LayerDot";
 import {
   DEFAULT_RASTER_OPACITY,
   sectionLayers,
   type RasterYear,
-  type SectionAccent,
   type SectionDef,
   type SectionLayer,
 } from "@/lib/sections";
@@ -26,24 +26,11 @@ import { cn } from "@/lib/utils";
  * on; this panel is where you switch it back off, pick a year and set
  * opacity. A row's × takes it out of the selection, so the panel can be
  * tidied where the clutter is rather than only from the picker.
+ *
+ * Each row leads with the colour the layer draws in, not an icon for its
+ * geometry: matching a row to what is on the map is the question a legend
+ * row has to answer, and a point-or-polygon glyph never answered it.
  */
-
-/**
- * Subject colour per group, resolved to the --sec-* tokens in globals.css.
- * Tints a row's icon rather than washing a whole card, so the panel still
- * scans by subject without the hue doing the shouting.
- */
-const ACCENT_TEXT: Record<SectionAccent, string> = {
-  forest: "text-sec-forest",
-  canopy: "text-sec-canopy",
-  change: "text-sec-change",
-  land: "text-sec-land",
-  imagery: "text-sec-imagery",
-  water: "text-sec-water",
-  infra: "text-sec-infra",
-  fauna: "text-sec-fauna",
-  carbon: "text-sec-carbon",
-};
 
 /**
  * The selected layers under one top-level group, in the same flattened order
@@ -137,7 +124,6 @@ function LayerRow({
   /** Expanded controls — only rendered while the layer is switched on. */
   children?: React.ReactNode;
 }) {
-  const Icon = row.icon;
   return (
     <div
       className={cn(
@@ -164,14 +150,7 @@ function LayerRow({
         className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors hover:bg-foreground/5"
       >
         <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
-        <Icon
-          className={cn(
-            "size-3.5 shrink-0",
-            !row.color && ACCENT_TEXT[row.accent],
-          )}
-          style={row.color ? { color: row.color } : undefined}
-          strokeWidth={2}
-        />
+        <LayerDot color={row.color} raster={row.raster} />
         <span className={cn("min-w-0 flex-1 truncate leading-tight", checked && "font-medium")}>
           {row.label}
         </span>

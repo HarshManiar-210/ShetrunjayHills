@@ -4,6 +4,7 @@ import { ChevronDown, FolderTree, Layers, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { LayerDot } from "@/components/LayerDot";
 import { sectionLayers, type SectionDef, type SectionLayer } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
@@ -262,13 +263,11 @@ function LayerOption({
   checked: boolean;
   onToggle: (next: boolean) => void;
 }) {
-  const Icon = layer.icon;
-
   if (layer.pending) {
     return (
       <div className="flex items-center gap-2.5 px-2 py-1.5">
         <Checkbox checked={false} disabled aria-hidden tabIndex={-1} />
-        <Icon className="size-3.5 shrink-0 text-muted-foreground/40" strokeWidth={2} />
+        <LayerDot color={layer.color} raster={layer.raster} faded />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] text-muted-foreground/50">
             {layer.label}
@@ -283,13 +282,9 @@ function LayerOption({
   return (
     <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-foreground/5">
       <Checkbox checked={checked} onCheckedChange={(next) => onToggle(next === true)} />
-      {/* Tinted to the colour it draws in, so the picker already reads as a
-          key to the map. */}
-      <Icon
-        className={cn("size-3.5 shrink-0", !layer.color && "text-muted-foreground")}
-        style={layer.color ? { color: layer.color } : undefined}
-        strokeWidth={2}
-      />
+      {/* The colour it draws in, so the dropdown already reads as a key to
+          the map. */}
+      <LayerDot color={layer.color} raster={layer.raster} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px]">{layer.label}</span>
         <span className="block truncate text-[10px] text-muted-foreground">{section}</span>

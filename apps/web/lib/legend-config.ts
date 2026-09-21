@@ -43,6 +43,19 @@ export interface RasterLegend {
    */
   rampLabels?: [string, string];
   /**
+   * Marks a legend that is a band key rather than a palette — an orthomosaic
+   * or a false-colour composite, whose R/G/B rows say which channel carries
+   * which band and name no colour the map is actually painted in. Such a
+   * theme has no colour that could stand for it in a list.
+   */
+  channels?: boolean;
+  /**
+   * Set on a placeholder legend — a theme whose real palette has not been
+   * delivered. Its greys are a stand-in, so nothing should present them as
+   * the theme's colour.
+   */
+  provisional?: boolean;
+  /**
    * Tick labels along the bar, one per class, evenly spaced. Only for a
    * theme whose classes really do divide the scale evenly — Aspect's eight
    * 45° compass sectors do; nothing else delivered so far does, and spacing
@@ -64,6 +77,7 @@ const PROVISIONAL_RAMP = [
 function provisionalLegend(layerId: string, classCount = 5): RasterLegend {
   return {
     layerId,
+    provisional: true,
     // The placeholder palette is a light→dark grey ramp, so it is ordered by
     // construction even before the real classes arrive.
     ramp: "low-to-high",
@@ -350,6 +364,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // raster (true-color composite: each channel is literally that band).
   orthomosaic: {
     layerId: "orthomosaic",
+    channels: true,
     classes: [
       { value: "R", label: "Red Band", color: "#FF0000" },
       { value: "G", label: "Green Band", color: "#00FF00" },
@@ -371,6 +386,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "satellite-imagery": {
     layerId: "satellite-imagery",
+    channels: true,
     classes: [
       { value: "R", label: "Red Band", color: "#FF0000" },
       { value: "G", label: "Green Band", color: "#00FF00" },
@@ -430,6 +446,52 @@ export function rampScale(legend: RasterLegend): RampScale | undefined {
     classes[classes.length - 1].label,
   ];
   return { classes, low, high, ticks: legend.rampTicks };
+}
+
+/**
+ * How a raster theme is represented as a single dot in a layer list.
+ *
+ * A theme has a palette rather than a colour, so something has to stand for
+ * it. A ramped palette is represented by its high end — dense forest, tall
+ * canopy, steep ground — which is what the theme is about and what someone
+ * is looking for on the map. A palette with no order to it has no such end,
+ * so it is shown as itself. A band key stands for nothing: an orthomosaic is
+ * not red just because its first row is the red channel.
+ */
+export type LayerDot =
+  | { kind: "solid"; color: string }
+  | { kind: "palette"; colors: string[] }
+  | { kind: "none" };
+
+/**
+ * Colours in a dot before it stops being one. Vegetation Change's palette is
+ * 25 classes; sliced across 8 pixels that is a third of a pixel each, which
+ * reads as mud. Sampling across the palette keeps the dot recognisably that
+ * theme's without pretending to show every class.
+ */
+const MAX_DOT_COLORS = 6;
+
+function sample<T>(items: T[], limit: number): T[] {
+  if (items.length <= limit) return items;
+  return Array.from(
+    { length: limit },
+    (_, i) => items[Math.round((i * (items.length - 1)) / (limit - 1))],
+  );
+}
+
+export function legendDot(legend: RasterLegend | undefined): LayerDot {
+  // A placeholder palette says nothing about the theme, and every provisional
+  // theme shares the same greys — ten identical near-black dots would be
+  // worse than none.
+  if (!legend || legend.channels || legend.provisional) return { kind: "none" };
+  if (legend.classes.length === 0) return { kind: "none" };
+
+  const scale = rampScale(legend);
+  if (scale) {
+    const high = scale.classes[scale.classes.length - 1];
+    return { kind: "solid", color: high.color };
+  }
+  return { kind: "palette", colors: sample(legend.classes, MAX_DOT_COLORS).map((c) => c.color) };
 }
 
 /**
