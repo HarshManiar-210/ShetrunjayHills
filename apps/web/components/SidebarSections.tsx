@@ -276,7 +276,11 @@ function SidebarSectionsImpl({
           groups.map(({ section, rows }, i) => (
             <section key={section.id} data-tour={i === 0 ? "section-theme" : undefined}>
               <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
-                <h3 className="min-w-0 truncate text-[11px] font-medium text-muted-foreground/70">
+                {/* Uppercase and letter-spaced, as the reference image sets
+                    its panel headings — it is what separates a heading from
+                    the layer names under it without a rule or a heavier
+                    weight. */}
+                <h3 className="min-w-0 truncate text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
                   {section.label}
                 </h3>
                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/40">
