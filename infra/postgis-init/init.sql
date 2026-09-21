@@ -261,7 +261,9 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('toposheet',   'Toposheet',                   grp('reference'), 2),
 
     ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 1),
-    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 2);
+    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 2),
+
+    ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
 
 -- Tree Density is a raster, so it gets its own group under Drone Analysis: a
 -- group holding placed rasters becomes a single layer, which would swallow
@@ -436,7 +438,10 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591);
+    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    -- Habitat Suitability: no georeferencing supplied. Bounds are the Study
+    -- Area's, which match the image's aspect ratio (10799x6936 ~ 1.557).
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.728476, 21.451971, 71.821823, 21.512008);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
@@ -476,7 +481,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     -- and switched independently once the data lands.
     ('fieldPlots',         'Field Plots and Statistics', grp('biodiversity-data'), 'vector', NULL, NULL, '', 1, 'pending'),
     ('rareSpecies',        'Rare Species',               grp('biodiversity-data'), 'vector', NULL, NULL, '', 2, 'pending'),
-    ('habitatSuitability', 'Habitat Suitability',        grp('wildlife-movement'), 'vector', NULL, NULL, '', 1, 'pending'),
     ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
 
     ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
