@@ -10,6 +10,7 @@ import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
 import { LayerPicker } from "@/components/LayerPicker";
+import { ExportButton } from "@/components/ExportButton";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import {
@@ -52,6 +53,8 @@ import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
 import type { LegendOverlay } from "@/components/LegendCard";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { RasterOverlay } from "@/components/Map";
+import type { ExportInput } from "@/lib/map-export";
+import type { Map as MapLibreMap } from "maplibre-gl";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -124,6 +127,12 @@ export function MapDashboard() {
   // being switched off cannot leave the bar pointing at nothing.
   const [preferredTheme, setPreferredTheme] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+
+  // The live map, for the PNG export: it needs the actual canvas, and the
+  // camera as it is at the moment of the click. A ref rather than state —
+  // nothing renders from it, and it must not re-render the dashboard when the
+  // map finishes mounting.
+  const mapRef = useRef<MapLibreMap | null>(null);
 
   // A layer big enough to be worth warning about, waiting on confirmation.
   const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
@@ -540,6 +549,27 @@ export function MapDashboard() {
     </div>
   );
 
+  /**
+   * Read at click time, not at render time: the map's pixels and its camera
+   * are whatever they are when someone presses export, and a snapshot taken
+   * when the header rendered would export a stale view.
+   */
+  const exportInput = useCallback((): ExportInput | null => {
+    const map = mapRef.current;
+    if (!map) return null;
+    const centre = map.getCenter();
+    return {
+      mapCanvas: map.getCanvas(),
+      basemap,
+      centre: { lat: centre.lat, lng: centre.lng },
+      zoom: map.getZoom(),
+      layers: visibleFeatures,
+      overlays: legendOverlays,
+      rasterLegends: legendRasterLayers,
+      rasterStats: statsRasterLayers,
+    };
+  }, [basemap, visibleFeatures, legendOverlays, legendRasterLayers, statsRasterLayers]);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header
@@ -548,6 +578,7 @@ export function MapDashboard() {
         onLoginClick={auth.openLogin}
         onLogoutClick={auth.logout}
         onHelpClick={() => setTourOpen(true)}
+        actions={<ExportButton input={exportInput} />}
         layerPicker={
           <LayerPicker
             sections={sections}
@@ -566,6 +597,9 @@ export function MapDashboard() {
         <div className="relative min-w-0 flex-1 p-4">
           <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
             <Map
+              onReady={(map) => {
+                mapRef.current = map;
+              }}
               data={layers ?? EMPTY}
               visibility={visibility}
               rasterOverlays={rasterOverlays}

@@ -678,6 +678,11 @@ export default function Map({
       // MAX_MAP_ZOOM for why this gives up no real detail.
       maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
+      // Needed to read the canvas back for the PNG export. WebGL discards the
+      // buffer after each frame unless asked not to, and reading a discarded
+      // buffer yields a blank image rather than an error — so the export
+      // would silently produce an empty map.
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
     mapRef.current = map;
 

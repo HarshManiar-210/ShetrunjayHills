@@ -36,6 +36,7 @@ export function Header({
   onHelpClick,
   search,
   layerPicker,
+  actions,
 }: {
   user: AuthUser | null;
   onMenuClick: () => void;
@@ -56,6 +57,11 @@ export function Header({
    * search is the faster one when you already know the name.
    */
   layerPicker?: React.ReactNode;
+  /**
+   * Sits with the help button, at the right-hand end — the export, which is
+   * an action on the whole dashboard rather than on any one panel.
+   */
+  actions?: React.ReactNode;
 }) {
   return (
     <header className="relative z-30 flex items-center gap-3 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 md:pl-0 xl:pr-4 xl:py-2.5">
@@ -115,6 +121,8 @@ export function Header({
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {/* Theme toggle disabled for now */}
         {/* <ThemeToggle /> */}
+
+        {actions}
 
         {onHelpClick && (
           <Button
