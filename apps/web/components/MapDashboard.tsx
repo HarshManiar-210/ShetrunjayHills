@@ -536,7 +536,7 @@ export function MapDashboard() {
               // centring on the map itself runs the bar under both once it is
               // wide. The container is click-through so the empty space beside
               // the bar does not eat map drags.
-              <div className="pointer-events-none absolute right-14 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex">
+              <div className="pointer-events-none absolute right-14 bottom-3 left-[13.5rem] z-10 hidden justify-center md:flex">
                 <YearBar
                   themes={temporalThemes}
                   focusedId={focusedTheme}

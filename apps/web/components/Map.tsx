@@ -928,12 +928,12 @@ export default function Map({
         className="absolute right-14 bottom-3 z-10"
       />
 
-      {/* Bottom-centre, between the basemap switcher on the left and the
-          legend card on the right. */}
+      {/* Bottom-centre, sitting just above the year bar rather than below
+          it — the timeline is the thing anchored to the map's edge. */}
       <CoordinateReadout
         mapRef={mapRef}
         mapLoaded={mapLoaded}
-        className="absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 md:block"
+        className="absolute bottom-[4.25rem] left-1/2 z-10 hidden -translate-x-1/2 md:block"
       />
 
       {!mapLoaded && (
