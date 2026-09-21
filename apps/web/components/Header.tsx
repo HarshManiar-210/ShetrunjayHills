@@ -58,7 +58,7 @@ export function Header({
   layerPicker?: React.ReactNode;
 }) {
   return (
-    <header className="relative z-30 flex items-center gap-3 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 xl:px-4 xl:py-2.5">
+    <header className="relative z-30 flex items-center gap-3 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 md:pl-0 xl:pr-4 xl:py-2.5">
       {/* Rule along the bottom edge, fading out to the right so it frames the
           band rather than underlining it. */}
       <span
@@ -66,19 +66,23 @@ export function Header({
         className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-linear-to-r from-nav-accent/55 via-nav-accent/20 to-transparent"
       />
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="xl:hidden"
-        aria-label="Open menu"
-        onClick={onMenuClick}
-      >
-        <Menu />
-      </Button>
+      {/* Exactly as wide as the layers panel floating below it, so the search
+          field starts where that panel ends. The block is the panel's width
+          rather than its width plus its inset because the panel's inset
+          (left-3) and this bar's gap (gap-3) are the same, so the gap after
+          the block stands in for the inset before the panel. Its own pl-3
+          lines the logo up with the panel's left edge. */}
+      <div className="flex shrink-0 items-center gap-2 md:w-[var(--layers-panel-w)] md:pl-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 xl:hidden"
+          aria-label="Open menu"
+          onClick={onMenuClick}
+        >
+          <Menu />
+        </Button>
 
-      {/* Natural width now: the sidebar column this used to mirror is gone,
-          so the brand takes the space it needs and the controls follow. */}
-      <div className="flex min-w-0 shrink-0 items-center gap-2">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-nav-soft to-nav-line/40 shadow-e1 ring-1 ring-nav-line">
           <Mountain className="size-5 text-nav-accent" strokeWidth={2.25} />
         </span>
@@ -92,13 +96,14 @@ export function Header({
             Web GIS Dashboard
           </p>
         </div>
-      </div>
 
-      {/* Separates the wordmark from the controls, so the bar reads as an
-          identity and a toolbar rather than one undifferentiated row. */}
-      {(search || layerPicker) && (
-        <span aria-hidden className="hidden h-7 w-px shrink-0 bg-nav-line sm:block" />
-      )}
+        {/* Separates the wordmark from the controls, so the bar reads as an
+            identity and a toolbar rather than one undifferentiated row. Held
+            to the block's trailing edge, which is the panel's edge too. */}
+        {(search || layerPicker) && (
+          <span aria-hidden className="ml-auto hidden h-7 w-px shrink-0 bg-nav-line sm:block" />
+        )}
+      </div>
 
       {/* Capped rather than free-growing: past about 28rem a search field
           stops looking like a field and starts looking like a gap. What it

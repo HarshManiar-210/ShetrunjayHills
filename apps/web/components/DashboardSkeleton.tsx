@@ -10,7 +10,7 @@ export function DashboardSkeleton() {
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 p-4">
           <div className="size-full rounded-2xl border border-border bg-muted" />
-          <div className="absolute top-3 left-3 hidden h-64 w-72 rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 md:block" />
+          <div className="absolute top-3 left-3 hidden h-64 w-[var(--layers-panel-w)] rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 md:block" />
           <div className="absolute top-3 right-3 hidden h-80 w-72 rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 xl:block" />
         </div>
       </div>

@@ -603,7 +603,7 @@ export function MapDashboard() {
               basemap switcher and the year bar rather than running under them,
               and it scrolls inside that cap. */}
           {panelOpen ? (
-            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-8rem)] w-72 flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
+            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-8rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
               {/* Null for everyone but admins, who get the users link here. */}
               <Sidebar variant="combined" user={auth.user} />
               {layersPanel(() => setPanelOpen(false))}
