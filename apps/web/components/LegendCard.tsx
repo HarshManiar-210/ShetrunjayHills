@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
-import { legendFor, type RasterLegend } from "@/lib/legend-config";
+import { legendFor, rampScale, type RampScale } from "@/lib/legend-config";
 import { geometryKindOf } from "@/lib/sections";
 import type { LayerFeature } from "@/lib/layers-api";
 
@@ -61,22 +61,16 @@ export interface LegendOverlay {
  * a fade would imply intermediate values the data does not contain, while the
  * bar still reads as one scale running low to high.
  */
-function ScaleRamp({ legend }: { legend: RasterLegend }) {
-  const ordered =
-    legend.ramp === "high-to-low" ? [...legend.classes].reverse() : legend.classes;
+function ScaleRamp({ scale }: { scale: RampScale }) {
+  const { classes, low, high } = scale;
 
-  const stops = ordered
+  const stops = classes
     .map((cls, i) => {
-      const from = (i / ordered.length) * 100;
-      const to = ((i + 1) / ordered.length) * 100;
+      const from = (i / classes.length) * 100;
+      const to = ((i + 1) / classes.length) * 100;
       return `${cls.color} ${from}%, ${cls.color} ${to}%`;
     })
     .join(", ");
-
-  const [low, high] = legend.rampLabels ?? [
-    ordered[0]?.label ?? "",
-    ordered.at(-1)?.label ?? "",
-  ];
 
   return (
     <div className="flex flex-col gap-1">
@@ -86,9 +80,9 @@ function ScaleRamp({ legend }: { legend: RasterLegend }) {
         aria-hidden
       />
 
-      {legend.rampTicks && (
+      {scale.ticks && (
         <div className="flex" aria-hidden>
-          {legend.rampTicks.map((tick) => (
+          {scale.ticks.map((tick) => (
             <span
               key={tick}
               className="flex-1 text-center text-[9px] font-medium text-muted-foreground"
@@ -161,6 +155,7 @@ export function LegendContent({
 
       {rasterLayers.map((raster) => {
         const legend = legendFor(raster.id);
+        const scale = legend && rampScale(legend);
         return (
           <div key={raster.id} className="flex flex-col gap-1.5">
             {/* Named and dated, as the mockup heads its legend: which year is
@@ -182,7 +177,7 @@ export function LegendContent({
                       class list under it is the detail of where the steps
                       fall. Reversed from the old layout, where a thin strip
                       trailed the list it was meant to summarise. */}
-                  {legend.ramp && <ScaleRamp legend={legend} />}
+                  {scale && <ScaleRamp scale={scale} />}
 
                   {/* Long class lists go two-up with their compact labels, so
                       the legend still fits without scrolling. */}

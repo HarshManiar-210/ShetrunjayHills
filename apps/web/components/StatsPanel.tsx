@@ -5,9 +5,9 @@ import { BarChart3, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
+import { LayerSwatch } from "@/components/LayerSwatch";
 import { ClassDonut } from "@/components/ClassDonut";
-import { geometryKindOf } from "@/lib/sections";
+import { countByLayer, STUDY_AREA_HA } from "@/lib/vector-stats";
 import {
   fetchRasterStats,
   nameClasses,
@@ -15,12 +15,6 @@ import {
   type RasterStats,
 } from "@/lib/raster-stats-api";
 import type { LayerFeature } from "@/lib/layers-api";
-
-/**
- * Real surveyed area of the Shetrunjay study area, in hectares — read off
- * StudyArea.geojson's own `areaSqKm` property, not estimated.
- */
-export const STUDY_AREA_HA = 3396;
 
 /**
  * A raster theme currently on the map, and the specific image it is showing.
@@ -50,33 +44,6 @@ const PERCENT = new Intl.NumberFormat(undefined, {
 });
 
 const toHectares = (sqMetres: number) => sqMetres / 10_000;
-
-// One row per vector layer, counted off the features actually loaded.
-interface VectorLayerCount {
-  id: number;
-  name: string;
-  count: number;
-  color: string;
-  geometryKind: SwatchGeometryKind;
-}
-
-function countByLayer(features: LayerFeature[]): VectorLayerCount[] {
-  const counts = new globalThis.Map<number, VectorLayerCount>();
-  for (const feature of features) {
-    const { id, name, color } = feature.properties;
-    const existing = counts.get(id);
-    if (existing) existing.count += 1;
-    else
-      counts.set(id, {
-        id,
-        name,
-        color,
-        count: 1,
-        geometryKind: geometryKindOf(feature.geometry.type),
-      });
-  }
-  return [...counts.values()];
-}
 
 /** Part-to-whole as a bar, for themes with too many classes to ring. */
 function StackedBar({ classes }: { classes: NamedClassStat[] }) {

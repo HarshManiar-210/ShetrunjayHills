@@ -404,6 +404,34 @@ export const LEGEND_CONFIG: Record<string, RasterLegend> = {
   ),
 };
 
+/** An ordered legend's classes, low first, with the two ends named. */
+export interface RampScale {
+  classes: LegendClass[];
+  low: string;
+  high: string;
+  ticks?: string[];
+}
+
+/**
+ * Resolves a legend's ramp into something drawable: the classes in scale
+ * order whichever way round the delivered colour doc listed them, and the
+ * captions for the two ends.
+ *
+ * Lives here rather than in the legend component because the PNG export
+ * draws the same bar on a canvas — two renderers, one ordering, so the bar
+ * cannot come out reversed in one of them.
+ */
+export function rampScale(legend: RasterLegend): RampScale | undefined {
+  if (!legend.ramp || legend.classes.length === 0) return undefined;
+  const classes =
+    legend.ramp === "high-to-low" ? [...legend.classes].reverse() : legend.classes;
+  const [low, high] = legend.rampLabels ?? [
+    classes[0].label,
+    classes[classes.length - 1].label,
+  ];
+  return { classes, low, high, ticks: legend.rampTicks };
+}
+
 /**
  * `layerId` is a raster theme's group key, straight off its `layer_groups`
  * row — the same id lib/sections.ts puts on a SectionDef. Renaming a group's
