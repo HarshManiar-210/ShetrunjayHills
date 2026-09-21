@@ -161,6 +161,8 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   "existing-water-conservation": { accent: "water", icon: Dam },
   "proposed-conservation-sites": { accent: "water", icon: Target },
   "biodiversity-data": { accent: "fauna", icon: PawPrint },
+  "wildlife-movement": { accent: "fauna", icon: Route },
+  "habitat-suitability": { accent: "fauna", icon: Layers },
   "administrative-boundaries": { accent: "infra", icon: MapIcon },
   reference: { accent: "infra", icon: Layers },
   toposheet: { accent: "imagery", icon: ScrollText },

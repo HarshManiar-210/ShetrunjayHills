@@ -232,11 +232,10 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('drone-data',                  'Drone Data',                  NULL, 3),
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
-    ('existing-water-conservation', 'Existing Water Conservation', NULL, 6),
-    ('proposed-conservation-sites', 'Proposed Conservation Sites', NULL, 7),
-    ('biodiversity-data',           'Biodiversity Data',           NULL, 8),
-    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 9),
-    ('reference',                   'Reference',                   NULL, 10);
+    ('biodiversity-data',           'Biodiversity Data',           NULL, 6),
+    ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
+    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
+    ('reference',                   'Reference',                   NULL, 9);
 
 -- Second level. Each of these holds one theme's rasters, so the frontend
 -- renders it as a single layer with a year picker -- which is why the six
@@ -259,7 +258,12 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('aspect',      'Aspect',                      grp('drone-data'), 5),
     ('chm',         'Canopy Height Model (CHM)',   grp('drone-data'), 6),
 
-    ('toposheet',   'Toposheet',                   grp('reference'), 2);
+    ('toposheet',   'Toposheet',                   grp('reference'), 2),
+
+    ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 1),
+    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 2),
+
+    ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
 
 -- Tree Density is a raster, so it gets its own group under Drone Analysis: a
 -- group holding placed rasters becomes a single layer, which would swallow
@@ -277,13 +281,13 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('streams',        'Stream Network',            grp('hydrogeology'), 'vector', 'line', '#8BB8E8', 'vector-data/Streams.geojson',           5, 71.728181, 21.451841, 71.822926, 21.512506),
     ('watershed',      'Watershed',          grp('hydrogeology'), 'vector', 'fill', '#2F9E9E', 'vector-data/Watersheds.geojson',         6, 71.728179, 21.451808, 71.822433, 21.512483),
-    ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              1, 71.713590, 21.445225, 71.841080, 21.525549),
-    ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             2, 71.711555, 21.433928, 71.841029, 21.525711),
-    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           3, 71.697710, 21.426989, 71.855530, 21.553063),
-    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'outline', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   4, 68.149498, 20.119593, 74.476251, 24.712427),
-    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#5AA469', 'vector-data/StudyArea.geojson',          5, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     1, 71.758100, 21.466484, 71.821988, 21.512142),
-    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       1, 71.697740, 21.427782, 71.855416, 21.552918);
+    ('roads',          'Roads',              grp('administrative-boundaries'),        'vector', 'line', '#D18B2A', 'vector-data/Roads.geojson',              2, 71.713590, 21.445225, 71.841080, 21.525549),
+    ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             3, 71.711555, 21.433928, 71.841029, 21.525711),
+    ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           5, 71.697710, 21.426989, 71.855530, 21.553063),
+    ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'outline', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   7, 68.149498, 20.119593, 74.476251, 24.712427),
+    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#5AA469', 'vector-data/StudyArea.geojson',          1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     8, 71.758100, 21.466484, 71.821988, 21.512142),
+    ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       4, 71.697740, 21.427782, 71.855416, 21.552918);
 
 -- Tree Inventory: per-tree survey attributes. Tree Height is the client's
 -- full 856,700-point survey, every point of it — but served as PMTiles
@@ -428,13 +432,15 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
     ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
     ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     1, 71.758298, 21.466727, 71.821811, 21.511256),
+    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591);
+    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    -- Habitat Suitability: extent supplied with the raster.
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
@@ -474,9 +480,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     -- and switched independently once the data lands.
     ('fieldPlots',         'Field Plots and Statistics', grp('biodiversity-data'), 'vector', NULL, NULL, '', 1, 'pending'),
     ('rareSpecies',        'Rare Species',               grp('biodiversity-data'), 'vector', NULL, NULL, '', 2, 'pending'),
-    ('wildlifeMovement',   'Wildlife Movement',          grp('biodiversity-data'), 'vector', NULL, NULL, '', 3, 'pending'),
-    ('habitatSuitability', 'Habitat Suitability',        grp('biodiversity-data'), 'vector', NULL, NULL, '', 4, 'pending'),
-    ('wildlifeCorridors',  'Wildlife Corridors',         grp('biodiversity-data'), 'vector', NULL, NULL, '', 5, 'pending'),
+    ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
 
     ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
 

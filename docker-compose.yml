@@ -40,6 +40,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # `docker compose up --watch` rebuilds + restarts on Go source changes.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./apps/api
 
   web:
     build:
@@ -55,6 +60,16 @@ services:
       - "3000:3000"
     depends_on:
       - api
+    # ponytail: rebuilds the prod image (~1 min), no HMR; swap to a dev-server override if that's too slow.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./apps/web
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./pnpm-lock.yaml
 
 volumes:
   postgis-data:
