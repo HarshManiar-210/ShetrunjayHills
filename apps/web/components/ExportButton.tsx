@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Printer } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { printDashboardSheet, type ExportInput } from "@/lib/map-export";
 import { cn } from "@/lib/utils";
@@ -49,8 +49,7 @@ export function ExportButton({
 
   return (
     <Button
-      variant="ghost"
-      size="icon"
+      variant="outline"
       disabled={state === "working"}
       onClick={run}
       aria-label={
@@ -59,17 +58,31 @@ export function ExportButton({
           : "Export the map, legend and statistics as a PDF"
       }
       title={state === "failed" ? "Export failed — try again" : "Export as PDF"}
+      // Built like the layer picker across the bar: same height, same pill,
+      // same inset shading, so the two named controls in the header match.
       className={cn(
-        "rounded-full border border-nav-line bg-nav-soft text-nav-accent shadow-e1 transition-[color,background-color,border-color,box-shadow] hover:border-nav-accent/50 hover:bg-nav-line/50 hover:text-foreground hover:ring-[3px] hover:ring-nav-accent/15 focus-visible:ring-[3px] focus-visible:ring-nav-accent/25",
+        "h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium",
+        "shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)]",
+        "transition-[color,box-shadow,background-color,border-color]",
+        "hover:border-nav-accent/45 hover:bg-nav-soft",
+        "focus-visible:border-nav-accent/60 focus-visible:ring-[3px] focus-visible:ring-nav-accent/20",
         state === "failed" && "border-destructive/50 text-destructive",
         className,
       )}
     >
       {state === "working" ? (
-        <Loader2 className="animate-spin" strokeWidth={2.25} />
+        <Loader2 className="size-4 shrink-0 animate-spin text-nav-accent" strokeWidth={2} />
       ) : (
-        <Printer strokeWidth={2.25} />
+        <Upload
+          className={cn("size-4 shrink-0", state === "failed" ? "text-destructive" : "text-nav-accent")}
+          strokeWidth={2}
+        />
       )}
+      {/* The label carries the meaning; on a phone the bar has no room for
+          it and the icon stands alone, as the other controls do. */}
+      <span className="hidden sm:inline">
+        {state === "working" ? "Exporting…" : state === "failed" ? "Export failed" : "Export map"}
+      </span>
     </Button>
   );
 }
