@@ -589,6 +589,7 @@ export default function Map({
   overlays,
   overlayDefs = [],
   basemap = DEFAULT_BASEMAP,
+  bottomCenter,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -600,6 +601,13 @@ export default function Map({
   overlayDefs?: OverlayDef[];
   /** Which basemap is active. See lib/basemaps.ts. */
   basemap?: BasemapId;
+  /**
+   * Goes in the bottom-centre stack, below the coordinate readout — the year
+   * bar, when there is one. A slot rather than a separately positioned panel
+   * because the readout has to sit clear of whatever is under it, and only a
+   * shared stack knows how tall that is.
+   */
+  bottomCenter?: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -928,13 +936,24 @@ export default function Map({
         className="absolute right-14 bottom-3 z-10"
       />
 
-      {/* Bottom-centre, sitting just above the year bar rather than below
-          it — the timeline is the thing anchored to the map's edge. */}
-      <CoordinateReadout
-        mapRef={mapRef}
-        mapLoaded={mapLoaded}
-        className="absolute bottom-[4.25rem] left-1/2 z-10 hidden -translate-x-1/2 md:block"
-      />
+      {/* Bottom-centre: the coordinate readout, and the year bar below it
+          when a temporal theme is on — the timeline is the thing anchored to
+          the map's edge, and the readout rides above it.
+
+          One flex column rather than two panels each at their own inset. The
+          bar's height is not a constant — it grows a row when compare mode
+          opens, and changed again when it was rebuilt as a timeline — so any
+          fixed offset for the readout is a collision waiting to happen, as it
+          duly was. Stacked, the gap holds itself.
+
+          Centred in the band the corner controls leave free: the basemap
+          switcher holds the bottom-left and the tool stack the bottom-right,
+          so centring on the map itself runs the bar under both. Click-through,
+          so the empty space beside them does not eat map drags. */}
+      <div className="pointer-events-none absolute right-14 bottom-3 left-[13.5rem] z-10 flex flex-col items-center gap-2">
+        <CoordinateReadout mapRef={mapRef} mapLoaded={mapLoaded} className="hidden md:block" />
+        {bottomCenter}
+      </div>
 
       {!mapLoaded && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">

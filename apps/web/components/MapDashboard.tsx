@@ -565,35 +565,30 @@ export function MapDashboard() {
               overlays={overlays}
               overlayDefs={overlayDefs}
               basemap={basemap}
+              // Handed to the map rather than positioned here, so it shares
+              // the bottom-centre stack with the coordinate readout: the
+              // readout then rides above whatever height the bar happens to
+              // be, instead of guessing at a fixed offset.
+              bottomCenter={
+                temporalThemes.length > 0 &&
+                focusedTheme && (
+                  <YearBar
+                    themes={temporalThemes}
+                    focusedId={focusedTheme}
+                    onFocusChange={setPreferredTheme}
+                    year={focusedYear}
+                    onYearChange={(year) => changeRasterYear(focusedTheme, year)}
+                    playing={playing}
+                    onPlayingChange={setPlaying}
+                    compareYear={focusedCompareYear}
+                    onCompareYearChange={changeCompareYear}
+                    blend={blend}
+                    onBlendChange={setBlend}
+                    className="pointer-events-auto hidden md:flex"
+                  />
+                )
+              }
             />
-
-            {/* Sits a row above the coordinate readout, which keeps the
-                bottom-centre position the brief shows for the readout while
-                giving the timeline its own line. */}
-            {temporalThemes.length > 0 && focusedTheme && (
-              // Centred within the band the other floating panels leave free,
-              // rather than within the map: the basemap switcher holds the
-              // bottom-left corner and the tool stack the bottom-right, and
-              // centring on the map itself runs the bar under both once it is
-              // wide. The container is click-through so the empty space beside
-              // the bar does not eat map drags.
-              <div className="pointer-events-none absolute right-14 bottom-3 left-[13.5rem] z-10 hidden justify-center md:flex">
-                <YearBar
-                  themes={temporalThemes}
-                  focusedId={focusedTheme}
-                  onFocusChange={setPreferredTheme}
-                  year={focusedYear}
-                  onYearChange={(year) => changeRasterYear(focusedTheme, year)}
-                  playing={playing}
-                  onPlayingChange={setPlaying}
-                  compareYear={focusedCompareYear}
-                  onCompareYearChange={changeCompareYear}
-                  blend={blend}
-                  onBlendChange={setBlend}
-                  className="pointer-events-auto"
-                />
-              </div>
-            )}
 
             {/* Bottom-left: the map tools took the right edge, per the brief. */}
             <BasemapSwitcher
