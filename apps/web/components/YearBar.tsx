@@ -148,7 +148,11 @@ export function YearBar({
           {themes.length > 1 ? (
             <Select value={theme.id} onValueChange={onFocusChange}>
               <SelectTrigger
-                className="h-auto w-44 border-0 bg-transparent p-0 text-[10px] text-muted-foreground shadow-none focus-visible:ring-0"
+                // Widens where the bar's band has room for it. At w-44 a
+                // name like "Historical Land Use (Satellite: 1978–2025)"
+                // lost its second half, which is the part that says which
+                // of the two land-use themes this is.
+                className="h-auto w-44 border-0 bg-transparent p-0 text-[10px] text-muted-foreground shadow-none focus-visible:ring-0 xl:w-56"
                 aria-label="Which layer the timeline controls"
               >
                 <SelectValue />
@@ -162,7 +166,7 @@ export function YearBar({
               </SelectContent>
             </Select>
           ) : (
-            <p className="truncate text-[10px] leading-tight text-muted-foreground">
+            <p className="truncate text-[10px] leading-tight text-muted-foreground" title={theme.label}>
               {theme.label} · {years.length} years
             </p>
           )}

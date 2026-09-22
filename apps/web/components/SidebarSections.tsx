@@ -182,7 +182,12 @@ function LayerRow({
       >
         <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
         <LayerDot color={row.color} raster={row.raster} />
-        <span className={cn("min-w-0 flex-1 truncate leading-tight", checked && "font-medium")}>
+        {/* Wraps rather than truncating. A layer's name is how it is
+            found again, and the long ones — CHM (Canopy Height Model),
+            Historical Land Use (Satellite: 1978–2025) — are exactly the
+            ones a clipped row rendered unidentifiable. Two lines cost
+            this panel nothing; it scrolls. */}
+        <span className={cn("min-w-0 flex-1 leading-tight", checked && "font-medium")}>
           {row.label}
         </span>
         {/* Deselect. Kept quiet until the row is hovered or focused, so the
@@ -310,7 +315,7 @@ function SidebarSectionsImpl({
       <div className="flex shrink-0 items-center gap-2 px-3 pt-2 pb-1.5">
         <p className="text-[13px] font-semibold">Layers</p>
         {total > 0 && (
-          <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+          <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={`${onCount} of ${total} layers switched on`}>
             {onCount} of {total} on
           </p>
         )}

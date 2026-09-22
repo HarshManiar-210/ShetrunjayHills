@@ -112,7 +112,7 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-xs font-medium">{layer.name}</span>
+        <span className="min-w-0 text-xs leading-tight font-medium">{layer.name}</span>
         {layer.year != null && (
           <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
             {layer.year}
@@ -217,7 +217,7 @@ export function StatsPanel({
           {vectorCounts.map((layer) => (
             <div key={layer.id} className="flex items-center gap-2 text-xs">
               <LayerSwatch color={layer.color} geometryKind={layer.geometryKind} />
-              <span className="min-w-0 flex-1 truncate">{layer.name}</span>
+              <span className="min-w-0 flex-1 leading-tight">{layer.name}</span>
               <span className="shrink-0 tabular-nums text-muted-foreground">
                 {COUNT.format(layer.count)}
               </span>

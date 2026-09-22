@@ -158,7 +158,7 @@ export function SectionPicker({
               onCheckedChange={(next) => onToggleSection(section.id, next === true)}
             />
             <section.icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={2} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+            <span className="min-w-0 flex-1 text-[13px] leading-tight font-medium">
               {section.label}
             </span>
             <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
@@ -269,7 +269,7 @@ function LayerOption({
         <Checkbox checked={false} disabled aria-hidden tabIndex={-1} />
         <LayerDot color={layer.color} raster={layer.raster} faded />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] text-muted-foreground/50">
+          <span className="block text-[13px] leading-tight text-muted-foreground/50">
             {layer.label}
           </span>
           <span className="block truncate text-[10px] text-muted-foreground/40">{section}</span>
@@ -286,7 +286,9 @@ function LayerOption({
           the map. */}
       <LayerDot color={layer.color} raster={layer.raster} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px]">{layer.label}</span>
+        {/* Wrapped, not clipped: this is where a layer is chosen, so
+            its name has to be readable in full. */}
+        <span className="block text-[13px] leading-tight">{layer.label}</span>
         <span className="block truncate text-[10px] text-muted-foreground">{section}</span>
       </span>
     </label>
