@@ -9,15 +9,18 @@ import type { LayerFeature } from "@/lib/layers-api";
 import { geometryKindOf } from "@/lib/sections";
 
 /**
- * Exports the dashboard as a PDF: one sheet carrying the map exactly as it is
- * on screen, with the legend and the statistics beside it.
+ * Exports the dashboard as one sheet — the map exactly as it is on screen,
+ * with the legend and the statistics beside it — as either a PNG file or a
+ * PDF.
  *
- * The sheet is composed on a 2D canvas and then handed to the browser's own
- * print pipeline, which is what turns it into a PDF — no PDF library, and
- * the user gets the page size, orientation and destination controls they
- * already know. Printing the live page instead was the obvious alternative
- * and a worse one: the dashboard is a full-height flex layout with the map on
- * a WebGL canvas and both panels floating over it in their own scroll
+ * Both come from the same composed canvas. The PNG is downloaded directly;
+ * the PDF goes through the browser's own print pipeline, which is what turns
+ * it into a PDF without a PDF library and leaves the user the page size and
+ * destination controls they already know.
+ *
+ * Printing the live page was the obvious alternative to composing one, and a
+ * worse one: the dashboard is a full-height flex layout with the map on a
+ * WebGL canvas and both panels floating over it in their own scroll
  * containers, so print laid it out in ways no stylesheet could reliably
  * rescue.
  *
@@ -597,6 +600,32 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
       "image/png",
     );
   });
+}
+
+/** Filename stamp: sortable, and distinct enough for repeated exports. */
+function stampFor(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${day}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+/**
+ * Composes the sheet and downloads it as a PNG.
+ *
+ * The same sheet the PDF is made from, handed over as a file instead of to
+ * the print dialog — for dropping into a slide or a chat, where a PDF is the
+ * wrong shape.
+ */
+export async function downloadDashboardSheet(input: ExportInput): Promise<void> {
+  const blob = await toBlob(await renderDashboardSheet(input));
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `shatrunjay-hills-${stampFor(new Date())}.png`;
+  link.click();
+  // Revoked on the next tick rather than immediately: Safari reads the href
+  // after the click handler returns.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** Longest edge of the printed page, in millimetres. A2's long edge. */
