@@ -85,11 +85,10 @@ function formatMb(bytes: number): string {
   return `${Math.round(bytes / 1_000_000)} MB`;
 }
 
-// The layers panel's fold-away control is hidden for now — flip this to true
-// to bring it back. The panel then gains a chevron and, once folded, a small
-// "Layers" button in its place. Everything behind it still works; only the
-// two controls are withheld.
-const SHOW_PANEL_COLLAPSE = false;
+// Whether the layers panel can be folded away: a chevron in its header, and
+// once folded, a small "Layers" button in its place. Flip to false to withhold
+// both — everything behind them keeps working, the panel simply stays open.
+const SHOW_PANEL_COLLAPSE = true;
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
@@ -125,8 +124,7 @@ export function MapDashboard() {
   const [visible, setVisible] = useState<Record<string, boolean>>({});
 
   // The floating panel can be folded away to clear the map. Open by default:
-  // it is the way into the dashboard. While SHOW_PANEL_COLLAPSE is off it
-  // stays open whatever this says.
+  // it is the way into the dashboard.
   const [panelOpen, setPanelOpen] = useState(true);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
