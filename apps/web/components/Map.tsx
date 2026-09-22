@@ -938,17 +938,20 @@ export default function Map({
           fixed offset for the readout is a collision waiting to happen, as it
           duly was. Stacked, the gap holds itself.
 
-          Centred in the band the corner controls leave free: the tool stack
-          holds the bottom-left and the basemap switcher the bottom-right, so
-          centring on the map itself runs the bar under both. Click-through, so
-          the empty space beside them does not eat map drags.
+          Centred in the band the other controls leave free: the tool stack
+          on the left and the basemap switcher on the right, so centring on the
+          map itself runs the bar under both. Click-through, so the empty space
+          beside them does not eat map drags. From 2xl both step inwards to sit
+          beside their panels, and the band narrows to match — which is why the
+          move waits for 2xl, since the bar's own controls need most of what is
+          left at 1280px.
 
           On a phone that band is barely a hundred pixels wide, which would
           crush the measure panel — the one member of this stack that does
           show at that size. So below md the column takes the full width and
           lifts clear of the corner controls instead of squeezing between
           them. */}
-      <div className="pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:right-[13.5rem] md:bottom-3 md:left-14">
+      <div className="pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:right-[13.5rem] md:bottom-3 md:left-14 2xl:right-[32.5rem] 2xl:left-[23rem]">
         {/* The measure panel joins the stack rather than sitting beside the
             tool stack that opens it. Anchored to its own corner it overlapped
             the year bar as soon as the window narrowed; in the column it
