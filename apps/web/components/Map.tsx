@@ -928,19 +928,6 @@ export default function Map({
         }}
       />
 
-      {/* Beside the tool stack that opens it, in the bottom-right corner.
-          Keyed on the mode so switching tools remounts with a clean slate,
-          rather than an effect inside it resetting state after the fact. */}
-      <MeasureTool
-        key={measureMode ?? "none"}
-        mapRef={mapRef}
-        mapLoaded={mapLoaded}
-        mode={measureMode}
-        onExit={() => setMeasureMode(null)}
-        measuringRef={measuringRef}
-        className="absolute right-14 bottom-3 z-10"
-      />
-
       {/* Bottom-centre: the coordinate readout, and the year bar below it
           when a temporal theme is on — the timeline is the thing anchored to
           the map's edge, and the readout rides above it.
@@ -951,11 +938,32 @@ export default function Map({
           fixed offset for the readout is a collision waiting to happen, as it
           duly was. Stacked, the gap holds itself.
 
-          Centred in the band the corner controls leave free: the basemap
-          switcher holds the bottom-left and the tool stack the bottom-right,
-          so centring on the map itself runs the bar under both. Click-through,
-          so the empty space beside them does not eat map drags. */}
-      <div className="pointer-events-none absolute right-14 bottom-3 left-[13.5rem] z-10 flex flex-col items-center gap-2">
+          Centred in the band the corner controls leave free: the tool stack
+          holds the bottom-left and the basemap switcher the bottom-right, so
+          centring on the map itself runs the bar under both. Click-through, so
+          the empty space beside them does not eat map drags.
+
+          On a phone that band is barely a hundred pixels wide, which would
+          crush the measure panel — the one member of this stack that does
+          show at that size. So below md the column takes the full width and
+          lifts clear of the corner controls instead of squeezing between
+          them. */}
+      <div className="pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:right-[13.5rem] md:bottom-3 md:left-14">
+        {/* The measure panel joins the stack rather than sitting beside the
+            tool stack that opens it. Anchored to its own corner it overlapped
+            the year bar as soon as the window narrowed; in the column it
+            simply pushes the rest down, at any width. Keyed on the mode so
+            switching tools remounts with a clean slate, rather than an effect
+            inside it resetting state after the fact. */}
+        <MeasureTool
+          key={measureMode ?? "none"}
+          mapRef={mapRef}
+          mapLoaded={mapLoaded}
+          mode={measureMode}
+          onExit={() => setMeasureMode(null)}
+          measuringRef={measuringRef}
+          className="pointer-events-auto"
+        />
         <CoordinateReadout mapRef={mapRef} mapLoaded={mapLoaded} className="hidden md:block" />
         {bottomCenter}
       </div>

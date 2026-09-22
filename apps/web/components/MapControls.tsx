@@ -32,9 +32,12 @@ const SETTLE_MS = 12_000;
 /**
  * The map's tool stack.
  *
- * Bottom-right: still the right-hand side the brief asks for, but down in the
- * corner so the top of that edge belongs entirely to the Legend and Statistics
- * cards — side by side they crowded each other.
+ * Bottom-left, on the near side of the year bar. It held the bottom-right
+ * corner until the year bar grew into a full timeline: the bar then had to
+ * stop short of the stack, and the measure panel that opens beside it landed
+ * on top of the bar on a narrow screen. Moving the stack across puts it and
+ * the basemap switcher on opposite edges, and gives the bar the whole width
+ * between them.
  *
  * Measure Distance, Measure Area and Show Location are all from the brief.
  * Show Location had previously been removed on the grounds that it points a
@@ -75,6 +78,22 @@ export function MapControls({
     setLocating(false);
   }, []);
 
+  /**
+   * Time is up. Whatever the best reading was by now is the answer — but if
+   * nothing arrived at all, say so.
+   *
+   * On a phone the permission sheet can be dismissed rather than answered,
+   * and some browsers then neither fire a position nor report an error. The
+   * watch simply never calls back, so without this the spinner stopped, no
+   * pin appeared, no message showed, and the button looked broken.
+   */
+  const settle = useCallback(() => {
+    stopWatching();
+    if (bestRef.current === Infinity) {
+      setLocateError("No location fix arrived. Check location permission for this site.");
+    }
+  }, [stopWatching]);
+
   // A watch left running after the tool stack unmounts keeps the device's
   // radio awake for a map nobody is looking at.
   useEffect(() => stopWatching, [stopWatching]);
@@ -84,6 +103,15 @@ export function MapControls({
     if (!map) return;
     if (!navigator.geolocation) {
       setLocateError("This browser cannot report a location.");
+      return;
+    }
+    // Browsers only hand out a position on a secure origin. Served over plain
+    // http — which is how the dashboard is reached from a phone on the LAN —
+    // the call is refused, and on Android it is refused as PERMISSION_DENIED,
+    // so without this check the tool blames the user for declining a prompt
+    // they were never shown.
+    if (!window.isSecureContext) {
+      setLocateError("Location needs a secure (https) connection to this site.");
       return;
     }
 
@@ -124,9 +152,9 @@ export function MapControls({
       { enableHighAccuracy: true, timeout: SETTLE_MS, maximumAge: 0 },
     );
 
-    // Whatever the best reading was by now is the answer; a watch left open
-    // past this is listening for a GPS lock that is not coming.
-    settleRef.current = setTimeout(stopWatching, SETTLE_MS);
+    // A watch left open past this is listening for a GPS lock that is not
+    // coming.
+    settleRef.current = setTimeout(settle, SETTLE_MS);
   }
 
   const locateLabel = locateError
@@ -144,7 +172,7 @@ export function MapControls({
   return (
     <div
       data-tour="map-controls"
-      className="absolute right-3 bottom-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm"
+      className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm"
     >
       <ToolButton label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
         <Plus />
@@ -258,7 +286,8 @@ function ToolButton({
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="left">{label}</TooltipContent>
+      {/* Opens away from the edge the stack sits on. */}
+      <TooltipContent side="right">{label}</TooltipContent>
     </Tooltip>
   );
 }

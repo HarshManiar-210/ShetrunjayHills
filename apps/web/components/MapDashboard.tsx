@@ -686,20 +686,22 @@ export function MapDashboard() {
               }
             />
 
-            {/* Bottom-left: the map tools took the right edge, per the brief. */}
+            {/* Bottom-right, opposite the tool stack, which moved to the
+                left so the year bar could have the width between them. */}
             <BasemapSwitcher
               value={basemap}
               onChange={setBasemap}
-              className="absolute bottom-3 left-3 z-10"
+              className="absolute right-3 bottom-3 z-10"
             />
           </div>
 
           {/* Top-left, mirroring the info panel's inset on the other edge.
-              Capped short of the bottom so a long selection stops clear of the
-              basemap switcher and the year bar rather than running under them,
-              and it scrolls inside that cap. */}
+              Capped so a long selection stops clear of the tool stack below it
+              rather than running into it: the stack is a fixed 205px (six 28px
+              buttons, a separator and padding), plus its own inset and a gap
+              between the two. It scrolls inside that cap. */}
           {panelOpen || !SHOW_PANEL_COLLAPSE ? (
-            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-8rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
+            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-17rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
               {/* Null for everyone but admins, who get the users link here. */}
               <Sidebar variant="combined" user={auth.user} />
               {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
@@ -719,13 +721,12 @@ export function MapDashboard() {
             </Button>
           )}
 
-          {/* Top-right, flush to the edge the tool stack vacated. Height
-              follows content, capped so a long legend stops clear of those
-              tools rather than running into them: the stack is a fixed 205px
-              (six 28px buttons, a separator and padding), plus its own inset
-              and a gap between the two. */}
+          {/* Top-right. Height follows content, capped so a long legend
+              stops clear of the basemap switcher in the corner below it — a
+              single 56px row of tiles, so this needs far less room than the
+              tool stack that used to sit there. */}
           {infoPanel(
-            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-17rem)] w-72 xl:flex",
+            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-8rem)] w-72 xl:flex",
           )}
         </div>
       </div>
