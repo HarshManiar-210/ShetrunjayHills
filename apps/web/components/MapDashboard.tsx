@@ -90,6 +90,13 @@ function formatMb(bytes: number): string {
 // both — everything behind them keeps working, the panel simply stays open.
 const SHOW_PANEL_COLLAPSE = true;
 
+/**
+ * Vertical room the tool stack needs in the bottom-right corner: its six 28px
+ * buttons, a separator and padding come to 205px, plus its own inset and the
+ * gap a panel above it should keep.
+ */
+const TOOL_STACK_CLEARANCE = 248;
+
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
 type MobileSheet = "menu" | "legend" | null;
@@ -126,6 +133,12 @@ export function MapDashboard() {
   // The floating panel can be folded away to clear the map. Open by default:
   // it is the way into the dashboard.
   const [panelOpen, setPanelOpen] = useState(true);
+
+  // Whether the legend and statistics column has grown down into the corner
+  // the tool stack sits in, which moves the stack left of it.
+  const [infoReachesCorner, setInfoReachesCorner] = useState(false);
+  const infoRef = useRef<HTMLDivElement | null>(null);
+  const mapAreaRef = useRef<HTMLDivElement | null>(null);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
@@ -202,6 +215,36 @@ export function MapDashboard() {
       cancelled = true;
     };
   }, [retryTick]);
+
+  /**
+   * Watch the legend and statistics column, and move the tool stack out of its
+   * way when it grows into the corner.
+   *
+   * Measured rather than derived from whether the cards are expanded: the
+   * column's height depends on how many layers are switched on and how many
+   * classes their legends carry, so two expanded cards can be shorter than one.
+   * The observer fires once when it starts watching, which is what sets the
+   * initial value — calling the check straight from the effect body would be
+   * setting state during the effect.
+   */
+  useEffect(() => {
+    const info = infoRef.current;
+    const area = mapAreaRef.current;
+    if (!info || !area) return;
+
+    const observer = new ResizeObserver(() => {
+      const panel = info.getBoundingClientRect();
+      const map = area.getBoundingClientRect();
+      // Zero height means the column is hidden at this breakpoint, in which
+      // case nothing is in the corner and the stack stays there.
+      setInfoReachesCorner(
+        panel.height > 0 && map.bottom - panel.bottom < TOOL_STACK_CLEARANCE,
+      );
+    });
+    observer.observe(info);
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
 
   // First visit runs the walkthrough on its own. The delay lets the lazily
   // loaded map and the sidebar mount, so the first spotlighted target is
@@ -562,8 +605,8 @@ export function MapDashboard() {
   // Legend and Statistics are two independent cards now, not two tabs of one.
   // The legend is what makes the map readable, so it should never be the thing
   // you switch away from to check a number.
-  const infoPanel = (className?: string) => (
-    <div className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
+  const infoPanel = (className?: string, ref?: React.Ref<HTMLDivElement>) => (
+    <div ref={ref} className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
       {/* Each card scrolls its own body rather than the column scrolling as a
           whole, so the two headers stay put and a long legend never pushes
           the statistics out of reach.
@@ -647,7 +690,7 @@ export function MapDashboard() {
       {/* No docked column any more: the layers panel floats over the map's
           top-left corner, so the map has the full width of the window. */}
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-w-0 flex-1 p-4">
+        <div ref={mapAreaRef} className="relative min-w-0 flex-1 p-4">
           <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
             <Map
               onReady={(map) => {
@@ -659,6 +702,7 @@ export function MapDashboard() {
               overlays={overlays}
               overlayDefs={overlayDefs}
               basemap={basemap}
+              infoReachesCorner={infoReachesCorner}
               // Handed to the map rather than positioned here, so it shares
               // the bottom-centre stack with the coordinate readout: the
               // readout then rides above whatever height the bar happens to
@@ -694,13 +738,12 @@ export function MapDashboard() {
           </div>
 
           {/* Top-left, mirroring the info panel's inset on the other edge.
-              Capped so a long selection stops clear of whatever shares its
-              column below: the tool stack, a fixed 205px of buttons, until
-              2xl moves it out from under and only the basemap switcher's
-              single row of tiles is left. Either way it scrolls inside the
-              cap. */}
+              The tool stack has left this side, so all that shares its column
+              below is the basemap switcher and the left end of the year bar's
+              row — which the bar does reach, since it fills its band at any
+              width narrower than its 72rem cap. It scrolls inside that. */}
           {panelOpen || !SHOW_PANEL_COLLAPSE ? (
-            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-17rem)] w-[var(--layers-panel-w)] flex-col 2xl:max-h-[calc(100%-6rem)] overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
+            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-11rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
               {/* Null for everyone but admins, who get the users link here. */}
               <Sidebar variant="combined" user={auth.user} />
               {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
@@ -720,11 +763,13 @@ export function MapDashboard() {
             </Button>
           )}
 
-          {/* Top-right. Nothing sits in the corner beneath it any more,
-              but the year bar's band now runs all the way to this edge, so the
-              cap is what keeps a long legend off the bar. */}
+          {/* Top-right. It may grow down past the tool stack in the corner
+              below — the stack steps aside for it rather than the column
+              stopping short, which is what the cap used to do. It still stops
+              clear of the year bar's own row. */}
           {infoPanel(
-            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-8rem)] w-72 xl:flex",
+            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-7rem)] w-72 xl:flex",
+            infoRef,
           )}
         </div>
       </div>

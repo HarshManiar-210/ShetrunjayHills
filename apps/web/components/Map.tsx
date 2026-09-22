@@ -32,6 +32,7 @@ import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
 import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
+import { cn } from "@/lib/utils";
 
 // Teaches MapLibre to resolve `pmtiles://<url>` by reading the archive with
 // Range requests instead of downloading it. Module scope, so it is registered
@@ -590,6 +591,7 @@ export default function Map({
   overlayDefs = [],
   basemap = DEFAULT_BASEMAP,
   bottomCenter,
+  infoReachesCorner = false,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -608,6 +610,12 @@ export default function Map({
    * shared stack knows how tall that is.
    */
   bottomCenter?: React.ReactNode;
+  /**
+   * Whether the legend and statistics column has grown down far enough to
+   * reach the bottom-right corner. When it has, the tool stack steps left of
+   * it and the bottom-centre band gives up the width to match.
+   */
+  infoReachesCorner?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -917,6 +925,7 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
+        className={infoReachesCorner ? "xl:right-[19.5rem]" : undefined}
         measureMode={measureMode}
         onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
@@ -938,19 +947,24 @@ export default function Map({
           fixed offset for the readout is a collision waiting to happen, as it
           duly was. Stacked, the gap holds itself.
 
-          Centred in the band the other controls leave free. They are all on
-          the left now — basemap switcher in the corner, then the tool stack —
-          so the band runs from their right edge out to the map's, which is
-          roughly twice the room it had when the two were split across both
-          corners. Click-through, so the empty space beside the bar does not
-          eat map drags.
+          Centred in the band the corner controls leave free: the basemap
+          switcher on the left, the tool stack on the right. When the legend
+          and statistics column reaches the corner the stack steps left of it,
+          and the band's right edge follows so the bar never runs underneath.
+          Click-through, so the empty space beside the bar does not eat map
+          drags.
 
           On a phone that band is barely a hundred pixels wide, which would
           crush the measure panel — the one member of this stack that does
           show at that size. So below md the column takes the full width and
           lifts clear of the corner controls instead of squeezing between
           them. */}
-      <div className="pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:right-3 md:bottom-3 md:left-[17rem] 2xl:left-[23rem]">
+      <div
+        className={cn(
+          "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-3 md:left-[13.5rem]",
+          infoReachesCorner ? "md:right-14 xl:right-[23rem]" : "md:right-14",
+        )}
+      >
         {/* The measure panel joins the stack rather than sitting beside the
             tool stack that opens it. Anchored to its own corner it overlapped
             the year bar as soon as the window narrowed; in the column it

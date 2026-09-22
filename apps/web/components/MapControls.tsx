@@ -32,15 +32,10 @@ const SETTLE_MS = 12_000;
 /**
  * The map's tool stack.
  *
- * Along the bottom-left, to the right of the basemap switcher that holds the
- * corner. From 2xl it steps further right again, clearing the layers panel
- * above it — which lets that panel run nearly the full height of the map
- * instead of stopping short of these buttons.
- *
- * The whole bottom-left is one row: switcher, tools, then the year bar's band
- * out to the right edge. Everything else the bar shares its row with used to
- * be split across both corners, which is what kept forcing the bar to stop
- * short at one end or the other.
+ * Bottom-right by default, and stepped left of the statistics card when that
+ * card and the legend above it grow tall enough to reach down here. Which
+ * they do is measured rather than assumed — see MapDashboard — because it
+ * depends on how many layers are switched on, not on a breakpoint.
  *
  * Measure Distance, Measure Area and Show Location are all from the brief.
  * Show Location had previously been removed on the grounds that it points a
@@ -53,11 +48,14 @@ export function MapControls({
   fitBounds,
   measureMode,
   onMeasureModeChange,
+  className,
 }: {
   mapRef: RefObject<MapLibreMap | null>;
   fitBounds: () => void;
   measureMode: MeasureMode;
   onMeasureModeChange: (mode: MeasureMode) => void;
+  /** Where it sits. The default is the bottom-right corner. */
+  className?: string;
 }) {
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
@@ -175,7 +173,10 @@ export function MapControls({
   return (
     <div
       data-tour="map-controls"
-      className="absolute bottom-3 left-[13.5rem] z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm 2xl:left-[19.5rem]"
+      className={cn(
+        "absolute right-3 bottom-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm",
+        className,
+      )}
     >
       <ToolButton label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
         <Plus />
@@ -290,7 +291,7 @@ function ToolButton({
         </Button>
       </TooltipTrigger>
       {/* Opens away from the edge the stack sits on. */}
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side="left">{label}</TooltipContent>
     </Tooltip>
   );
 }
