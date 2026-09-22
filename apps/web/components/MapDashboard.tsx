@@ -684,26 +684,23 @@ export function MapDashboard() {
               }
             />
 
-            {/* Bottom-right, opposite the tool stack. From 2xl it steps
-                left to sit beside the statistics card rather than beneath it;
-                below that there is no room to bring both controls in off the
-                edges without taking the year bar's band with them. */}
+            {/* Back in the bottom-left corner it started in, with the
+                tool stack beside it rather than opposite. */}
             <BasemapSwitcher
               value={basemap}
               onChange={setBasemap}
-              className="absolute right-3 bottom-3 z-10 2xl:right-[19.5rem]"
+              className="absolute bottom-3 left-3 z-10"
             />
           </div>
 
           {/* Top-left, mirroring the info panel's inset on the other edge.
-              Capped so a long selection stops clear of the tool stack below it
-              rather than running into it: the stack is a fixed 205px (six 28px
-              buttons, a separator and padding), plus its own inset and a gap
-              between the two. From 2xl the stack moves out from under it, so
-              the cap relaxes to the map's own height. Either way it scrolls
-              inside that cap. */}
+              Capped so a long selection stops clear of whatever shares its
+              column below: the tool stack, a fixed 205px of buttons, until
+              2xl moves it out from under and only the basemap switcher's
+              single row of tiles is left. Either way it scrolls inside the
+              cap. */}
           {panelOpen || !SHOW_PANEL_COLLAPSE ? (
-            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-17rem)] w-[var(--layers-panel-w)] flex-col 2xl:max-h-[calc(100%-5rem)] overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
+            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-17rem)] w-[var(--layers-panel-w)] flex-col 2xl:max-h-[calc(100%-6rem)] overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
               {/* Null for everyone but admins, who get the users link here. */}
               <Sidebar variant="combined" user={auth.user} />
               {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
@@ -723,13 +720,11 @@ export function MapDashboard() {
             </Button>
           )}
 
-          {/* Top-right. Height follows content, capped so a long legend
-              stops clear of the basemap switcher in the corner below it — a
-              single 56px row of tiles, so this needs far less room than the
-              tool stack that used to sit there. From 2xl the switcher steps
-              out from under it too, and the cap relaxes again. */}
+          {/* Top-right. Nothing sits in the corner beneath it any more,
+              but the year bar's band now runs all the way to this edge, so the
+              cap is what keeps a long legend off the bar. */}
           {infoPanel(
-            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-8rem)] w-72 xl:flex 2xl:max-h-[calc(100%-5rem)]",
+            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-8rem)] w-72 xl:flex",
           )}
         </div>
       </div>

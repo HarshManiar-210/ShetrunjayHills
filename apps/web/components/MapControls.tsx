@@ -32,15 +32,15 @@ const SETTLE_MS = 12_000;
 /**
  * The map's tool stack.
  *
- * Bottom-left, on the near side of the year bar, and from 2xl it steps right
- * to sit beside the layers panel rather than beneath it — which also lets
- * that panel run the full height of the map.
+ * Along the bottom-left, to the right of the basemap switcher that holds the
+ * corner. From 2xl it steps further right again, clearing the layers panel
+ * above it — which lets that panel run nearly the full height of the map
+ * instead of stopping short of these buttons.
  *
- * It cannot step right below 2xl. The year bar carries about 400px of
- * unshrinkable controls before its track begins, and pulling both this and
- * the basemap switcher in off the edges costs the bar some 300px of the band
- * it is centred in; at 1280px that leaves the track no room at all. So the
- * corners are where these live until there is width to spare.
+ * The whole bottom-left is one row: switcher, tools, then the year bar's band
+ * out to the right edge. Everything else the bar shares its row with used to
+ * be split across both corners, which is what kept forcing the bar to stop
+ * short at one end or the other.
  *
  * Measure Distance, Measure Area and Show Location are all from the brief.
  * Show Location had previously been removed on the grounds that it points a
@@ -175,7 +175,7 @@ export function MapControls({
   return (
     <div
       data-tour="map-controls"
-      className="absolute bottom-3 left-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm 2xl:left-[19.5rem]"
+      className="absolute bottom-3 left-[13.5rem] z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm 2xl:left-[19.5rem]"
     >
       <ToolButton label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
         <Plus />
