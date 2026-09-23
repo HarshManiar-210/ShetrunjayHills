@@ -35,6 +35,8 @@ export function Header({
   onLogoutClick,
   onHelpClick,
   search,
+  layerPicker,
+  actions,
 }: {
   user: AuthUser | null;
   onMenuClick: () => void;
@@ -43,14 +45,26 @@ export function Header({
   /** Replays the dashboard walkthrough. Omitted on pages that have no tour. */
   onHelpClick?: () => void;
   /**
-   * Layer search, left-aligned to sit directly above the map's left edge.
-   * Only the dashboard has layers to search, so pages without them simply
-   * pass nothing and the right-hand controls keep their place.
+   * Layer search. Only the dashboard has layers to search, so pages without
+   * them simply pass nothing and the right-hand controls keep their place.
    */
   search?: React.ReactNode;
+  /**
+   * The layer picker — which layers the map's panel lists. It lives in the bar
+   * rather than in the panel because it is what fills the panel, and because
+   * the panel now floats over the map with only the selection in it. It sits
+   * after the search field: both are ways into the same set of layers, and
+   * search is the faster one when you already know the name.
+   */
+  layerPicker?: React.ReactNode;
+  /**
+   * Sits with the help button, at the right-hand end — the export, which is
+   * an action on the whole dashboard rather than on any one panel.
+   */
+  actions?: React.ReactNode;
 }) {
   return (
-    <header className="relative z-30 flex items-center gap-2 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 xl:gap-0 xl:py-2.5 xl:pr-3 xl:pl-0">
+    <header className="relative z-30 flex items-center gap-3 border-b border-border bg-linear-to-r from-nav-deep via-nav to-nav-deep p-3 shadow-e2 md:pl-0 xl:pr-4 xl:py-2.5">
       {/* Rule along the bottom edge, fading out to the right so it frames the
           band rather than underlining it. */}
       <span
@@ -58,20 +72,23 @@ export function Header({
         className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-linear-to-r from-nav-accent/55 via-nav-accent/20 to-transparent"
       />
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="xl:hidden"
-        aria-label="Open menu"
-        onClick={onMenuClick}
-      >
-        <Menu />
-      </Button>
+      {/* Exactly as wide as the layers panel floating below it, so the search
+          field starts where that panel ends. The block is the panel's width
+          rather than its width plus its inset because the panel's inset
+          (left-3) and this bar's gap (gap-3) are the same, so the gap after
+          the block stands in for the inset before the panel. Its own pl-3
+          lines the logo up with the panel's left edge. */}
+      <div className="flex shrink-0 items-center gap-2 md:w-[var(--layers-panel-w)] md:pl-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 xl:hidden"
+          aria-label="Open menu"
+          onClick={onMenuClick}
+        >
+          <Menu />
+        </Button>
 
-      {/* On xl this occupies exactly the sidebar's column (w-[18%] in
-          MapDashboard), so whatever follows it in the bar lines up with the
-          map column that starts below it. Keep the two widths in step. */}
-      <div className="flex min-w-0 shrink-0 items-center gap-2 xl:w-[18%] xl:px-4">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-nav-soft to-nav-line/40 shadow-e1 ring-1 ring-nav-line">
           <Mountain className="size-5 text-nav-accent" strokeWidth={2.25} />
         </span>
@@ -85,17 +102,27 @@ export function Header({
             Web GIS Dashboard
           </p>
         </div>
+
+        {/* Separates the wordmark from the controls, so the bar reads as an
+            identity and a toolbar rather than one undifferentiated row. Held
+            to the block's trailing edge, which is the panel's edge too. */}
+        {(search || layerPicker) && (
+          <span aria-hidden className="ml-auto hidden h-7 w-px shrink-0 bg-nav-line sm:block" />
+        )}
       </div>
 
-      {search && (
-        <div className="min-w-0 flex-1 xl:pl-4">
-          <div className="w-full max-w-md">{search}</div>
-        </div>
-      )}
+      {/* Capped rather than free-growing: past about 28rem a search field
+          stops looking like a field and starts looking like a gap. What it
+          does not take stays as space before the controls on the right. */}
+      {search && <div className="min-w-0 max-w-md flex-1">{search}</div>}
+
+      {layerPicker}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {/* Theme toggle disabled for now */}
         {/* <ThemeToggle /> */}
+
+        {actions}
 
         {onHelpClick && (
           <Button

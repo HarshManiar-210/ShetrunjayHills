@@ -1,130 +1,81 @@
-import { memo } from "react";
-import { type LucideIcon } from "lucide-react";
+import { memo, useState } from "react";
+import { PanelLeftClose, RotateCcw, X } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { LayerDot } from "@/components/LayerDot";
 import {
   DEFAULT_RASTER_OPACITY,
-  iconForGeometry,
-  rasterToggleKey,
+  sectionLayers,
   type RasterYear,
   type SectionAccent,
   type SectionDef,
+  type SectionLayer,
 } from "@/lib/sections";
 import { cn } from "@/lib/utils";
 
 /**
- * The layers column, built to the client's mockup.
+ * The layers panel, floating over the map's top-left corner.
  *
- * The shape it replaces stacked every group in its own raised, hue-washed card
- * — legible at a dozen layers, a wall of competing boxes at eighty. The
- * mockup's answer is a flat list: a plain heading per group with a count, then
- * one quiet row per layer, and chrome only around whichever layer is switched
- * on and expanded. That inverts what carries emphasis, so the eye lands on
- * what is drawing rather than on the container it sits in.
+ * It lists only what has been selected in the navbar's picker, which is the
+ * change that makes a floating panel viable at all: the docked column had to
+ * carry every layer in the seed, eighty-odd rows that no float could hold
+ * without covering the map it annotates. Here the panel holds the handful of
+ * layers someone is actually working with, so it stays short enough to sit on
+ * the map, and the map gets the full width of the window.
  *
- * The tree from the API still drives it. A group becomes a heading; a raster
- * theme (which is one layer with years) and a vector layer both become rows,
- * so the two-level structure flattens to exactly the heading-and-rows the
- * mockup draws.
+ * Selecting is the picker's job, and a layer arrives here already switched
+ * on; this panel is where you switch it back off, pick a year and set
+ * opacity. A row's × takes it out of the selection, so the panel can be
+ * tidied where the clutter is rather than only from the picker.
+ *
+ * Each row leads with the colour the layer draws in, not an icon for its
+ * geometry: matching a row to what is on the map is the question a legend
+ * row has to answer, and a point-or-polygon glyph never answered it.
  */
 
 /**
- * Subject colour per group, resolved to the --sec-* tokens in globals.css.
- * Now only tints a row's icon rather than washing a whole card, so the column
- * still scans by subject without the hue doing the shouting.
+ * Subject filters for the panel.
+ *
+ * These cut across the seed's sections on purpose: forest cover lives in
+ * Forest Layers but canopy height lives in Drone Analysis, and someone
+ * looking at forest wants both. So the buckets are built from the subject
+ * accent each section already carries (GROUP_STYLE in lib/sections.ts) rather
+ * than from the section tree — which also means a new group picks up a
+ * filter from its accent alone, with no edit here.
+ *
+ * Presentation only: no layer is named, and a section whose accent is not
+ * listed falls under "Other" — which keeps a new subject colour visible in
+ * the panel while filtered, rather than vanishing from every bucket.
  */
-const ACCENT_TEXT: Record<SectionAccent, string> = {
-  forest: "text-sec-forest",
-  canopy: "text-sec-canopy",
-  change: "text-sec-change",
-  land: "text-sec-land",
-  imagery: "text-sec-imagery",
-  water: "text-sec-water",
-  infra: "text-sec-infra",
-  fauna: "text-sec-fauna",
-  carbon: "text-sec-carbon",
-};
+const FILTERS: { id: string; label: string; accents: SectionAccent[] }[] = [
+  { id: "forest", label: "Forest", accents: ["forest", "change"] },
+  { id: "trees", label: "Trees", accents: ["canopy", "carbon"] },
+  { id: "land-water", label: "Land & water", accents: ["land", "water"] },
+  { id: "imagery", label: "Imagery", accents: ["imagery"] },
+  { id: "boundaries", label: "Boundaries", accents: ["infra"] },
+  { id: "wildlife", label: "Wildlife", accents: ["fauna"] },
+];
 
-/** Switched-on rows wear the amber accent, matching the mockup. */
-const BRAND_SWITCH = "data-checked:bg-brand";
+const FILTER_OF: Partial<Record<SectionAccent, string>> = Object.fromEntries(
+  FILTERS.flatMap((f) => f.accents.map((accent) => [accent, f.id])),
+);
 
-function LayerRow({
-  label,
-  icon: Icon,
-  accentClass,
-  iconColor,
-  checked,
-  onToggle,
-  children,
-}: {
-  label: string;
-  icon: LucideIcon;
-  /** Subject tint for the icon, when the row has no colour of its own. */
-  accentClass?: string;
-  /** The exact colour this layer draws in, so the row doubles as a key. */
-  iconColor?: string;
-  checked: boolean;
-  onToggle: () => void;
-  /** Expanded controls — only rendered for the layer that is switched on. */
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg transition-colors",
-        // Chrome appears only around the active layer, so it reads as the one
-        // thing currently in play rather than one card among eighty.
-        checked && "bg-card/70 ring-1 ring-border/70",
-      )}
-    >
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-foreground/5"
-      >
-        <Icon
-          className={cn("size-3.5 shrink-0", !iconColor && (accentClass ?? "text-muted-foreground"))}
-          style={iconColor ? { color: iconColor } : undefined}
-          strokeWidth={2}
-        />
-        <span className={cn("min-w-0 flex-1 leading-tight", checked && "font-medium")}>
-          {label}
-        </span>
-        <Switch
-          size="sm"
-          checked={checked}
-          className={BRAND_SWITCH}
-          aria-label={`Toggle ${label} layer`}
-          tabIndex={-1}
-        />
-      </div>
-      {checked && children && <div className="px-2.5 pb-2.5">{children}</div>}
-    </div>
-  );
-}
+const OTHER = { id: "other", label: "Other" };
+const ALL = "all";
 
-/** A layer the client has listed but not delivered data for. */
-function PendingRow({ label, icon: Icon }: { label: string; icon: LucideIcon }) {
-  return (
-    <div className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm">
-      <Icon className="size-3.5 shrink-0 text-muted-foreground/40" strokeWidth={2} />
-      <span className="min-w-0 flex-1 leading-tight text-muted-foreground/50">{label}</span>
-      <span className="shrink-0 text-[10px] font-medium text-brand/70">Coming soon</span>
-    </div>
-  );
+/**
+ * The selected layers under one top-level group, in the same flattened order
+ * the picker lists them in — so a row sits under the same heading in both.
+ * Pending layers can't be selected, so they never reach here.
+ */
+function panelRows(section: SectionDef, selected: Record<string, boolean>): SectionLayer[] {
+  return sectionLayers(section).filter((layer) => selected[layer.key]);
 }
 
 /**
- * Years as chips rather than a dropdown, per the mockup: the whole series is
- * visible at once, so how many years a theme has — and which are missing — is
- * readable without opening anything.
+ * Years as chips rather than a dropdown: the whole series is visible at once,
+ * so how many years a theme has — and which are missing — is readable without
+ * opening anything.
  */
 function YearChips({
   label,
@@ -190,135 +141,126 @@ function OpacityControl({
   );
 }
 
-/**
- * One row per switchable thing under a heading. A raster theme is a single
- * layer with years, so it collapses to a row that expands into its chips and
- * opacity; a vector layer is a row with nothing to expand.
- */
-function GroupRows({
-  section,
-  visibility,
-  onToggleSection,
-  onToggleItem,
-  rasterYear,
-  onRasterYearChange,
-  rasterOpacity,
-  onRasterOpacityChange,
+function LayerRow({
+  row,
+  checked,
+  onToggle,
+  onRemove,
+  children,
 }: {
-  section: SectionDef;
-  visibility: Record<string, boolean>;
-  onToggleSection: (id: string, on: boolean) => void;
-  onToggleItem: (key: string) => void;
-  rasterYear: Record<string, number>;
-  onRasterYearChange: (sectionId: string, year: number) => void;
-  rasterOpacity: Record<string, number>;
-  onRasterOpacityChange: (sectionId: string, opacity: number) => void;
+  row: SectionLayer;
+  checked: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+  /** Expanded controls — only rendered while the layer is switched on. */
+  children?: React.ReactNode;
 }) {
   return (
-    <>
-      {section.items.map((item) =>
-        item.pending ? (
-          <PendingRow
-            key={item.key}
-            label={item.label}
-            icon={item.icon ?? iconForGeometry(item.geometryKind)}
-          />
-        ) : (
-          <LayerRow
-            key={item.key}
-            label={item.label}
-            icon={item.icon ?? iconForGeometry(item.geometryKind)}
-            iconColor={item.color}
-            checked={Boolean(visibility[item.key])}
-            onToggle={() => onToggleItem(item.key)}
-          />
-        ),
+    <div
+      className={cn(
+        "group/row rounded-lg transition-colors",
+        // Chrome appears only around what is drawing, so the eye lands on the
+        // layers in play rather than on the containers they sit in.
+        checked && "bg-foreground/6 ring-1 ring-border/70",
       )}
-
-      {section.children.map((child) => {
-        if (child.mode === "layer") {
-          const key = rasterToggleKey(child.id);
-          const on = Boolean(visibility[key]);
-          return (
-            <LayerRow
-              key={child.id}
-              label={child.label}
-              icon={child.icon}
-              accentClass={ACCENT_TEXT[child.accent]}
-              checked={on}
-              onToggle={() => onToggleSection(child.id, !on)}
-            >
-              <div className="flex flex-col gap-2">
-                {child.years.length > 1 && (
-                  <YearChips
-                    label={child.label}
-                    years={child.years}
-                    year={rasterYear[child.id] ?? child.years.at(-1)?.year ?? null}
-                    onChange={(year) => onRasterYearChange(child.id, year)}
-                  />
-                )}
-                <OpacityControl
-                  label={child.label}
-                  opacity={rasterOpacity[child.id] ?? DEFAULT_RASTER_OPACITY}
-                  onChange={(opacity) => onRasterOpacityChange(child.id, opacity)}
-                />
-              </div>
-            </LayerRow>
-          );
-        }
-
-        // A nested group of vector layers: its rows join this heading's list
-        // rather than opening a second level of headings, which is what keeps
-        // the column as flat as the mockup draws it.
-        return (
-          <GroupRows
-            key={child.id}
-            section={child}
-            visibility={visibility}
-            onToggleSection={onToggleSection}
-            onToggleItem={onToggleItem}
-            rasterYear={rasterYear}
-            onRasterYearChange={onRasterYearChange}
-            rasterOpacity={rasterOpacity}
-            onRasterOpacityChange={onRasterOpacityChange}
-          />
-        );
-      })}
-
-      {/* A heading with no rows at all would otherwise be a bare label. */}
-      {section.items.length === 0 && section.children.length === 0 && (
-        <p className="px-2.5 py-2 text-xs text-muted-foreground/50 italic">No layers yet</p>
-      )}
-    </>
+    >
+      {/* The whole row is the hit target — the checkbox is the indicator, not
+          a separate control, so there is one tab stop and one click path. */}
+      <div
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`Show ${row.label} on the map`}
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors hover:bg-foreground/5"
+      >
+        <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
+        <LayerDot color={row.color} raster={row.raster} />
+        {/* Wraps rather than truncating. A layer's name is how it is
+            found again, and the long ones — CHM (Canopy Height Model),
+            Historical Land Use (Satellite: 1978–2025) — are exactly the
+            ones a clipped row rendered unidentifiable. Two lines cost
+            this panel nothing; it scrolls. */}
+        <span className={cn("min-w-0 flex-1 leading-tight", checked && "font-medium")}>
+          {row.label}
+        </span>
+        {/* Deselect. Kept quiet until the row is hovered or focused, so the
+            panel does not read as a column of close buttons. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          aria-label={`Remove ${row.label} from the panel`}
+          className="shrink-0 rounded text-muted-foreground/0 transition-colors group-hover/row:text-muted-foreground/60 hover:text-foreground! focus-visible:text-muted-foreground focus-visible:outline-none"
+        >
+          <X className="size-3.5" strokeWidth={2.25} />
+        </button>
+      </div>
+      {checked && children && <div className="px-2 pb-2">{children}</div>}
+    </div>
   );
 }
 
-/** How many switchable layers a heading covers, for the count beside it. */
-function layerCount(section: SectionDef): number {
-  if (section.mode === "layer") return 1;
+/** One subject filter. "All" is always first and always present. */
+function FilterChip({
+  label,
+  active,
+  onSelect,
+}: {
+  label: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
   return (
-    section.items.length + section.children.reduce((sum, child) => sum + layerCount(child), 0)
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={cn(
+        "h-6 shrink-0 rounded-full px-2.5 text-[11px] font-medium whitespace-nowrap transition-colors",
+        active
+          ? "bg-brand text-brand-foreground"
+          : "bg-foreground/5 text-muted-foreground ring-1 ring-border hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
 function SidebarSectionsImpl({
   sections,
+  selected,
   visibility,
-  onToggleSection,
-  onToggleItem,
+  onToggleLayer,
+  onDeselectLayer,
   onResetLayers,
+  onCollapse,
   rasterYear,
   onRasterYearChange,
   rasterOpacity,
   onRasterOpacityChange,
 }: {
   sections: SectionDef[];
-  /** Toggle key → on, across every group at once. See lib/sections.ts. */
+  /** Toggle key → selected in the navbar picker, i.e. listed in this panel. */
+  selected: Record<string, boolean>;
+  /** Toggle key → drawing on the map. A subset of `selected`. */
   visibility: Record<string, boolean>;
-  onToggleSection: (id: string, on: boolean) => void;
-  onToggleItem: (key: string) => void;
-  /** Switches everything off — the mockup's "Reset view". */
+  onToggleLayer: (key: string) => void;
+  /** Takes a layer back out of the selection, and off the map with it. */
+  onDeselectLayer: (key: string) => void;
+  /** Switches every selected layer off, without deselecting any. */
   onResetLayers: () => void;
+  /** Folds the panel away. Omitted where there is nothing to fold into. */
+  onCollapse?: () => void;
   /** Group id → selected year. */
   rasterYear: Record<string, number>;
   onRasterYearChange: (sectionId: string, year: number) => void;
@@ -326,61 +268,169 @@ function SidebarSectionsImpl({
   rasterOpacity: Record<string, number>;
   onRasterOpacityChange: (sectionId: string, opacity: number) => void;
 }) {
-  const total = sections.reduce((sum, section) => sum + layerCount(section), 0);
-  const onCount = Object.values(visibility).filter(Boolean).length;
+  const [filter, setFilter] = useState(ALL);
+
+  // Only the groups that have something selected in them are drawn, so the
+  // panel is exactly as tall as the work in progress.
+  const all = sections
+    .map((section) => ({ section, rows: panelRows(section, selected) }))
+    .filter(({ rows }) => rows.length > 0);
+
+  // The counts describe the whole selection, not the filtered view: the header
+  // is there to say what is on, and a filter is a way of looking rather than a
+  // change to what is drawn.
+  const total = all.reduce((sum, g) => sum + g.rows.length, 0);
+  const onCount = all.reduce(
+    (sum, g) => sum + g.rows.filter((row) => visibility[row.key]).length,
+    0,
+  );
+
+  // Only the filters that have something behind them, and only when there is
+  // more than one — a filter offering a single choice is noise.
+  const present = new Set(
+    all.flatMap(({ rows }) => rows.map((row) => FILTER_OF[row.accent] ?? "other")),
+  );
+  const chips = [...FILTERS.map(({ id, label }) => ({ id, label })), OTHER].filter((f) =>
+    present.has(f.id),
+  );
+  const showChips = chips.length > 1;
+
+  // Derived rather than stored: deselecting the last forest layer would
+  // otherwise leave the panel filtered to a subject that no longer exists,
+  // showing nothing, with no effect needed to repair it.
+  const active = showChips && chips.some((f) => f.id === filter) ? filter : ALL;
+
+  const groups =
+    active === ALL
+      ? all
+      : all
+          .map(({ section, rows }) => ({
+            section,
+            rows: rows.filter((row) => (FILTER_OF[row.accent] ?? OTHER.id) === active),
+          }))
+          .filter(({ rows }) => rows.length > 0);
 
   return (
     <div data-tour="sections" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
-        <p className="text-[11px] font-medium tracking-wide text-muted-foreground">
-          Layers · {total}
-        </p>
-        <button
-          type="button"
-          onClick={onResetLayers}
-          disabled={onCount === 0}
-          className="text-[11px] font-medium text-brand transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-40"
+      <div className="flex shrink-0 items-center gap-2 px-3 pt-2 pb-1.5">
+        <p className="text-[13px] font-semibold">Layers</p>
+        {total > 0 && (
+          <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground" title={`${onCount} of ${total} layers switched on`}>
+            {onCount} of {total} on
+          </p>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {/* Reduced to its icon so the header can carry the count as well.
+              A third piece of text beside "Layers" and "1 of 17 on" left the
+              row too tight to read in a panel this narrow. */}
+          <button
+            type="button"
+            onClick={onResetLayers}
+            disabled={onCount === 0}
+            aria-label="Switch every layer off"
+            title="Switch every layer off"
+            className="text-muted-foreground/60 transition-colors hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+          >
+            <RotateCcw className="size-3.5" strokeWidth={2} />
+          </button>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              aria-label="Hide the layers panel"
+              className="text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              <PanelLeftClose className="size-3.5" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {showChips && (
+        // Scrolls sideways rather than wrapping: wrapping costs the panel a
+        // whole row of height for one overflowing chip, and this sits on top
+        // of the map.
+        <div
+          role="group"
+          aria-label="Filter layers by subject"
+          className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2 scrollbar-none"
         >
-          Reset view
-        </button>
+          <FilterChip label="All" active={active === ALL} onSelect={() => setFilter(ALL)} />
+          {chips.map((f) => (
+            <FilterChip
+              key={f.id}
+              label={f.label}
+              active={active === f.id}
+              onSelect={() => setFilter(f.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 scrollbar-thin">
+        {groups.length === 0 ? (
+          <p className="px-2.5 py-3 text-xs leading-relaxed text-muted-foreground">
+            No layers selected yet. Open{" "}
+            <span className="font-medium text-foreground">Layers</span> in the top bar and tick a
+            section to choose from it.
+          </p>
+        ) : (
+          groups.map(({ section, rows }, i) => (
+            <section key={section.id} data-tour={i === 0 ? "section-theme" : undefined}>
+              <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
+                {/* Uppercase and letter-spaced, as the reference image sets
+                    its panel headings — it is what separates a heading from
+                    the layer names under it without a rule or a heavier
+                    weight. */}
+                <h3 className="min-w-0 truncate text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
+                  {section.label}
+                </h3>
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/40">
+                  {rows.length}
+                </span>
+              </div>
+
+              {/* Spaced rather than stacked flush: a switched-on row is a
+                  card with its own controls inside it, and two of those
+                  touching read as one box with a seam. */}
+              <div className="flex flex-col gap-2">
+                {rows.map((row) => (
+                  <LayerRow
+                    key={row.key}
+                    row={row}
+                    checked={Boolean(visibility[row.key])}
+                    onToggle={() => onToggleLayer(row.key)}
+                    onRemove={() => onDeselectLayer(row.key)}
+                  >
+                    {row.raster && (
+                      <div className="flex flex-col gap-2">
+                        {row.raster.years.length > 1 && (
+                          <YearChips
+                            label={row.label}
+                            years={row.raster.years}
+                            year={rasterYear[row.raster.id] ?? row.raster.years.at(-1)?.year ?? null}
+                            onChange={(year) => onRasterYearChange(row.raster!.id, year)}
+                          />
+                        )}
+                        <OpacityControl
+                          label={row.label}
+                          opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
+                          onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
+                        />
+                      </div>
+                    )}
+                  </LayerRow>
+                ))}
+              </div>
+            </section>
+          ))
+        )}
       </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 scrollbar-thin">
-        {sections.map((section, i) => (
-          <section key={section.id} data-tour={i === 0 ? "section-theme" : undefined}>
-            <div className="flex items-center justify-between gap-2 px-2.5 pt-3 pb-1">
-              <h3 className="min-w-0 truncate text-[11px] font-medium text-muted-foreground/70">
-                {section.label}
-              </h3>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/40">
-                {layerCount(section)}
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-0.5">
-              <GroupRows
-                section={section}
-                visibility={visibility}
-                onToggleSection={onToggleSection}
-                onToggleItem={onToggleItem}
-                rasterYear={rasterYear}
-                onRasterYearChange={onRasterYearChange}
-                rasterOpacity={rasterOpacity}
-                onRasterOpacityChange={onRasterOpacityChange}
-              />
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <p className="shrink-0 border-t border-border/60 px-4 py-2.5 text-[11px] text-muted-foreground">
-        {onCount === 0 ? "No layers visible" : `${onCount} layer${onCount === 1 ? "" : "s"} visible`}
-      </p>
     </div>
   );
 }
 
-// Memoised because the dashboard re-renders on state this column has nothing
+// Memoised because the dashboard re-renders on state this panel has nothing
 // to do with — opening the mobile sheet, running the walkthrough — and its
 // props are all stable across those.
 export const SidebarSections = memo(SidebarSectionsImpl);

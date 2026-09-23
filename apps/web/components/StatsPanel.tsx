@@ -5,9 +5,9 @@ import { BarChart3, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
+import { LayerSwatch } from "@/components/LayerSwatch";
 import { ClassDonut } from "@/components/ClassDonut";
-import { geometryKindOf } from "@/lib/sections";
+import { countByLayer, STUDY_AREA_HA } from "@/lib/vector-stats";
 import {
   fetchRasterStats,
   nameClasses,
@@ -15,12 +15,6 @@ import {
   type RasterStats,
 } from "@/lib/raster-stats-api";
 import type { LayerFeature } from "@/lib/layers-api";
-
-/**
- * Real surveyed area of the Shetrunjay study area, in hectares — read off
- * StudyArea.geojson's own `areaSqKm` property, not estimated.
- */
-export const STUDY_AREA_HA = 3396;
 
 /**
  * A raster theme currently on the map, and the specific image it is showing.
@@ -50,33 +44,6 @@ const PERCENT = new Intl.NumberFormat(undefined, {
 });
 
 const toHectares = (sqMetres: number) => sqMetres / 10_000;
-
-// One row per vector layer, counted off the features actually loaded.
-interface VectorLayerCount {
-  id: number;
-  name: string;
-  count: number;
-  color: string;
-  geometryKind: SwatchGeometryKind;
-}
-
-function countByLayer(features: LayerFeature[]): VectorLayerCount[] {
-  const counts = new globalThis.Map<number, VectorLayerCount>();
-  for (const feature of features) {
-    const { id, name, color } = feature.properties;
-    const existing = counts.get(id);
-    if (existing) existing.count += 1;
-    else
-      counts.set(id, {
-        id,
-        name,
-        color,
-        count: 1,
-        geometryKind: geometryKindOf(feature.geometry.type),
-      });
-  }
-  return [...counts.values()];
-}
 
 /** Part-to-whole as a bar, for themes with too many classes to ring. */
 function StackedBar({ classes }: { classes: NamedClassStat[] }) {
@@ -145,7 +112,7 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-xs font-medium">{layer.name}</span>
+        <span className="min-w-0 text-xs leading-tight font-medium">{layer.name}</span>
         {layer.year != null && (
           <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
             {layer.year}
@@ -250,7 +217,7 @@ export function StatsPanel({
           {vectorCounts.map((layer) => (
             <div key={layer.id} className="flex items-center gap-2 text-xs">
               <LayerSwatch color={layer.color} geometryKind={layer.geometryKind} />
-              <span className="min-w-0 flex-1 truncate">{layer.name}</span>
+              <span className="min-w-0 flex-1 leading-tight">{layer.name}</span>
               <span className="shrink-0 tabular-nums text-muted-foreground">
                 {COUNT.format(layer.count)}
               </span>

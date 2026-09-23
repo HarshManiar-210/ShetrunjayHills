@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
-import { legendFor, type RasterLegend } from "@/lib/legend-config";
+import { legendFor, rampScale, type RampScale } from "@/lib/legend-config";
 import { geometryKindOf } from "@/lib/sections";
 import type { LayerFeature } from "@/lib/layers-api";
 
@@ -30,6 +30,12 @@ function isLong(legend: { classes: unknown[] }): boolean {
 export interface LegendRasterLayer {
   id: string;
   name: string;
+  /**
+   * The year on screen, for the theme title. Omitted for a single-image
+   * theme, whose one row is labelled with the theme's own name and would
+   * otherwise read "Orthomosaic · Orthomosaic".
+   */
+  yearLabel?: string;
   isPhotographic?: boolean;
 }
 
@@ -42,32 +48,60 @@ export interface LegendOverlay {
 }
 
 /**
- * The continuous ramp the client asked for: the theme's class colours laid
- * end to end beneath the class list.
+ * The gradient bar: the theme's class colours laid end to end, leading its
+ * legend the way the client's mockup shows.
  *
- * Only drawn for an ordered palette (see RasterLegend.ramp). Hard colour stops
- * rather than a smooth blend — the imagery is classified, so a smooth fade
- * would imply intermediate values the data does not contain, while the strip
- * still reads as one scale running low to high.
+ * Only drawn for an ordered palette (see RasterLegend.ramp), and always with
+ * low on the left whichever order the delivered colour doc listed the classes
+ * in. What sits under it is whatever the data actually supports — evenly
+ * spaced ticks for a theme whose classes are equal steps, otherwise just the
+ * two ends named.
+ *
+ * Hard colour stops rather than a smooth blend: the imagery is classified, so
+ * a fade would imply intermediate values the data does not contain, while the
+ * bar still reads as one scale running low to high.
  */
-function ClassRamp({ legend }: { legend: RasterLegend }) {
-  const stops = legend.classes
+function ScaleRamp({ scale }: { scale: RampScale }) {
+  const { classes, low, high } = scale;
+
+  const stops = classes
     .map((cls, i) => {
-      const from = (i / legend.classes.length) * 100;
-      const to = ((i + 1) / legend.classes.length) * 100;
+      const from = (i / classes.length) * 100;
+      const to = ((i + 1) / classes.length) * 100;
       return `${cls.color} ${from}%, ${cls.color} ${to}%`;
     })
     .join(", ");
 
-  // No end captions: the class list sits directly above in the same order, so
-  // naming the ends again would say the same thing twice. The strip's job is
-  // to show the scale as one continuous thing.
   return (
-    <span
-      className="mt-1 h-2 w-full rounded-full ring-1 ring-foreground/10"
-      style={{ backgroundImage: `linear-gradient(to right, ${stops})` }}
-      aria-hidden
-    />
+    <div className="flex flex-col gap-1">
+      <span
+        className="h-3 w-full rounded-full ring-1 ring-foreground/15"
+        style={{ backgroundImage: `linear-gradient(to right, ${stops})` }}
+        aria-hidden
+      />
+
+      {scale.ticks && (
+        <div className="flex" aria-hidden>
+          {scale.ticks.map((tick) => (
+            <span
+              key={tick}
+              className="flex-1 text-center text-[9px] font-medium text-muted-foreground"
+            >
+              {tick}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* The ends named, which is the one thing a bar cannot say for itself.
+          The class list below fills in the middle. */}
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate text-[10px] text-muted-foreground">{low}</span>
+        <span className="min-w-0 truncate text-right text-[10px] text-muted-foreground">
+          {high}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -121,16 +155,30 @@ export function LegendContent({
 
       {rasterLayers.map((raster) => {
         const legend = legendFor(raster.id);
+        const scale = legend && rampScale(legend);
         return (
-          <div key={raster.id} className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">{raster.name}</span>
+          <div key={raster.id} className="flex flex-col gap-1.5">
+            {/* Named and dated, as the mockup heads its legend: which year is
+                on screen is half of what the colours mean. */}
+            <span className="text-[13px] leading-tight font-semibold">
+              {raster.name}
+              {raster.yearLabel && (
+                <span className="text-muted-foreground"> · {raster.yearLabel}</span>
+              )}
+            </span>
             {raster.isPhotographic ? (
               <span className="text-xs text-muted-foreground/70 italic">
                 Photographic image — no class legend
               </span>
             ) : (
               legend && (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
+                  {/* The bar leads, as in the mockup: it is the scale, and the
+                      class list under it is the detail of where the steps
+                      fall. Reversed from the old layout, where a thin strip
+                      trailed the list it was meant to summarise. */}
+                  {scale && <ScaleRamp scale={scale} />}
+
                   {/* Long class lists go two-up with their compact labels, so
                       the legend still fits without scrolling. */}
                   <div
@@ -151,7 +199,6 @@ export function LegendContent({
                       </div>
                     ))}
                   </div>
-                  {legend.ramp && <ClassRamp legend={legend} />}
                   {legend.note && (
                     <span className="text-[10px] text-muted-foreground/70 italic">{legend.note}</span>
                   )}

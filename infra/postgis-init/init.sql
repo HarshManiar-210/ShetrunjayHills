@@ -252,11 +252,11 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('current-land-use',     'Current Land Use (Drone: 2026)',           grp('landuse'), 2),
 
     ('orthomosaic', 'Orthomosaic',                 grp('drone-data'), 1),
-    ('dsm',         'Digital Surface Model (DSM)', grp('drone-data'), 2),
-    ('dtm',         'Digital Terrain Model (DTM)', grp('drone-data'), 3),
+    ('dsm',         'DSM (Digital Surface Model)', grp('drone-data'), 2),
+    ('dtm',         'DTM (Digital Terrain Model)', grp('drone-data'), 3),
     ('slope',       'Slope',                       grp('drone-data'), 4),
     ('aspect',      'Aspect',                      grp('drone-data'), 5),
-    ('chm',         'Canopy Height Model (CHM)',   grp('drone-data'), 6),
+    ('chm',         'CHM (Canopy Height Model)',   grp('drone-data'), 6),
 
     ('toposheet',   'Toposheet',                   grp('reference'), 2),
 
@@ -397,11 +397,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- tile pyramid, which would bake the current placement in.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    ('dsm',   'Digital Surface Model (DSM)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4547790, 71.8240547, 21.5129591),
-    ('dtm',   'Digital Terrain Model (DTM)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
+    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4547790, 71.8240547, 21.5129591),
+    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
     ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
     ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4551430, 71.8234229, 21.5120913),
-    ('chm',   'Canopy Height Model (CHM)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4558151, 71.8229114, 21.5120633);
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4558151, 71.8229114, 21.5120633);
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
@@ -464,7 +464,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('treeCount',           'Tree Count',                  grp('drone-analysis'), 'vector', NULL, NULL, '', 4, 'pending'),
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
     ('growingStock',        'Growing Stock',               grp('drone-analysis'), 'vector', NULL, NULL, '', 6, 'pending'),
-    ('treesOutsideForests', 'Trees Outside Forests (TOF)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
+    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
 
     ('floodDepth', 'Flood Depth (m)', grp('hydrogeology'), 'vector', NULL, NULL, '', 7, 'pending'),
 

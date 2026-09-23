@@ -21,17 +21,47 @@ export interface RasterLegend {
   /** Present when a class's color scale is only approximately labeled (no exact numeric breakpoints were given). */
   note?: string;
   /**
-   * Whether the classes form an ordered scale, in which case the legend also
-   * draws them as a continuous gradient (the client asked for gradient
-   * legends). True for anything that runs low→high — canopy density, canopy
-   * height, slope, elevation, fragmentation from patch to core.
+   * Set when the classes form an ordered scale, in which case the legend
+   * leads with them as a gradient bar (the client asked for gradient
+   * legends). The value says which way round the class list runs, because
+   * the delivered colour docs list some themes densest-first and some
+   * sparsest-first, and the bar always has to draw low on the left.
    *
-   * Left off for genuinely categorical palettes: Land Use's barren / built-up
-   * / water, Aspect's eight compass directions and Vegetation Change's
-   * transition matrix have no order to ramp along, and drawing one would
-   * assert a progression that isn't in the data.
+   * Left off for genuinely categorical palettes: Land Use's barren /
+   * built-up / water and Vegetation Change's transition matrix have no order
+   * to ramp along, and a photographic raster's R/G/B key is not a scale at
+   * all. Drawing a bar for those would assert a progression that isn't in
+   * the data.
    */
-  ramp?: boolean;
+  ramp?: "low-to-high" | "high-to-low";
+  /**
+   * What to write under the two ends of the bar. Defaults to the lowest and
+   * highest class's own label, which is usually what you want; set it where
+   * the end of the scale is better named than its end class — e.g. Slope,
+   * whose real range in degrees is known even though its intermediate
+   * breakpoints were never supplied.
+   */
+  rampLabels?: [string, string];
+  /**
+   * Marks a legend that is a band key rather than a palette — an orthomosaic
+   * or a false-colour composite, whose R/G/B rows say which channel carries
+   * which band and name no colour the map is actually painted in. Such a
+   * theme has no colour that could stand for it in a list.
+   */
+  channels?: boolean;
+  /**
+   * Set on a placeholder legend — a theme whose real palette has not been
+   * delivered. Its greys are a stand-in, so nothing should present them as
+   * the theme's colour.
+   */
+  provisional?: boolean;
+  /**
+   * Tick labels along the bar, one per class, evenly spaced. Only for a
+   * theme whose classes really do divide the scale evenly — Aspect's eight
+   * 45° compass sectors do; nothing else delivered so far does, and spacing
+   * ticks evenly over unequal classes would misreport where the breaks are.
+   */
+  rampTicks?: string[];
 }
 
 // Visibly provisional — a plain 5-step grey ramp, distinct from any real
@@ -47,9 +77,10 @@ const PROVISIONAL_RAMP = [
 function provisionalLegend(layerId: string, classCount = 5): RasterLegend {
   return {
     layerId,
+    provisional: true,
     // The placeholder palette is a light→dark grey ramp, so it is ordered by
     // construction even before the real classes arrive.
-    ramp: true,
+    ramp: "low-to-high",
     classes: Array.from({ length: classCount }, (_, i) => ({
       value: i + 1,
       label: `TODO — class ${i + 1} label`,
@@ -69,7 +100,9 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // Forest Cover theme's legend (the imagery's own palette matches it exactly).
   "forest-cover": {
     layerId: "forest-cover",
-    ramp: true,
+    // Densest first, as the client's colour doc lists them.
+    ramp: "high-to-low",
+    rampLabels: ["Non forest", "Very dense forest"],
     classes: [
       { value: 1, label: "Very Dense Forest", color: "#06660c" },
       { value: 2, label: "Moderately Dense Forest", color: "#05ba19" },
@@ -81,7 +114,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "green-cover": {
     layerId: "green-cover",
-    ramp: true,
+    ramp: "low-to-high",
     classes: [
       { value: 1, label: "Non-Forest", color: "#dedede" },
       { value: 2, label: "Forest", color: "#0a8d23" },
@@ -111,7 +144,9 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   "forest-fragmentation": {
     layerId: "forest-fragmentation",
-    ramp: true,
+    // Patch through to core: most fragmented to least.
+    ramp: "low-to-high",
+    rampLabels: ["Most fragmented", "Least fragmented"],
     classes: [
       { value: "patch", label: "Patch", color: "#e07b34" },
       { value: "edge", label: "Edge", color: "#ffff00" },
@@ -280,7 +315,8 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   chm: {
     layerId: "chm",
-    ramp: true,
+    ramp: "low-to-high",
+    rampLabels: ["Low canopy", "High canopy"],
     classes: [
       { value: 1, label: "Low canopy height", color: "#28bceb" },
       { value: 2, label: "Medium-low canopy height", color: "#a4fc3c" },
@@ -291,7 +327,10 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   slope: {
     layerId: "slope",
-    ramp: true,
+    ramp: "low-to-high",
+    // The range is the one number the delivered data does pin down, so the
+    // ends of the bar carry it even though the breaks between are unknown.
+    rampLabels: ["Flat · 0°", "Steep · 88°"],
     classes: [
       { value: 1, label: "Flattest", color: "#2c7bb6" },
       { value: 2, label: "Gentle", color: "#abd9e9" },
@@ -303,6 +342,13 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   aspect: {
     layerId: "aspect",
+    // Azimuth is continuous and the palette runs along it, so this does get a
+    // bar — and uniquely, its eight classes are eight equal 45° sectors, so
+    // ticks can sit evenly under it and still be telling the truth about
+    // where the breaks are.
+    ramp: "low-to-high",
+    rampTicks: ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+    rampLabels: ["North · 0°", "North west · 360°"],
     classes: [
       { value: "N", label: "North (337.5°–22.5°)", color: "#30123b" },
       { value: "NE", label: "North East (22.5°–67.5°)", color: "#466be3" },
@@ -318,6 +364,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // raster (true-color composite: each channel is literally that band).
   orthomosaic: {
     layerId: "orthomosaic",
+    channels: true,
     classes: [
       { value: "R", label: "Red Band", color: "#FF0000" },
       { value: "G", label: "Green Band", color: "#00FF00" },
@@ -329,8 +376,17 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   // shows Near Infrared reflectance most years, but the literal Red band in
   // 1980); that per-year mapping isn't modeled anywhere in this app, so it
   // isn't shown here.
+  // A scanned Survey of India sheet. It carries its own printed key inside
+  // the image, so there is nothing to reproduce here — but an entry with a
+  // note beats a bare theme name with silence under it.
+  toposheet: {
+    layerId: "toposheet",
+    classes: [],
+    note: "Scanned survey sheet — it carries its own printed legend in the image.",
+  },
   "satellite-imagery": {
     layerId: "satellite-imagery",
+    channels: true,
     classes: [
       { value: "R", label: "Red Band", color: "#FF0000" },
       { value: "G", label: "Green Band", color: "#00FF00" },
@@ -354,6 +410,7 @@ const PROVISIONAL_IDS = [
   "carbon-stock",
   "dsm",
   "dtm",
+  "tree-density",
 ];
 
 export const LEGEND_CONFIG: Record<string, RasterLegend> = {
@@ -362,6 +419,80 @@ export const LEGEND_CONFIG: Record<string, RasterLegend> = {
     PROVISIONAL_IDS.map((id) => [id, provisionalLegend(id)]),
   ),
 };
+
+/** An ordered legend's classes, low first, with the two ends named. */
+export interface RampScale {
+  classes: LegendClass[];
+  low: string;
+  high: string;
+  ticks?: string[];
+}
+
+/**
+ * Resolves a legend's ramp into something drawable: the classes in scale
+ * order whichever way round the delivered colour doc listed them, and the
+ * captions for the two ends.
+ *
+ * Lives here rather than in the legend component because the PNG export
+ * draws the same bar on a canvas — two renderers, one ordering, so the bar
+ * cannot come out reversed in one of them.
+ */
+export function rampScale(legend: RasterLegend): RampScale | undefined {
+  if (!legend.ramp || legend.classes.length === 0) return undefined;
+  const classes =
+    legend.ramp === "high-to-low" ? [...legend.classes].reverse() : legend.classes;
+  const [low, high] = legend.rampLabels ?? [
+    classes[0].label,
+    classes[classes.length - 1].label,
+  ];
+  return { classes, low, high, ticks: legend.rampTicks };
+}
+
+/**
+ * How a raster theme is represented as a single dot in a layer list.
+ *
+ * A theme has a palette rather than a colour, so something has to stand for
+ * it. A ramped palette is represented by its high end — dense forest, tall
+ * canopy, steep ground — which is what the theme is about and what someone
+ * is looking for on the map. A palette with no order to it has no such end,
+ * so it is shown as itself. A band key stands for nothing: an orthomosaic is
+ * not red just because its first row is the red channel.
+ */
+export type LayerDot =
+  | { kind: "solid"; color: string }
+  | { kind: "palette"; colors: string[] }
+  | { kind: "none" };
+
+/**
+ * Colours in a dot before it stops being one. Vegetation Change's palette is
+ * 25 classes; sliced across 8 pixels that is a third of a pixel each, which
+ * reads as mud. Sampling across the palette keeps the dot recognisably that
+ * theme's without pretending to show every class.
+ */
+const MAX_DOT_COLORS = 6;
+
+function sample<T>(items: T[], limit: number): T[] {
+  if (items.length <= limit) return items;
+  return Array.from(
+    { length: limit },
+    (_, i) => items[Math.round((i * (items.length - 1)) / (limit - 1))],
+  );
+}
+
+export function legendDot(legend: RasterLegend | undefined): LayerDot {
+  // A placeholder palette says nothing about the theme, and every provisional
+  // theme shares the same greys — ten identical near-black dots would be
+  // worse than none.
+  if (!legend || legend.channels || legend.provisional) return { kind: "none" };
+  if (legend.classes.length === 0) return { kind: "none" };
+
+  const scale = rampScale(legend);
+  if (scale) {
+    const high = scale.classes[scale.classes.length - 1];
+    return { kind: "solid", color: high.color };
+  }
+  return { kind: "palette", colors: sample(legend.classes, MAX_DOT_COLORS).map((c) => c.color) };
+}
 
 /**
  * `layerId` is a raster theme's group key, straight off its `layer_groups`

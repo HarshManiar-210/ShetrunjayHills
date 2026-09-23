@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ListTree, Menu as MenuIcon } from "lucide-react";
+import { ListTree, Menu as MenuIcon, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
+import { LayerPicker, SectionPicker } from "@/components/LayerPicker";
+import { ExportButton } from "@/components/ExportButton";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
 import {
@@ -45,13 +47,15 @@ import {
   isRasterToggleKey,
   layerIdOf,
   rasterToggleKey,
-  sectionToggleKeys,
+  sectionLayers,
   DEFAULT_RASTER_OPACITY,
 } from "@/lib/sections";
 import { DEFAULT_BASEMAP, type BasemapId } from "@/lib/basemaps";
 import type { LegendOverlay } from "@/components/LegendCard";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { RasterOverlay } from "@/components/Map";
+import type { ExportInput } from "@/lib/map-export";
+import type { Map as MapLibreMap } from "maplibre-gl";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -81,6 +85,18 @@ function formatMb(bytes: number): string {
   return `${Math.round(bytes / 1_000_000)} MB`;
 }
 
+// Whether the layers panel can be folded away: a chevron in its header, and
+// once folded, a small "Layers" button in its place. Flip to false to withhold
+// both — everything behind them keeps working, the panel simply stays open.
+const SHOW_PANEL_COLLAPSE = true;
+
+/**
+ * Vertical room the tool stack needs in the bottom-right corner: its six 28px
+ * buttons, a separator and padding come to 205px, plus its own inset and the
+ * gap a panel above it should keep.
+ */
+const TOOL_STACK_CLEARANCE = 248;
+
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
 type MobileSheet = "menu" | "legend" | null;
@@ -96,10 +112,33 @@ export function MapDashboard() {
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
   const [tourOpen, setTourOpen] = useState(false);
 
-  // One flat map of toggle key → on, covering every layer in the sidebar:
-  // any number, from any number of sections, draw at once. See lib/sections.ts
-  // for the key namespace. Nothing is on by default.
+  // Layers are chosen in two stages, and these are the two maps.
+  //
+  // `selected` is the navbar picker's answer to "which layers am I working
+  // with" — everything it holds is listed in the map's layers panel. `visible`
+  // is that panel's answer to "which of those are drawing", so it is always a
+  // subset: deselecting a layer switches it off on the way out. Both use the
+  // same toggle-key namespace (see lib/sections.ts), and both start empty.
+  //
+  // The split exists because the panel now floats over the map. A panel
+  // carrying every layer in the seed could only ever be a docked column;
+  // carrying the handful someone picked, it fits on the map.
+  // Which sections the first dropdown has picked. Its only job is to decide
+  // what the layer dropdown lists, so it holds section ids rather than toggle
+  // keys and never reaches the map.
+  const [activeSections, setActiveSections] = useState<Record<string, boolean>>({});
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
+
+  // The floating panel can be folded away to clear the map. Open by default:
+  // it is the way into the dashboard.
+  const [panelOpen, setPanelOpen] = useState(true);
+
+  // Whether the legend and statistics column has grown down into the corner
+  // the tool stack sits in, which moves the stack left of it.
+  const [infoReachesCorner, setInfoReachesCorner] = useState(false);
+  const infoRef = useRef<HTMLDivElement | null>(null);
+  const mapAreaRef = useRef<HTMLDivElement | null>(null);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
@@ -111,6 +150,12 @@ export function MapDashboard() {
   // being switched off cannot leave the bar pointing at nothing.
   const [preferredTheme, setPreferredTheme] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+
+  // The live map, for the PNG export: it needs the actual canvas, and the
+  // camera as it is at the moment of the click. A ref rather than state —
+  // nothing renders from it, and it must not re-render the dashboard when the
+  // map finishes mounting.
+  const mapRef = useRef<MapLibreMap | null>(null);
 
   // A layer big enough to be worth warning about, waiting on confirmation.
   const [heavyPrompt, setHeavyPrompt] = useState<HeavyLayer | null>(null);
@@ -170,6 +215,36 @@ export function MapDashboard() {
       cancelled = true;
     };
   }, [retryTick]);
+
+  /**
+   * Watch the legend and statistics column, and move the tool stack out of its
+   * way when it grows into the corner.
+   *
+   * Measured rather than derived from whether the cards are expanded: the
+   * column's height depends on how many layers are switched on and how many
+   * classes their legends carry, so two expanded cards can be shorter than one.
+   * The observer fires once when it starts watching, which is what sets the
+   * initial value — calling the check straight from the effect body would be
+   * setting state during the effect.
+   */
+  useEffect(() => {
+    const info = infoRef.current;
+    const area = mapAreaRef.current;
+    if (!info || !area) return;
+
+    const observer = new ResizeObserver(() => {
+      const panel = info.getBoundingClientRect();
+      const map = area.getBoundingClientRect();
+      // Zero height means the column is hidden at this breakpoint, in which
+      // case nothing is in the corner and the stack stays there.
+      setInfoReachesCorner(
+        panel.height > 0 && map.bottom - panel.bottom < TOOL_STACK_CLEARANCE,
+      );
+    });
+    observer.observe(info);
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
 
   // First visit runs the walkthrough on its own. The delay lets the lazily
   // loaded map and the sidebar mount, so the first spotlighted target is
@@ -256,37 +331,92 @@ export function MapDashboard() {
     setHeavyPrompt(null);
   }, [heavyPrompt, setKeysVisible]);
 
-  const toggleSection = useCallback(
-    (id: string, on: boolean) => {
-      const def = allSections.find((s) => s.id === id);
-      if (def) requestKeys(sectionToggleKeys(def), on);
-    },
-    [allSections, requestKeys],
-  );
-
   const toggleItem = useCallback(
     (key: string) => requestKeys([key], !visible[key]),
     [requestKeys, visible],
   );
 
-  /** The sidebar's "Reset view": switch every layer off and start again. */
+  /**
+   * Pick a layer into the panel, or take it back out.
+   *
+   * Both directions carry visibility with them. Selecting switches the layer
+   * on, because picking a layer out of the menu is already the act of asking
+   * to see it — arriving in the panel switched off would make every layer a
+   * two-click affair. Deselecting switches it off, because a layer that has
+   * left the panel must not carry on drawing with no control left anywhere
+   * that could stop it.
+   *
+   * Switching on still goes through requestKeys, so the size warning gates a
+   * layer picked from the menu exactly as it gates one switched on in the
+   * panel.
+   */
+  const toggleSelected = useCallback(
+    (key: string, picked: boolean) => {
+      setSelected((sel) => ({ ...sel, [key]: picked }));
+      if (picked) {
+        requestKeys([key], true);
+        return;
+      }
+      setVisible((v) => {
+        if (!v[key]) return v;
+        const next = { ...v };
+        delete next[key];
+        return next;
+      });
+    },
+    [requestKeys],
+  );
+
+  const deselectLayer = useCallback(
+    (key: string) => toggleSelected(key, false),
+    [toggleSelected],
+  );
+
+  /**
+   * Pick a section into the layer dropdown, or take it back out.
+   *
+   * Dropping a section drops its layers with it: they would otherwise stay
+   * selected and drawing with no dropdown left that lists them, and so no way
+   * to switch them off except the panel.
+   */
+  const toggleSectionActive = useCallback(
+    (id: string, on: boolean) => {
+      setActiveSections((a) => ({ ...a, [id]: on }));
+      if (on) return;
+      const section = sections.find((s) => s.id === id);
+      if (!section) return;
+      for (const layer of sectionLayers(section)) toggleSelected(layer.key, false);
+    },
+    [sections, toggleSelected],
+  );
+
+  /** The panel's "Reset view": switch every layer off, keeping the selection. */
   const resetLayers = useCallback(() => {
     setVisible({});
     setPlaying(false);
   }, []);
 
-  // Search result picked: switch that layer on and open its section so the
-  // row is visible in the sidebar. Always on, never a toggle — someone who
-  // searched for a layer wants to see it, not to turn off what they found.
-  // Picking a search result just switches the layer on. The sidebar is a flat
-  // list now and a row expands when it is on, so there is no disclosure state
-  // left to open on the way down — which is why `path` goes unused here.
+  // Search result picked: select it into the panel *and* switch it on. Always
+  // on, never a toggle — someone who searched for a layer wants to see it, not
+  // to turn off what they found. Search is the one route that skips the
+  // picker, which is the point of it: naming a layer should not require
+  // knowing which section holds it, so `path` goes unused here.
   const revealLayer = useCallback(
     (_path: string[], key: string) => {
+      // Search is the one route that skips both dropdowns, so it opens the
+      // layer's own section on the way past: without that the layer would be
+      // in the panel and on the map but missing from the dropdown that is
+      // supposed to list it.
+      const owner = sections.find((section) =>
+        sectionLayers(section).some((layer) => layer.key === key),
+      );
+      if (owner) setActiveSections((a) => ({ ...a, [owner.id]: true }));
+      setSelected((sel) => ({ ...sel, [key]: true }));
+      setPanelOpen(true);
       requestKeys([key], true);
       setMobileSheet(null);
     },
-    [requestKeys],
+    [requestKeys, sections],
   );
 
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
@@ -409,7 +539,14 @@ export function MapDashboard() {
   );
 
   const legendRasterLayers = useMemo(
-    () => activeRasters.map(({ section }) => ({ id: section.id, name: section.label })),
+    () =>
+      activeRasters.map(({ section, image }) => ({
+        id: section.id,
+        name: section.label,
+        // A single-image theme labels its one row with the theme's own name,
+        // so repeating it would read "Orthomosaic · Orthomosaic".
+        yearLabel: image.label === section.label ? undefined : image.label,
+      })),
     [activeRasters],
   );
 
@@ -439,10 +576,10 @@ export function MapDashboard() {
     [allSections, overlays],
   );
 
-  const sidebarSections = (
+  const layersPanel = (onCollapse?: () => void) => (
     <>
       {error && (
-        <div className="flex flex-col items-start gap-2 px-4 py-3">
+        <div className="flex flex-col items-start gap-2 px-3 py-3">
           <p className="text-sm text-destructive">Could not load layers.</p>
           <Button size="sm" variant="outline" onClick={() => setRetryTick((t) => t + 1)}>
             Retry
@@ -451,10 +588,12 @@ export function MapDashboard() {
       )}
       <SidebarSections
         sections={sections}
+        selected={selected}
         visibility={visible}
-        onToggleSection={toggleSection}
-        onToggleItem={toggleItem}
+        onToggleLayer={toggleItem}
+        onDeselectLayer={deselectLayer}
         onResetLayers={resetLayers}
+        onCollapse={onCollapse}
         rasterYear={rasterYear}
         onRasterYearChange={changeRasterYear}
         rasterOpacity={rasterOpacity}
@@ -466,8 +605,8 @@ export function MapDashboard() {
   // Legend and Statistics are two independent cards now, not two tabs of one.
   // The legend is what makes the map readable, so it should never be the thing
   // you switch away from to check a number.
-  const infoPanel = (className?: string) => (
-    <div className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
+  const infoPanel = (className?: string, ref?: React.Ref<HTMLDivElement>) => (
+    <div ref={ref} className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
       {/* Each card scrolls its own body rather than the column scrolling as a
           whole, so the two headers stay put and a long legend never pushes
           the statistics out of reach.
@@ -489,6 +628,48 @@ export function MapDashboard() {
     </div>
   );
 
+  /**
+   * Read at click time, not at render time: the map's pixels and its camera
+   * are whatever they are when someone presses export, and a snapshot taken
+   * when the header rendered would export a stale view.
+   */
+  const exportInput = useCallback((): ExportInput | null => {
+    const map = mapRef.current;
+    if (!map) return null;
+    const centre = map.getCenter();
+    return {
+      mapCanvas: map.getCanvas(),
+      basemap,
+      centre: { lat: centre.lat, lng: centre.lng },
+      zoom: map.getZoom(),
+      layers: visibleFeatures,
+      overlays: legendOverlays,
+      rasterLegends: legendRasterLayers,
+      rasterStats: statsRasterLayers,
+    };
+  }, [basemap, visibleFeatures, legendOverlays, legendRasterLayers, statsRasterLayers]);
+
+  // The two dropdowns, shared between the bar and the mobile sheet. Below md
+  // the bar cannot hold them: the brand, search, export and help controls
+  // already fill a phone's width, and two more would squeeze the search field
+  // to nothing. They move into the menu sheet instead, above the panel they
+  // fill.
+  const pickers = (
+    <>
+      <SectionPicker
+        sections={sections}
+        active={activeSections}
+        onToggleSection={toggleSectionActive}
+      />
+      <LayerPicker
+        sections={sections}
+        active={activeSections}
+        selected={selected}
+        onToggleLayer={toggleSelected}
+      />
+    </>
+  );
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <Header
@@ -497,64 +678,58 @@ export function MapDashboard() {
         onLoginClick={auth.openLogin}
         onLogoutClick={auth.logout}
         onHelpClick={() => setTourOpen(true)}
+        actions={<ExportButton input={exportInput} />}
+        layerPicker={
+          <div className="hidden shrink-0 items-center gap-2 md:flex">{pickers}</div>
+        }
         search={
           <LayerSearch sections={sections} visibility={visible} onSelect={revealLayer} />
         }
       />
 
+      {/* No docked column any more: the layers panel floats over the map's
+          top-left corner, so the map has the full width of the window. */}
       <div className="flex min-h-0 flex-1">
-        {/* Header mirrors this width for its brand block, so the search bar
-            above lines up with the map column — keep the two in step. */}
-        <aside className="hidden w-[18%] shrink-0 flex-col border-r border-border bg-sidebar xl:flex">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-thin">
-            <Sidebar variant="combined" user={auth.user} />
-            <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
-          </div>
-          <p className="shrink-0 border-t border-border/60 bg-panel-deep px-4 py-2.5 text-center text-[11px] tracking-wide text-muted-foreground">
-            © Shatrunjay Hills {new Date().getFullYear()}
-          </p>
-        </aside>
-
-        <div className="relative min-w-0 flex-1 p-4">
+        <div ref={mapAreaRef} className="relative min-w-0 flex-1 p-4">
           <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
             <Map
+              onReady={(map) => {
+                mapRef.current = map;
+              }}
               data={layers ?? EMPTY}
               visibility={visibility}
               rasterOverlays={rasterOverlays}
               overlays={overlays}
               overlayDefs={overlayDefs}
               basemap={basemap}
+              infoReachesCorner={infoReachesCorner}
+              // Handed to the map rather than positioned here, so it shares
+              // the bottom-centre stack with the coordinate readout: the
+              // readout then rides above whatever height the bar happens to
+              // be, instead of guessing at a fixed offset.
+              bottomCenter={
+                temporalThemes.length > 0 &&
+                focusedTheme && (
+                  <YearBar
+                    themes={temporalThemes}
+                    focusedId={focusedTheme}
+                    onFocusChange={setPreferredTheme}
+                    year={focusedYear}
+                    onYearChange={(year) => changeRasterYear(focusedTheme, year)}
+                    playing={playing}
+                    onPlayingChange={setPlaying}
+                    compareYear={focusedCompareYear}
+                    onCompareYearChange={changeCompareYear}
+                    blend={blend}
+                    onBlendChange={setBlend}
+                    className="pointer-events-auto hidden md:flex"
+                  />
+                )
+              }
             />
 
-            {/* Sits a row above the coordinate readout, which keeps the
-                bottom-centre position the brief shows for the readout while
-                giving the timeline its own line. */}
-            {temporalThemes.length > 0 && focusedTheme && (
-              // Centred within the band the other floating panels leave free,
-              // rather than within the map: the basemap switcher holds the
-              // bottom-left corner and the tool stack the bottom-right, and
-              // centring on the map itself runs the bar under both once it is
-              // wide. The container is click-through so the empty space beside
-              // the bar does not eat map drags.
-              <div className="pointer-events-none absolute right-14 bottom-14 left-[13.5rem] z-10 hidden justify-center md:flex">
-                <YearBar
-                  themes={temporalThemes}
-                  focusedId={focusedTheme}
-                  onFocusChange={setPreferredTheme}
-                  year={focusedYear}
-                  onYearChange={(year) => changeRasterYear(focusedTheme, year)}
-                  playing={playing}
-                  onPlayingChange={setPlaying}
-                  compareYear={focusedCompareYear}
-                  onCompareYearChange={changeCompareYear}
-                  blend={blend}
-                  onBlendChange={setBlend}
-                  className="pointer-events-auto"
-                />
-              </div>
-            )}
-
-            {/* Bottom-left: the map tools took the right edge, per the brief. */}
+            {/* Back in the bottom-left corner it started in, with the
+                tool stack beside it rather than opposite. */}
             <BasemapSwitcher
               value={basemap}
               onChange={setBasemap}
@@ -562,13 +737,39 @@ export function MapDashboard() {
             />
           </div>
 
-          {/* Top-right, now flush to the edge the tool stack vacated. Height
-              follows content, capped so a long legend stops clear of those
-              tools rather than running into them: the stack is a fixed 205px
-              (six 28px buttons, a separator and padding), plus its own inset
-              and a gap between the two. */}
+          {/* Top-left, mirroring the info panel's inset on the other edge.
+              The tool stack has left this side, so all that shares its column
+              below is the basemap switcher and the left end of the year bar's
+              row — which the bar does reach, since it fills its band at any
+              width narrower than its 72rem cap. It scrolls inside that. */}
+          {panelOpen || !SHOW_PANEL_COLLAPSE ? (
+            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-11rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
+              {/* Null for everyone but admins, who get the users link here. */}
+              <Sidebar variant="combined" user={auth.user} />
+              {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
+              <p className="shrink-0 border-t border-border/60 px-3 py-2 text-center text-[10px] tracking-wide text-muted-foreground">
+                © Shatrunjay Hills {new Date().getFullYear()}
+              </p>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="absolute top-3 left-3 z-10 hidden gap-2 shadow-e2 md:flex"
+              onClick={() => setPanelOpen(true)}
+            >
+              <PanelLeftOpen className="size-3.5" strokeWidth={2} />
+              Layers
+            </Button>
+          )}
+
+          {/* Top-right. It may grow down past the tool stack in the corner
+              below — the stack steps aside for it rather than the column
+              stopping short, which is what the cap used to do. It still stops
+              clear of the year bar's own row. */}
           {infoPanel(
-            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-17rem)] w-72 xl:flex",
+            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-7rem)] w-72 xl:flex",
+            infoRef,
           )}
         </div>
       </div>
@@ -595,8 +796,13 @@ export function MapDashboard() {
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
         <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 pt-12 scrollbar-thin">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pb-3 md:hidden">
+            {pickers}
+          </div>
           <Sidebar variant="combined" user={auth.user} />
-          <div className="flex-1 bg-linear-to-b from-panel to-panel-deep">{sidebarSections}</div>
+          <div className="flex flex-1 flex-col bg-linear-to-b from-panel to-panel-deep">
+            {layersPanel()}
+          </div>
         </SheetContent>
       </Sheet>
 

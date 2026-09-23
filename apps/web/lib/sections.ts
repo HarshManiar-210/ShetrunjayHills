@@ -338,29 +338,60 @@ export function flattenSections(sections: SectionDef[]): SectionDef[] {
 }
 
 /**
- * Every toggle key a section's header switch owns, including its whole
- * subtree — switching "Forest Layers" on means switching on everything under
- * it. Pending layers are left out: they have no data, so "switch the group
- * on" must not claim to have turned them on.
+ * One switchable layer, flattened out of the tree.
+ *
+ * Both places that list layers — the navbar picker and the map's layers panel
+ * — work from this, so a layer appears under the same heading, with the same
+ * label and colour, in both. They differ only in what they do with a row.
  */
-export function sectionToggleKeys(section: SectionDef): string[] {
-  const own =
+export interface SectionLayer {
+  /** Toggle key, in the visibility namespace described at the top of this file. */
+  key: string;
+  label: string;
+  /** No data delivered, so it is listed but cannot be switched on. */
+  pending: boolean;
+  /** The colour it draws in, when it has one of its own. */
+  color?: string;
+  icon: LucideIcon;
+  /** The subject colour of the group it came from. */
+  accent: SectionAccent;
+  /** Set when this layer *is* a raster theme, whose years and opacity it owns. */
+  raster?: SectionDef;
+}
+
+/**
+ * Every layer under a group, flattened to one level.
+ *
+ * A raster theme is one layer even though it holds an image per year, and a
+ * nested group contributes its rows rather than a second level of headings:
+ * however deep the seeded tree goes, a group's layers are a flat list.
+ */
+export function sectionLayers(section: SectionDef): SectionLayer[] {
+  const own: SectionLayer[] =
     section.mode === "layer"
-      ? [rasterToggleKey(section.id)]
-      : section.items.filter((item) => !item.pending).map((item) => item.key);
-  return [...own, ...section.children.flatMap(sectionToggleKeys)];
+      ? [
+          {
+            key: rasterToggleKey(section.id),
+            label: section.label,
+            pending: false,
+            icon: section.icon,
+            accent: section.accent,
+            raster: section,
+          },
+        ]
+      : section.items.map((item) => ({
+          key: item.key,
+          label: item.label,
+          pending: Boolean(item.pending),
+          color: item.color,
+          icon: item.icon ?? iconForGeometry(item.geometryKind),
+          accent: section.accent,
+        }));
+
+  // Children are walked either way: a raster theme can still have groups
+  // seeded beneath it.
+  return [...own, ...section.children.flatMap(sectionLayers)];
 }
 
 /** What a raster theme draws at until its opacity slider is touched. */
 export const DEFAULT_RASTER_OPACITY = 0.75;
-
-/**
- * Whether a section has anything to disclose. Every raster theme does — it
- * has an opacity slider even when it is a single image with no year to pick.
- * A group with one layer and no children is fully expressed by its header
- * switch, so it gets no chevron.
- */
-export function sectionIsExpandable(section: SectionDef): boolean {
-  if (section.children.length > 0) return true;
-  return section.mode === "layer" ? true : section.items.length > 1;
-}

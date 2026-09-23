@@ -93,6 +93,12 @@
   --input: oklch(0.916 0.004 96.0);
   --ring: oklch(0.560 0.006 96.0);
   --radius: 0.75rem;
+
+  /* Width of the layers panel floating over the map. Shared with the header,
+     whose brand block is this wide so the search field starts exactly where
+     the panel ends — which holds because the panel's inset (left-3) is the
+     same as the bar's gap (gap-3). Change it here and both follow. */
+  --layers-panel-w: 18rem;
   --sidebar: oklch(1 0 0);
   --sidebar-foreground: oklch(0.218 0.000 89.9);
   --sidebar-primary: oklch(0.325 0.006 96.0);
@@ -246,6 +252,17 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background-color: var(--border);
     border-radius: 9999px;
+  }
+
+  /* No scrollbar at all, for a row that scrolls sideways and is short enough
+     to read as one: the filter chips above the layers panel. A 6px track
+     under a 24px row of pills is most of a second row of chrome. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }
 /* MapLibre ships its own light chrome — the attribution pill, popups and the

@@ -111,18 +111,18 @@ export function YearBar({
       data-tour="year-bar"
       className={cn(
         // Fills the band its container leaves free rather than capping at a
-        // fixed width, so the year ticks and the compare control get room
-        // instead of crowding into the middle of the map. The cap only bites
-        // on a very wide screen, where a bar spanning the whole map would be
-        // more travel than the control is worth.
-        "flex w-full max-w-[72rem] flex-col gap-2 rounded-2xl bg-card/95 px-3 py-2.5 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm",
+        // fixed width, so the track has room to breathe instead of crowding
+        // into the middle of the map. The cap only bites on a very wide
+        // screen, where a bar spanning everything is more travel than the
+        // control is worth.
+        "flex w-full max-w-[72rem] flex-col rounded-2xl bg-card/95 px-3 py-1.5 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm",
         className,
       )}
     >
       <div className="flex items-center gap-3">
         <Button
           size="icon-sm"
-          className="shrink-0 rounded-full"
+          className="size-7 shrink-0 rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
           aria-label={playing ? "Pause the timeline" : "Play through the years"}
           onClick={() => {
             if (playing) {
@@ -139,13 +139,20 @@ export function YearBar({
           {playing ? <Pause /> : <Play />}
         </Button>
 
-        {/* Which theme the bar drives. A plain label when there is only one, so
-            a picker with a single option never appears. */}
+        {/* The selected year leads, as in the reference: it is the one fact
+            the bar exists to report, so it is read before the layer name. */}
         <div className="min-w-0 shrink-0">
+          <p className="text-[13px] leading-tight font-semibold tabular-nums">
+            {years[current]?.label}
+          </p>
           {themes.length > 1 ? (
             <Select value={theme.id} onValueChange={onFocusChange}>
               <SelectTrigger
-                className="h-7 w-48 border-0 bg-transparent px-1 text-xs font-medium shadow-none"
+                // Widens where the bar's band has room for it. At w-44 a
+                // name like "Historical Land Use (Satellite: 1978–2025)"
+                // lost its second half, which is the part that says which
+                // of the two land-use themes this is.
+                className="h-auto w-44 border-0 bg-transparent p-0 text-[10px] text-muted-foreground shadow-none focus-visible:ring-0 xl:w-56"
                 aria-label="Which layer the timeline controls"
               >
                 <SelectValue />
@@ -159,32 +166,65 @@ export function YearBar({
               </SelectContent>
             </Select>
           ) : (
-            <p className="truncate px-1 text-xs font-medium">{theme.label}</p>
+            <p className="truncate text-[10px] leading-tight text-muted-foreground" title={theme.label}>
+              {theme.label} · {years.length} years
+            </p>
           )}
-          <p className="px-1 text-[10px] text-muted-foreground">{years.length} years</p>
         </div>
 
-        {/* The timeline. A row of ticks rather than a slider: the years are
-            unevenly spaced (1980, 1989, 1998, 2008, 2018, 2025, 2026) and a
-            proportional axis would crush the recent ones together. */}
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto scrollbar-thin">
+        {/* The timeline as a track with a node per year.
+            Nodes are evenly spaced rather than placed proportionally: the
+            series is unevenly sampled (1980, 1989, 1998, 2008, 2018, 2025,
+            2026) and a true time axis crushes the recent years into each
+            other, which are the ones most often compared. */}
+        <div className="relative flex min-w-0 flex-1 items-start justify-between gap-1 px-2">
+          {/* One rule behind every node, inset by half a node so it starts and
+              ends at the first and last centres rather than overshooting. */}
+          <span
+            aria-hidden
+            className="absolute top-[7px] right-2 left-2 h-px bg-border"
+          />
+          <span
+            aria-hidden
+            className="absolute top-[7px] left-2 h-px bg-brand transition-[width]"
+            style={{
+              width:
+                years.length > 1
+                  ? `calc((100% - 1rem) * ${current / (years.length - 1)})`
+                  : "0px",
+            }}
+          />
+
           {years.map((y, i) => {
             const active = i === current;
             const compared = y.year === compareYear;
+            const past = i < current;
             return (
               <button
                 key={y.year}
                 type="button"
                 aria-current={active}
+                title={y.label}
                 onClick={() => onYearChange(y.year)}
-                className={cn(
-                  "shrink-0 rounded-md px-2.5 py-1 text-xs tabular-nums transition-colors",
-                  active && "bg-primary font-semibold text-primary-foreground",
-                  !active && compared && "bg-primary/20 font-medium text-foreground",
-                  !active && !compared && "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
-                )}
+                className="group relative flex shrink-0 flex-col items-center gap-1"
               >
-                {y.label}
+                <span
+                  className={cn(
+                    "size-[15px] rounded-full border-2 bg-card transition-colors",
+                    active && "border-brand bg-brand",
+                    !active && compared && "border-brand bg-card",
+                    !active && !compared && past && "border-brand/60",
+                    !active && !compared && !past && "border-border group-hover:border-brand/60",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-[10px] leading-none tabular-nums transition-colors",
+                    active ? "font-semibold text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {y.label}
+                </span>
               </button>
             );
           })}
@@ -193,7 +233,7 @@ export function YearBar({
         <Button
           variant={comparing ? "default" : "outline"}
           size="sm"
-          className="shrink-0 gap-1.5"
+          className="h-7 shrink-0 gap-1.5"
           onClick={() => {
             if (comparing) {
               onCompareYearChange(null);
@@ -212,7 +252,7 @@ export function YearBar({
       </div>
 
       {comparing && (
-        <div className="flex items-center gap-3 border-t border-border/60 pt-2">
+        <div className="mt-2 flex items-center gap-3 border-t border-border/60 pt-2">
           <Select
             value={String(compareYear)}
             onValueChange={(v) => onCompareYearChange(Number(v))}
