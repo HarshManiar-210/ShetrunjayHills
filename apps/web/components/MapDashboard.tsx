@@ -572,7 +572,13 @@ export function MapDashboard() {
       allSections
         .flatMap((section) => section.items)
         .filter((item) => overlays[item.key])
-        .map(({ key, label, color, geometryKind }) => ({ key, label, color, geometryKind })),
+        .map(({ key, label, color, geometryKind, categories }) => ({
+          key,
+          label,
+          color,
+          geometryKind,
+          categories,
+        })),
     [allSections, overlays],
   );
 

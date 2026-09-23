@@ -1,4 +1,5 @@
 import { overlayDataUrl, type OverlayMeta } from "@/lib/overlays-api";
+import type { LegendClass } from "@/lib/legend-config";
 
 // Static reference overlays — basemap-style reference geometry, not
 // RBAC-permissioned layers, so they bypass the DB-backed `layers` table on
@@ -13,6 +14,14 @@ export interface OverlayDef {
   url: string;
   color: string;
   kind: "line" | "fill" | "outline" | "point";
+  /**
+   * Set together, when the layer draws per-feature instead of in one flat
+   * `color`: colorField is the GeoJSON property to key the paint colour off
+   * (e.g. "Type"), categories is that property's value → colour/label rows.
+   * Undefined for every flat-colour overlay, which is still the common case.
+   */
+  colorField?: string;
+  categories?: LegendClass[];
   /**
    * SW/NE corners of the layer's own geometry, from its `static_overlays`
    * row. The map frames a layer from this the moment its switch is flipped,
@@ -43,6 +52,8 @@ export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
       url: overlayDataUrl(o.key),
       color: o.color ?? "#6B7280",
       kind: o.kind,
+      colorField: o.color_field,
+      categories: o.categories,
       tiled: o.tiled ?? false,
       bounds:
         o.min_lon != null && o.min_lat != null && o.max_lon != null && o.max_lat != null

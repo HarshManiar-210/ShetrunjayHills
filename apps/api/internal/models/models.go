@@ -2,6 +2,8 @@
 // repositories. Rows, not code, define which roles/layers/permissions exist.
 package models
 
+import "encoding/json"
+
 type User struct {
 	ID           int    `json:"id"`
 	Username     string `json:"username"`
@@ -29,9 +31,9 @@ type StaticOverlay struct {
 	// its own parent.
 	GroupID   int    `json:"group_id"`
 	AssetType string `json:"asset_type"`
-	Kind      string   `json:"kind,omitempty"`
-	Color     string   `json:"color,omitempty"`
-	FilePath  string   `json:"-"`
+	Kind      string `json:"kind,omitempty"`
+	Color     string `json:"color,omitempty"`
+	FilePath  string `json:"-"`
 	// Status is 'available' or 'pending' — a pending row announces a layer
 	// whose data hasn't been delivered yet (no kind/color/file_path).
 	Status string `json:"status"`
@@ -43,6 +45,13 @@ type StaticOverlay struct {
 	MinLat *float64 `json:"min_lat,omitempty"`
 	MaxLon *float64 `json:"max_lon,omitempty"`
 	MaxLat *float64 `json:"max_lat,omitempty"`
+	// ColorField + Categories replace the flat Color above for a layer whose
+	// features carry their own class (Forest Cover FSI's density classes,
+	// Forest Type FSI's species types): ColorField names the GeoJSON property
+	// holding that class, and Categories is that class's value/label/color
+	// rows, straight out of the DB. nil/nil for every flat-colour row.
+	ColorField string          `json:"color_field,omitempty"`
+	Categories json.RawMessage `json:"categories,omitempty"`
 	// SizeBytes is the asset's size on disk, filled in by the Overlays
 	// handler rather than stored in the DB — statting the file cannot drift
 	// out of step with it the way a seeded column would. Lets the frontend

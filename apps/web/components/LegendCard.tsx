@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LayerSwatch, type SwatchGeometryKind } from "@/components/LayerSwatch";
-import { legendFor, rampScale, type RampScale } from "@/lib/legend-config";
+import { legendFor, rampScale, type LegendClass, type RampScale } from "@/lib/legend-config";
 import { geometryKindOf } from "@/lib/sections";
 import type { LayerFeature } from "@/lib/layers-api";
 
@@ -45,6 +45,8 @@ export interface LegendOverlay {
   label: string;
   color: string;
   geometryKind: SwatchGeometryKind;
+  /** Set for a per-feature overlay (Forest Cover/Forest Type FSI) — see SectionItem.categories. */
+  categories?: LegendClass[];
 }
 
 /**
@@ -122,6 +124,11 @@ export function LegendContent({
   className?: string;
 }) {
   const rows = uniqueLayers(layers);
+  // A categorical overlay (Forest Cover/Forest Type FSI) draws per-feature,
+  // so one swatch can't stand for it — it gets a class list instead, laid
+  // out the same way a raster theme's below.
+  const plainOverlays = overlays.filter((o) => !o.categories?.length);
+  const categoricalOverlays = overlays.filter((o) => o.categories?.length);
 
   if (rows.length === 0 && overlays.length === 0 && rasterLayers.length === 0) {
     return (
@@ -133,7 +140,7 @@ export function LegendContent({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      {(rows.length > 0 || overlays.length > 0) && (
+      {(rows.length > 0 || plainOverlays.length > 0) && (
         <div className="flex flex-col gap-1.5">
           {rows.map((feature) => (
             <div key={feature.properties.id} className="flex items-center gap-2 text-sm">
@@ -144,7 +151,7 @@ export function LegendContent({
               <span>{feature.properties.name}</span>
             </div>
           ))}
-          {overlays.map((overlay) => (
+          {plainOverlays.map((overlay) => (
             <div key={overlay.key} className="flex items-center gap-2 text-sm">
               <LayerSwatch color={overlay.color} geometryKind={overlay.geometryKind} />
               <span>{overlay.label}</span>
@@ -152,6 +159,22 @@ export function LegendContent({
           ))}
         </div>
       )}
+
+      {categoricalOverlays.map((overlay) => (
+        <div key={overlay.key} className="flex flex-col gap-1.5">
+          <span className="text-[13px] leading-tight font-semibold">{overlay.label}</span>
+          <div className="flex flex-col gap-1">
+            {overlay.categories!.map((cls) => (
+              <div key={cls.value} className="flex items-center gap-1.5 text-xs">
+                <LayerSwatch color={cls.color} geometryKind={overlay.geometryKind} />
+                <span className="truncate" title={cls.label}>
+                  {cls.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
 
       {rasterLayers.map((raster) => {
         const legend = legendFor(raster.id);

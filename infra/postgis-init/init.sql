@@ -110,7 +110,16 @@ CREATE TABLE static_overlays (
     min_lon    DOUBLE PRECISION,
     min_lat    DOUBLE PRECISION,
     max_lon    DOUBLE PRECISION,
-    max_lat    DOUBLE PRECISION
+    max_lat    DOUBLE PRECISION,
+    -- A vector layer normally draws in one flat `color`. A row whose features
+    -- carry their own class (Forest Cover FSI's density classes, Forest
+    -- Type's species types) instead sets color_field to the GeoJSON property
+    -- holding that class, and categories to that class's value/label/color
+    -- rows — the same shape lib/legend-config.ts already uses for a raster
+    -- theme's classes, so the legend renders it the same way. NULL/NULL for
+    -- every flat-colour row, which is still the common case.
+    color_field TEXT,
+    categories  JSONB
 );
 
 -- ---------------------------------------------------------------------------
@@ -232,7 +241,6 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('drone-data',                  'Drone Data',                  NULL, 3),
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
-    ('biodiversity-data',           'Biodiversity Data',           NULL, 6),
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
     ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
     ('reference',                   'Reference',                   NULL, 9);
@@ -265,11 +273,13 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
 
--- Tree Density is a raster, so it gets its own group under Drone Analysis: a
--- group holding placed rasters becomes a single layer, which would swallow
--- Tree Height next to it.
+-- Tree Density and Growing Stock are both rasters, so each gets its own group
+-- under Drone Analysis: a group holding placed rasters becomes a single
+-- layer, which would swallow Tree Height (and the still-pending rows) next
+-- to it.
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
-    ('tree-density', 'Tree Density', grp('drone-analysis'), 1);
+    ('tree-density',  'Tree Density',   grp('drone-analysis'), 1),
+    ('growing-stock', 'Growing Stock',  grp('drone-analysis'), 2);
 
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
@@ -305,6 +315,35 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
     ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
+
+-- Forest Survey of India (FSI) 2023 notification: official density-class and
+-- species-type polygons, delivered as vector data rather than as imagery.
+-- Distinct from the yearwise Forest Cover/Forest Type raster themes above
+-- (drone-classified imagery, one image per year) — this is one year's
+-- official government classification, and each feature carries its own class
+-- in a `Type` property, so these sit directly under Forest Layers rather than
+-- either raster subgroup (whose `forest-cover`/`forest-type` groups already
+-- render as a single raster layer with a year picker — a vector row seeded
+-- there would be silently dropped, see lib/sections.ts buildSections).
+-- color_field + categories drive the map's per-feature fill and the legend's
+-- class list; color is just the most common class, for the layer's own
+-- swatch in the sidebar and layer picker.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('forestCoverFSI', 'Forest Cover FSI 2023', grp('forest-layers'), 'vector', 'fill', '#b4d862', 'Type', '[
+        {"value": "MODERATELY DENSE FOREST (Tree Canopy density 40% & above but < 70%)", "label": "Moderately Dense Forest", "color": "#1e641e"},
+        {"value": "OPEN FOREST (Tree Canopy density 10% & above but < 40%)", "label": "Open Forest", "color": "#b4d862"},
+        {"value": "SCRUB (Tree Canopy density < 10%)", "label": "Scrub", "color": "#ff0000"},
+        {"value": "WATER", "label": "Water", "color": "#2839c9"}
+    ]', 'vector-data/forest-cover-FSI.geojson', 7, 71.729094, 21.451799, 71.821913, 21.511363),
+    ('forestTypeFSI', 'Forest Type FSI 2023', grp('forest-layers'), 'vector', 'fill', '#20c0d9', 'Type', '[
+        {"value": "3B/C2 Southern moist mixed deciduous forest", "label": "3B/C2 Southern moist mixed deciduous forest", "color": "#ea808f"},
+        {"value": "5/DS4 Dry Grassland", "label": "5/DS4 Dry Grassland", "color": "#cd81e2"},
+        {"value": "5/E 8c Salvadora-T amarix scrub", "label": "5/E 8c Salvadora-Tamarix scrub", "color": "#17e48f"},
+        {"value": "5/E1 Anogeissus pendula Forest", "label": "5/E1 Anogeissus pendula Forest", "color": "#20c0d9"},
+        {"value": "6/E4 Salvadora scrub", "label": "6/E4 Salvadora scrub", "color": "#eaaa7d"},
+        {"value": "Acacia senegal forest", "label": "Acacia senegal forest", "color": "#a0eb55"},
+        {"value": "Water", "label": "Water", "color": "#00206d"}
+    ]', 'vector-data/forest-type-FSI.geojson', 8, 71.728918, 21.451784, 71.821736, 21.511611);
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
@@ -435,10 +474,12 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
--- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
--- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
+-- Tree Density and Growing Stock: both drone-derived, tight-cropped to the
+-- flight footprint, so both take the Orthomosaic's bounds (pixel aspect 1.564
+-- and 1.555 respectively vs 1.566 in Web Mercator).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
     -- Habitat Suitability: extent supplied with the raster.
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
 
@@ -459,11 +500,10 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('forestType', 'Forest Type', grp('forest-type'),   'raster', '', 1, 'pending');
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
-    -- Drone Analysis. Tree Height and Tree Species are seeded above; these
-    -- are the rest of the brief's list for that group.
-    ('treeCount',           'Tree Count',                  grp('drone-analysis'), 'vector', NULL, NULL, '', 4, 'pending'),
+    -- Drone Analysis. Tree Height and Tree Species are seeded above, Tree
+    -- Density and Growing Stock are their own raster groups below; these are
+    -- the rest of the brief's list for that group.
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
-    ('growingStock',        'Growing Stock',               grp('drone-analysis'), 'vector', NULL, NULL, '', 6, 'pending'),
     ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
 
     ('floodDepth', 'Flood Depth (m)', grp('hydrogeology'), 'vector', NULL, NULL, '', 7, 'pending'),
@@ -475,11 +515,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 3, 'pending'),
     ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 4, 'pending'),
 
-    -- Biodiversity Data. The brief marks Rare Species as something to
-    -- highlight within Field Plots; it is its own layer so it can be styled
-    -- and switched independently once the data lands.
-    ('fieldPlots',         'Field Plots and Statistics', grp('biodiversity-data'), 'vector', NULL, NULL, '', 1, 'pending'),
-    ('rareSpecies',        'Rare Species',               grp('biodiversity-data'), 'vector', NULL, NULL, '', 2, 'pending'),
     ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
 
     ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
