@@ -110,7 +110,16 @@ CREATE TABLE static_overlays (
     min_lon    DOUBLE PRECISION,
     min_lat    DOUBLE PRECISION,
     max_lon    DOUBLE PRECISION,
-    max_lat    DOUBLE PRECISION
+    max_lat    DOUBLE PRECISION,
+    -- A vector layer normally draws in one flat `color`. A row whose features
+    -- carry their own class (Forest Cover FSI's density classes, Forest
+    -- Type's species types) instead sets color_field to the GeoJSON property
+    -- holding that class, and categories to that class's value/label/color
+    -- rows — the same shape lib/legend-config.ts already uses for a raster
+    -- theme's classes, so the legend renders it the same way. NULL/NULL for
+    -- every flat-colour row, which is still the common case.
+    color_field TEXT,
+    categories  JSONB
 );
 
 -- ---------------------------------------------------------------------------
@@ -305,6 +314,35 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
     ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
+
+-- Forest Survey of India (FSI) 2023 notification: official density-class and
+-- species-type polygons, delivered as vector data rather than as imagery.
+-- Distinct from the yearwise Forest Cover/Forest Type raster themes above
+-- (drone-classified imagery, one image per year) — this is one year's
+-- official government classification, and each feature carries its own class
+-- in a `Type` property, so these sit directly under Forest Layers rather than
+-- either raster subgroup (whose `forest-cover`/`forest-type` groups already
+-- render as a single raster layer with a year picker — a vector row seeded
+-- there would be silently dropped, see lib/sections.ts buildSections).
+-- color_field + categories drive the map's per-feature fill and the legend's
+-- class list; color is just the most common class, for the layer's own
+-- swatch in the sidebar and layer picker.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('forestCoverFSI', 'Forest Cover FSI 2023', grp('forest-layers'), 'vector', 'fill', '#b4d862', 'Type', '[
+        {"value": "MODERATELY DENSE FOREST (Tree Canopy density 40% & above but < 70%)", "label": "Moderately Dense Forest", "color": "#1e641e"},
+        {"value": "OPEN FOREST (Tree Canopy density 10% & above but < 40%)", "label": "Open Forest", "color": "#b4d862"},
+        {"value": "SCRUB (Tree Canopy density < 10%)", "label": "Scrub", "color": "#ff0000"},
+        {"value": "WATER", "label": "Water", "color": "#2839c9"}
+    ]', 'vector-data/forest-cover-FSI.geojson', 7, 71.729094, 21.451799, 71.821913, 21.511363),
+    ('forestTypeFSI', 'Forest Type FSI 2023', grp('forest-layers'), 'vector', 'fill', '#20c0d9', 'Type', '[
+        {"value": "3B/C2 Southern moist mixed deciduous forest", "label": "3B/C2 Southern moist mixed deciduous forest", "color": "#ea808f"},
+        {"value": "5/DS4 Dry Grassland", "label": "5/DS4 Dry Grassland", "color": "#cd81e2"},
+        {"value": "5/E 8c Salvadora-T amarix scrub", "label": "5/E 8c Salvadora-Tamarix scrub", "color": "#17e48f"},
+        {"value": "5/E1 Anogeissus pendula Forest", "label": "5/E1 Anogeissus pendula Forest", "color": "#20c0d9"},
+        {"value": "6/E4 Salvadora scrub", "label": "6/E4 Salvadora scrub", "color": "#eaaa7d"},
+        {"value": "Acacia senegal forest", "label": "Acacia senegal forest", "color": "#a0eb55"},
+        {"value": "Water", "label": "Water", "color": "#00206d"}
+    ]', 'vector-data/forest-type-FSI.geojson', 8, 71.728918, 21.451784, 71.821736, 21.511611);
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
