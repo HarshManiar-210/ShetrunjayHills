@@ -28,7 +28,6 @@ import {
   Zap,
   ScrollText,
   Ruler,
-  Hash,
   Scale,
   Waves,
   type LucideIcon,
@@ -163,6 +162,7 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
 
   "drone-analysis": { accent: "canopy", icon: Sprout },
   "tree-density": { accent: "canopy", icon: TreePine },
+  "growing-stock": { accent: "canopy", icon: Scale },
   hydrogeology: { accent: "water", icon: Droplets },
   "existing-water-conservation": { accent: "water", icon: Dam },
   "proposed-conservation-sites": { accent: "water", icon: Target },
@@ -192,7 +192,6 @@ const ITEM_STYLE: Record<string, LucideIcon> = {
   lineament: Zap,
   dyke: Ruler,
   treeHeight: Ruler,
-  treeCount: Hash,
   carbonStock: Scale,
   greenwash: Sprout,
   forestBoundary: Trees,
