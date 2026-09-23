@@ -241,7 +241,6 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('drone-data',                  'Drone Data',                  NULL, 3),
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
-    ('biodiversity-data',           'Biodiversity Data',           NULL, 6),
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
     ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
     ('reference',                   'Reference',                   NULL, 9);
@@ -513,11 +512,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 3, 'pending'),
     ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 4, 'pending'),
 
-    -- Biodiversity Data. The brief marks Rare Species as something to
-    -- highlight within Field Plots; it is its own layer so it can be styled
-    -- and switched independently once the data lands.
-    ('fieldPlots',         'Field Plots and Statistics', grp('biodiversity-data'), 'vector', NULL, NULL, '', 1, 'pending'),
-    ('rareSpecies',        'Rare Species',               grp('biodiversity-data'), 'vector', NULL, NULL, '', 2, 'pending'),
     ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
 
     ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
