@@ -273,11 +273,13 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
 
--- Tree Density is a raster, so it gets its own group under Drone Analysis: a
--- group holding placed rasters becomes a single layer, which would swallow
--- Tree Height next to it.
+-- Tree Density and Growing Stock are both rasters, so each gets its own group
+-- under Drone Analysis: a group holding placed rasters becomes a single
+-- layer, which would swallow Tree Height (and the still-pending rows) next
+-- to it.
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
-    ('tree-density', 'Tree Density', grp('drone-analysis'), 1);
+    ('tree-density',  'Tree Density',   grp('drone-analysis'), 1),
+    ('growing-stock', 'Growing Stock',  grp('drone-analysis'), 2);
 
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
@@ -472,10 +474,12 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
--- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
--- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 in Web Mercator).
+-- Tree Density and Growing Stock: both drone-derived, tight-cropped to the
+-- flight footprint, so both take the Orthomosaic's bounds (pixel aspect 1.564
+-- and 1.555 respectively vs 1.566 in Web Mercator).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity', 'Tree Density', grp('tree-density'), 'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
     -- Habitat Suitability: extent supplied with the raster.
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
 
@@ -496,11 +500,10 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('forestType', 'Forest Type', grp('forest-type'),   'raster', '', 1, 'pending');
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
-    -- Drone Analysis. Tree Height and Tree Species are seeded above; these
-    -- are the rest of the brief's list for that group.
-    ('treeCount',           'Tree Count',                  grp('drone-analysis'), 'vector', NULL, NULL, '', 4, 'pending'),
+    -- Drone Analysis. Tree Height and Tree Species are seeded above, Tree
+    -- Density and Growing Stock are their own raster groups below; these are
+    -- the rest of the brief's list for that group.
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
-    ('growingStock',        'Growing Stock',               grp('drone-analysis'), 'vector', NULL, NULL, '', 6, 'pending'),
     ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
 
     ('floodDepth', 'Flood Depth (m)', grp('hydrogeology'), 'vector', NULL, NULL, '', 7, 'pending'),
