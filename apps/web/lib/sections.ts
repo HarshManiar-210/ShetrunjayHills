@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import type { LayerGroup, OverlayMeta } from "@/lib/overlays-api";
 import type { SwatchGeometryKind } from "@/components/LayerSwatch";
+import type { LegendClass } from "@/lib/legend-config";
 
 /**
  * The sidebar's tree, assembled from two API lists: `layer_groups` (the
@@ -96,6 +97,12 @@ export interface SectionItem {
   pending?: boolean;
   /** Presentation only — see ITEM_STYLE. Falls back to iconForGeometry when unset. */
   icon?: LucideIcon;
+  /**
+   * Set when the overlay draws per-feature (Forest Cover/Forest Type FSI's
+   * classes) rather than in its one flat `color` — the legend then shows this
+   * class list instead of a single swatch. Absent for every other layer.
+   */
+  categories?: LegendClass[];
 }
 
 export interface RasterYear {
@@ -325,6 +332,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         geometryKind: swatchKindOf(o.kind),
         pending: o.status === "pending",
         icon: ITEM_STYLE[o.key],
+        categories: o.categories,
       })),
     };
   }

@@ -31,6 +31,7 @@ import { MapControls } from "@/components/MapControls";
 import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
 import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
+import type { LegendClass } from "@/lib/legend-config";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 import { cn } from "@/lib/utils";
 
@@ -399,8 +400,31 @@ function flowLayerIds(defs: OverlayDef[]): string[] {
 // "missing layer" errors when a switch is flipped rapidly. Safe to call
 // repeatedly with a growing def list (e.g. once the overlay-metadata fetch
 // lands after the map has already loaded) — an existing source is skipped.
+// A flat colour for most overlays, or — when the row carries a colorField +
+// categories (Forest Cover FSI's density classes, Forest Type FSI's species
+// types) — a per-feature `match` on that property, falling back to the
+// overlay's own colour for a value not in the list. Typed loosely: MapLibre's
+// expression grammar lives in @maplibre/maplibre-gl-style-spec, which pnpm
+// doesn't hoist into this package for import.
+// ponytail: any here, not a hand-rolled expression type.
+function overlayColorExpr(
+  color: string,
+  colorField: string | undefined,
+  categories: LegendClass[] | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  if (!colorField || !categories || categories.length === 0) return color;
+  return [
+    "match",
+    ["get", colorField],
+    ...categories.flatMap((c) => [c.value, c.color]),
+    color,
+  ];
+}
+
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, tiled, url } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url } of defs) {
+    const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
 
@@ -436,7 +460,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": color, "line-width": LINE_WIDTH },
+        paint: { "line-color": fillColor, "line-width": LINE_WIDTH },
       });
       map.addLayer({
         id: `${sourceId}-flow`,
@@ -462,7 +486,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         ...from,
         layout: { visibility: "none" },
         paint: {
-          "circle-color": color,
+          "circle-color": fillColor,
           "circle-radius": 2.5,
           "circle-stroke-width": 0.5,
           "circle-stroke-color": CASING,
@@ -479,7 +503,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         layout: { visibility: "none" },
-        paint: { "fill-color": color, "fill-opacity": kind === "outline" ? 0 : 0.15 },
+        paint: { "fill-color": fillColor, "fill-opacity": kind === "outline" ? 0 : 0.15 },
       });
       map.addLayer({
         id: `${sourceId}-outline`,
@@ -487,7 +511,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         layout: { visibility: "none" },
-        paint: { "line-color": color, "line-width": OUTLINE_WIDTH },
+        paint: { "line-color": fillColor, "line-width": OUTLINE_WIDTH },
       });
       map.addLayer({
         id: `${sourceId}-flow`,

@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/layers-api";
+import type { LegendClass } from "@/lib/legend-config";
 
 // Mirrors models.StaticOverlay's JSON shape (apps/api/internal/models) —
 // file_path never leaves the server, only the key needed to ask
@@ -17,6 +18,16 @@ export interface OverlayMeta {
    */
   kind?: "line" | "fill" | "outline" | "point";
   color?: string;
+  /**
+   * Set together, on a row whose features carry their own class (Forest
+   * Cover FSI's density classes, Forest Type FSI's species types) instead of
+   * drawing in one flat `color`: color_field is the GeoJSON property holding
+   * that class, and categories is that class's value/label/color, in the
+   * same shape a raster theme's legend classes already use. Absent on every
+   * flat-colour row, which is still the common case.
+   */
+  color_field?: string;
+  categories?: LegendClass[];
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
   min_lon?: number;
