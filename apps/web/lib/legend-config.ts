@@ -509,7 +509,7 @@ export interface RampScale {
  * order whichever way round the delivered colour doc listed them, and the
  * captions for the two ends.
  *
- * Lives here rather than in the legend component because the PNG export
+ * Lives here rather than in the legend component because the JPG export
  * draws the same bar on a canvas — two renderers, one ordering, so the bar
  * cannot come out reversed in one of them.
  */
