@@ -54,7 +54,7 @@ function PickerTrigger({
         )}
       >
         <Icon className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
-        <span className="hidden sm:inline">{label}</span>
+        <span className="hidden max-w-40 truncate sm:inline">{label}</span>
         {count > 0 && (
           <span className="rounded-full bg-brand px-1.5 py-px text-[10px] font-semibold tabular-nums text-brand-foreground">
             {count}
@@ -194,6 +194,56 @@ export function SectionPicker({
 }
 
 /**
+ * A dropdown for one section that the seed gives a picker of its own
+ * (`own_picker`): its layers, listed straight away with no section step.
+ */
+export function SectionLayerPicker({
+  section,
+  selected,
+  onToggleLayer,
+  className,
+}: {
+  section: SectionDef;
+  /** Toggle key → selected. */
+  selected: Record<string, boolean>;
+  onToggleLayer: (key: string, picked: boolean) => void;
+  className?: string;
+}) {
+  const layers = sectionLayers(section);
+  const count = layers.filter((l) => selected[l.key]).length;
+
+  return (
+    <Popover>
+      <PickerTrigger
+        icon={section.icon}
+        label={section.label}
+        count={count}
+        className={className}
+      />
+      <PickerBody
+        title={section.label}
+        clearable={count > 0}
+        onClear={() => {
+          for (const layer of layers) {
+            if (selected[layer.key]) onToggleLayer(layer.key, false);
+          }
+        }}
+        footer="Selected layers draw on the map and appear in its layers panel."
+      >
+        {layers.map((layer) => (
+          <LayerOption
+            key={layer.key}
+            layer={layer}
+            checked={Boolean(selected[layer.key])}
+            onToggle={(next) => onToggleLayer(layer.key, next)}
+          />
+        ))}
+      </PickerBody>
+    </Popover>
+  );
+}
+
+/**
  * The second dropdown: the layers inside the picked sections.
  *
  * Every row names the section it came from. The list is ordered by section
@@ -281,7 +331,7 @@ function LayerOption({
 }: {
   layer: SectionLayer;
   /** The section this layer belongs to, named under it on the row. */
-  section: string;
+  section?: string;
   checked: boolean;
   onToggle: (next: boolean) => void;
 }) {
@@ -294,7 +344,9 @@ function LayerOption({
           <span className="block text-[13px] leading-tight text-muted-foreground/50">
             {layer.label}
           </span>
-          <span className="block truncate text-[10px] text-muted-foreground/40">{section}</span>
+          {section && (
+            <span className="block truncate text-[10px] text-muted-foreground/40">{section}</span>
+          )}
         </span>
         <span className="shrink-0 text-[10px] font-medium text-brand/70">Coming soon</span>
       </div>
@@ -311,7 +363,9 @@ function LayerOption({
         {/* Wrapped, not clipped: this is where a layer is chosen, so
             its name has to be readable in full. */}
         <span className="block text-[13px] leading-tight">{layer.label}</span>
-        <span className="block truncate text-[10px] text-muted-foreground">{section}</span>
+        {section && (
+          <span className="block truncate text-[10px] text-muted-foreground">{section}</span>
+        )}
       </span>
     </label>
   );

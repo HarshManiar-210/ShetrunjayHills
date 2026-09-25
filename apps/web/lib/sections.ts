@@ -147,6 +147,8 @@ export interface SectionDef {
   children: SectionDef[];
   /** 0 for a top-level heading. Drives the sidebar's indentation. */
   depth: number;
+  /** Listed in a navbar dropdown of its own rather than under Sections. */
+  ownPicker: boolean;
 }
 
 /**
@@ -326,6 +328,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         years,
         children,
         depth,
+        ownPicker: Boolean(group.own_picker),
       };
     }
 
@@ -339,6 +342,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       years: [],
       children,
       depth,
+      ownPicker: Boolean(group.own_picker),
       items: rows.map((o) => ({
         key: o.key,
         label: o.label,

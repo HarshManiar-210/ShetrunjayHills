@@ -64,6 +64,8 @@ export interface LayerGroup {
   label: string;
   parent_id?: number;
   sort_order: number;
+  /** A top-level group with a navbar dropdown of its own. */
+  own_picker?: boolean;
 }
 
 export async function fetchLayerGroups(): Promise<LayerGroup[]> {

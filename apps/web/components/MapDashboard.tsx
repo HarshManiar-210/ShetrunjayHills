@@ -9,7 +9,7 @@ import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
-import { LayerPicker, SectionPicker } from "@/components/LayerPicker";
+import { LayerPicker, SectionLayerPicker, SectionPicker } from "@/components/LayerPicker";
 import { ExportButton } from "@/components/ExportButton";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
@@ -276,6 +276,10 @@ export function MapDashboard() {
     () => buildSections(layerGroups, overlayMeta),
     [layerGroups, overlayMeta],
   );
+  // Groups the seed gives a dropdown of their own leave the Sections/Layers
+  // pair, so a layer is only ever listed in one navbar picker.
+  const pickerSections = useMemo(() => sections.filter((s) => !s.ownPicker), [sections]);
+  const ownPickerSections = useMemo(() => sections.filter((s) => s.ownPicker), [sections]);
   // Flattened once, because almost everything downstream asks a question of
   // the whole tree rather than of one level of it.
   const allSections = useMemo(() => flattenSections(sections), [sections]);
@@ -698,18 +702,26 @@ export function MapDashboard() {
   const pickers = (
     <>
       <SectionPicker
-        sections={sections}
+        sections={pickerSections}
         active={activeSections}
         onToggleSection={toggleSectionActive}
         loadError={treeError}
         onRetry={() => setRetryTick((t) => t + 1)}
       />
       <LayerPicker
-        sections={sections}
+        sections={pickerSections}
         active={activeSections}
         selected={selected}
         onToggleLayer={toggleSelected}
       />
+      {ownPickerSections.map((section) => (
+        <SectionLayerPicker
+          key={section.id}
+          section={section}
+          selected={selected}
+          onToggleLayer={toggleSelected}
+        />
+      ))}
     </>
   );
 
