@@ -59,6 +59,7 @@ import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { RasterOverlay } from "@/components/Map";
 import type { ExportInput } from "@/lib/map-export";
 import type { Map as MapLibreMap } from "maplibre-gl";
+import type { LatLng } from "@/lib/coords";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -145,6 +146,10 @@ export function MapDashboard() {
   const [infoReachesCorner, setInfoReachesCorner] = useState(false);
   const infoRef = useRef<HTMLDivElement | null>(null);
   const mapAreaRef = useRef<HTMLDivElement | null>(null);
+
+  // The last coordinate searched for, pinned on the map. Replaced, never
+  // stacked: one pin at a time.
+  const [pin, setPin] = useState<LatLng | null>(null);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
@@ -738,7 +743,15 @@ export function MapDashboard() {
           <div className="hidden shrink-0 items-center gap-2 md:flex">{pickers}</div>
         }
         search={
-          <LayerSearch sections={sections} visibility={visible} onSelect={revealLayer} />
+          <LayerSearch
+            sections={sections}
+            visibility={visible}
+            onSelect={revealLayer}
+            onGoTo={(point) => {
+              setPin({ ...point });
+              setMobileSheet(null);
+            }}
+          />
         }
       />
 
@@ -758,6 +771,7 @@ export function MapDashboard() {
               overlayDefs={overlayDefs}
               basemap={basemap}
               infoReachesCorner={infoReachesCorner}
+              pin={pin}
               // Handed to the map rather than positioned here, so it shares
               // the bottom-centre stack with the coordinate readout: the
               // readout then rides above whatever height the bar happens to

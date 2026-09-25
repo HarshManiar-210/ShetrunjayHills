@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
   LngLatBounds,
+  Marker,
   Popup,
   type FilterSpecification,
   type GeoJSONSource,
@@ -34,6 +35,7 @@ import type { OverlayDef } from "@/lib/static-overlays";
 import type { LegendClass } from "@/lib/legend-config";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 import { cn } from "@/lib/utils";
+import { formatLatLng, type LatLng } from "@/lib/coords";
 
 // Teaches MapLibre to resolve `pmtiles://<url>` by reading the archive with
 // Range requests instead of downloading it. Module scope, so it is registered
@@ -620,6 +622,9 @@ function render(map: MapLibreMap, data: LayerCollection, fitOnce: { done: boolea
   }
 }
 
+/** How close a coordinate search zooms: a few fields across. */
+const SEARCH_PIN_ZOOM = 15;
+
 export default function Map({
   data,
   visibility,
@@ -630,6 +635,7 @@ export default function Map({
   basemap = DEFAULT_BASEMAP,
   bottomCenter,
   infoReachesCorner = false,
+  pin = null,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -654,6 +660,11 @@ export default function Map({
    * it and the bottom-centre band gives up the width to match.
    */
   infoReachesCorner?: boolean;
+  /**
+   * A coordinate searched for in the header. The map flies to it and drops a
+   * marker; a new object for the same point flies there again.
+   */
+  pin?: LatLng | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -781,6 +792,23 @@ export default function Map({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A searched coordinate: fly there and mark it. Zooms in only as far as
+  // SEARCH_PIN_ZOOM, and never back out if the view is already closer. The
+  // marker's popup repeats the coordinate, so it can be read off the map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !pin) return;
+    const at: [number, number] = [pin.lng, pin.lat];
+    const marker = new Marker({ color: "#DC2626" })
+      .setLngLat(at)
+      .setPopup(new Popup({ offset: 28, closeButton: false }).setText(formatLatLng(pin)))
+      .addTo(map);
+    map.flyTo({ center: at, zoom: Math.max(map.getZoom(), SEARCH_PIN_ZOOM) });
+    return () => {
+      marker.remove();
+    };
+  }, [pin, mapLoaded]);
 
   // data updates: push into the already-running map without recreating it
   useEffect(() => {

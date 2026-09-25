@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { MapPin, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { rasterToggleKey, type SectionDef } from "@/lib/sections";
+import { formatLatLng, parseLatLng, type LatLng } from "@/lib/coords";
 
 interface SearchEntry {
   /** Where this layer sits, e.g. "Forest Layers · Forest Cover (Yearwise)". */
@@ -81,7 +82,8 @@ function search(index: SearchEntry[], query: string): SearchEntry[] {
 /**
  * Layer search for the header bar. A permanently visible input — typing opens
  * a result dropdown anchored under it, and picking a result switches that
- * layer's section on and turns the layer itself on.
+ * layer's section on and turns the layer itself on. A "lat, long" query is
+ * offered as a place to go instead (see lib/coords.ts).
  *
  * The dropdown is absolutely positioned rather than sitting in flow, so a long
  * result list overhangs the map instead of growing the header.
@@ -90,12 +92,15 @@ export function LayerSearch({
   sections,
   visibility,
   onSelect,
+  onGoTo,
   className,
 }: {
   sections: SectionDef[];
   /** Toggle key → on, across every section. Drives the "On" badge. */
   visibility: Record<string, boolean>;
   onSelect: (path: string[], key: string) => void;
+  /** A coordinate pair was searched for: centre the map there. */
+  onGoTo: (point: LatLng) => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -107,8 +112,12 @@ export function LayerSearch({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const index = useMemo(() => buildIndex(sections), [sections]);
-  const results = useMemo(() => search(index, query), [index, query]);
-  const showResults = open && query.trim() !== "";
+  // A coordinate pair is never also a layer name, so it replaces the layer
+  // results rather than joining them.
+  const point = useMemo(() => parseLatLng(query), [query]);
+  const results = useMemo(() => (point ? [] : search(index, query)), [index, query, point]);
+  // Nothing to offer means no dropdown at all, rather than one saying so.
+  const showResults = open && (point !== null || results.length > 0);
 
   // Clamp rather than reset: the list shrinks as the query narrows, and an
   // index left past the end would highlight nothing.
@@ -136,10 +145,21 @@ export function LayerSearch({
     reset();
   }
 
+  function goTo(target: LatLng) {
+    onGoTo(target);
+    reset();
+    inputRef.current?.blur();
+  }
+
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
       reset();
+      return;
+    }
+    if (point && event.key === "Enter") {
+      event.preventDefault();
+      goTo(point);
       return;
     }
     if (!showResults || results.length === 0) return;
@@ -176,10 +196,10 @@ export function LayerSearch({
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Search layers…"
-          aria-label="Search layers"
+          placeholder="Search layers or lat, long…"
+          aria-label="Search layers or coordinates"
           role="combobox"
-          aria-expanded={showResults && results.length > 0}
+          aria-expanded={showResults}
           aria-controls="layer-search-results"
           className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
@@ -205,10 +225,22 @@ export function LayerSearch({
           role="listbox"
           className="absolute top-full left-0 z-50 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-border bg-popover shadow-e3 ring-1 ring-black/5 scrollbar-thin"
         >
-          {results.length === 0 ? (
-            <p className="px-3 py-3 text-xs text-muted-foreground">
-              No layer matches “{query.trim()}”.
-            </p>
+          {point ? (
+            <button
+              type="button"
+              role="option"
+              aria-selected
+              onClick={() => goTo(point)}
+              className="flex w-full items-center gap-2 bg-nav-soft px-3 py-2 text-left"
+            >
+              <MapPin className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm tabular-nums">{formatLatLng(point)}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  Go to coordinates
+                </span>
+              </span>
+            </button>
           ) : (
             results.map((result, i) => {
               const on = Boolean(visibility[result.key]);
