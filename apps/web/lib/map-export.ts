@@ -112,22 +112,6 @@ function clip(ctx: Ctx, text: string, maxW: number): string {
   return `${cut}…`;
 }
 
-function wrap(ctx: Ctx, text: string, maxW: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of text.split(/\s+/)) {
-    const next = line ? `${line} ${word}` : word;
-    if (ctx.measureText(next).width > maxW && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = next;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
 function sectionHeading(c: Cursor, text: string) {
   setFont(c, 9, 600);
   if (!c.dry) {
@@ -195,17 +179,6 @@ function keyValue(c: Cursor, key: string, value: string) {
     c.ctx.fillText(value, c.x + c.w, c.y + 8);
   }
   c.y += 14;
-}
-
-function note(c: Cursor, text: string) {
-  setFont(c, 8.5);
-  const lines = wrap(c.ctx, text, c.w);
-  if (!c.dry) {
-    c.ctx.textAlign = "left";
-    c.ctx.fillStyle = FAINT;
-    lines.forEach((line, i) => c.ctx.fillText(line, c.x, c.y + 7 + i * 10));
-  }
-  c.y += lines.length * 10 + 2;
 }
 
 function emptyLine(c: Cursor, text: string) {
@@ -319,14 +292,7 @@ async function measure(rasterStats: StatsRasterLayer[]): Promise<MeasuredRaster[
     rasterStats.map(async (layer) => {
       try {
         const stats = await fetchRasterStats(layer.imageKey);
-        if (stats.photographic) {
-          return {
-            layer,
-            areaSqM: stats.area_sq_m,
-            classes: [],
-            message: "Photographic image — no classes to summarise",
-          };
-        }
+        if (stats.photographic) return { layer, areaSqM: stats.area_sq_m, classes: [] };
         return {
           layer,
           areaSqM: stats.area_sq_m,
@@ -358,8 +324,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
     color: f.properties.color,
     kind: geometryKindOf(f.geometry.type),
   }));
-  const nothingOn =
-    vectors.length === 0 && input.overlays.length === 0 && input.rasterLegends.length === 0;
 
   // The heading travels with the first rows under it, so a column break can
   // never leave it stranded at the foot of a column.
@@ -368,7 +332,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
     for (const v of vectors) swatchRow(c, v.color, v.kind, v.label);
     for (const o of input.overlays)
       swatchRow(c, o.color, o.geometryKind, o.group ? `${o.label} · ${o.group}` : o.label);
-    if (nothingOn) emptyLine(c, "No layers switched on.");
     c.y += 6;
   });
 
@@ -387,8 +350,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
         );
       }
       for (const cls of legend?.classes ?? []) swatchRow(c, cls.color, "raster", cls.label);
-      if (legend?.note) note(c, legend.note);
-      if (!legend) emptyLine(c, "No class legend for this theme.");
       c.y += 6;
     });
   }
@@ -398,7 +359,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
   blocks.push((c) => {
     sectionHeading(c, "Statistics");
     keyValue(c, "Study area", `${COUNT.format(STUDY_AREA_HA)} ha`);
-    if (measured.length === 0 && counts.length === 0) emptyLine(c, "Nothing measured.");
     c.y += 4;
   });
 

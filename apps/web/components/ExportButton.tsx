@@ -118,13 +118,11 @@ export function ExportButton({
         <ExportChoice
           icon={FileImage}
           label="JPG image"
-          hint="Downloads the sheet as a file"
           onSelect={() => run("jpg")}
         />
         <ExportChoice
           icon={FileText}
           label="PDF document"
-          hint="Opens the print dialog — choose Save as PDF"
           onSelect={() => run("pdf")}
         />
       </DropdownMenuContent>
@@ -140,21 +138,16 @@ export function ExportButton({
 function ExportChoice({
   icon: Icon,
   label,
-  hint,
   onSelect,
 }: {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   label: string;
-  hint: string;
   onSelect: () => void;
 }) {
   return (
-    <DropdownMenuItem className="items-start gap-2.5 py-2" onSelect={onSelect}>
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm">{label}</span>
-        <span className="block text-[11px] leading-snug text-muted-foreground">{hint}</span>
-      </span>
+    <DropdownMenuItem className="items-center gap-2.5 py-2" onSelect={onSelect}>
+      <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
+      <span className="min-w-0 flex-1 text-sm">{label}</span>
     </DropdownMenuItem>
   );
 }

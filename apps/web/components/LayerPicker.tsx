@@ -69,18 +69,16 @@ function PickerTrigger({
   );
 }
 
-/** Popover chrome shared by both pickers: a titled header, a body, a footer. */
+/** Popover chrome shared by the pickers: a titled header and a body. */
 function PickerBody({
   title,
   onClear,
   clearable,
-  footer,
   children,
 }: {
   title: string;
   onClear: () => void;
   clearable: boolean;
-  footer: string;
   children: React.ReactNode;
 }) {
   return (
@@ -102,10 +100,6 @@ function PickerBody({
       <div className="max-h-[min(28rem,60vh)] overflow-y-auto p-1.5 scrollbar-thin">
         {children}
       </div>
-
-      <p className="border-t border-border px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-        {footer}
-      </p>
     </PopoverContent>
   );
 }
@@ -154,7 +148,6 @@ export function SectionPicker({
             if (active[section.id]) onToggleSection(section.id, false);
           }
         }}
-        footer="Pick a section to choose layers from it."
       >
         {loadError && (
           <div className="flex flex-col items-start gap-2 px-2.5 py-3">
@@ -224,7 +217,6 @@ export function SectionLayerPicker({
             if (selected[layer.key]) onToggleLayer(layer.key, false);
           }
         }}
-        footer="Selected layers draw on the map and appear in its layers panel."
       >
         {layers.map((layer) => (
           <LayerOption
@@ -293,7 +285,6 @@ export function LayerPicker({
             }
           }
         }}
-        footer="Selected layers draw on the map and appear in its layers panel."
       >
         {groups.map(({ section, layers }, i) => (
             <div key={section.id} className={cn(i > 0 && "mt-1 border-t border-border/60 pt-1")}>

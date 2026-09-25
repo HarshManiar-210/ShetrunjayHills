@@ -23,9 +23,9 @@ export function LoginDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Log in</DialogTitle>
-          <DialogDescription>
-            Sign in to unlock the layers available to your role. Your current
-            map view and filters are kept as they are.
+          {/* Screen readers only: the dialog needs a description, the page does not. */}
+          <DialogDescription className="sr-only">
+            Sign in to unlock the layers available to your role.
           </DialogDescription>
         </DialogHeader>
         <LoginForm

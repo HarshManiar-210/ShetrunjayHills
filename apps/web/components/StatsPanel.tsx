@@ -136,12 +136,6 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
         </span>
       )}
 
-      {stats?.photographic && (
-        <span className="text-[11px] text-muted-foreground/70 italic">
-          Photographic image — no classes to summarise
-        </span>
-      )}
-
       {classes.length > 0 && (
         <>
           <div className="flex items-baseline justify-between gap-2 text-[11px]">

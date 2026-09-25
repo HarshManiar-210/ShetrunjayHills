@@ -49,6 +49,9 @@ export function CoordinateReadout({
     <div
       className={cn(
         "pointer-events-none rounded-full bg-card/95 px-3 py-1.5 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm",
+        // Hidden, not unmounted, off the map: it keeps its place in the
+        // bottom stack, so nothing below it shifts as the pointer comes and goes.
+        !position && "invisible",
         className,
       )}
     >
@@ -64,7 +67,8 @@ export function CoordinateReadout({
             <span className="text-foreground">{position.lng.toFixed(4)}</span>
           </>
         ) : (
-          <span className="text-muted-foreground">Move over the map for coordinates</span>
+          // Sized like a reading so the hidden pill holds the same space.
+          <span aria-hidden>Lat 00.0000 · Lng 00.0000</span>
         )}
       </p>
     </div>
