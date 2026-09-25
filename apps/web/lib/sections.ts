@@ -198,7 +198,6 @@ const ITEM_STYLE: Record<string, LucideIcon> = {
   causeway: Waypoints,
   checkDam: Dam,
   fireline: Flame,
-  potentialSmc: Target,
   vantalawadi: MapPinned,
   streams: Waves,
   watershed: Droplets,

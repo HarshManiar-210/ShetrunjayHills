@@ -233,9 +233,6 @@ WHERE
 --     the only satellite imagery stack delivered.
 --   * "Forest Cover FSI" / "Forest Type FSI" read as naming the source of
 --     those themes rather than separate layers, so they are not own groups.
---   * "Proposed Conservation Sites" already has one delivered file
---     (potentialSMC.geojson, whose features carry a Name like "Check Dam"),
---     so it is seeded as one layer beside the three named placeholders.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
@@ -414,7 +411,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway-existing-water-conservation.geojson',      4, 71.728402, 21.450967, 71.820940, 21.505128),
     ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam-existing-water-conservation.geojson',     3, 71.737601, 21.456108, 71.821241, 21.509884),
     ('fireline',      'Fireline',      grp('reference'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
-    ('potentialSmc',  'Potential SMC', grp('proposed-conservation-sites'), 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  5, 71.730361, 21.458173, 71.820895, 21.502023),
     ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
     ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
