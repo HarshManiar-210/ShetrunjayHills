@@ -28,6 +28,8 @@ export interface OverlayMeta {
    */
   color_field?: string;
   categories?: LegendClass[];
+  /** The properties a clicked feature's popup shows, in order. Absent shows them all. */
+  popup_fields?: string[];
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
   min_lon?: number;

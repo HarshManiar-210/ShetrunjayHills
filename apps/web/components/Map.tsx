@@ -303,7 +303,7 @@ function attachPopups(
 
     popup
       .setLngLat(e.lngLat)
-      .setHTML(popupHtml(label, feature.properties, def?.color))
+      .setHTML(popupHtml(label, feature.properties, def?.color, def?.popupFields))
       .addTo(map);
   });
 

@@ -198,8 +198,15 @@ function humanise(key: string): string {
 }
 
 /** The showable attributes of a feature, in the order the source lists them. */
-export function popupFields(properties: Record<string, unknown> | null): PopupField[] {
+export function popupFields(
+  properties: Record<string, unknown> | null,
+  /** The layer's own field list (static_overlays.popup_fields), when it has one. */
+  only?: string[],
+): PopupField[] {
   if (!properties) return [];
+  const entries = only?.length
+    ? only.map((key) => [key, properties[key]] as const)
+    : Object.entries(properties);
   const fields: PopupField[] = [];
   // Two columns can land on the same label — StudyArea carries both `area`
   // (hectares) and `areaSqKm`, which are one measurement stated twice. Showing
@@ -207,8 +214,8 @@ export function popupFields(properties: Record<string, unknown> | null): PopupFi
   // the first spelling wins.
   const seen = new Set<string>();
 
-  for (const [key, raw] of Object.entries(properties)) {
-    if (INTERNAL_KEYS.has(key.toLowerCase())) continue;
+  for (const [key, raw] of entries) {
+    if (!only?.length && INTERNAL_KEYS.has(key.toLowerCase())) continue;
     const value = formatValue(raw);
     if (value === null) continue;
 
@@ -248,8 +255,9 @@ export function popupHtml(
   properties: Record<string, unknown> | null,
   /** The colour this layer draws in, for the header chip. */
   color?: string,
+  only?: string[],
 ): string {
-  const fields = popupFields(properties);
+  const fields = popupFields(properties, only);
   const shown = fields.slice(0, MAX_ROWS);
   const hidden = fields.length - shown.length;
 
