@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { LegendCard } from "@/components/LegendCard";
 import { StatsCard } from "@/components/StatsPanel";
-import { LayerSearch } from "@/components/LayerSearch";
+import { CoordinateSearch } from "@/components/CoordinateSearch";
 import {
   Walkthrough,
   shouldAutoRunWalkthrough,
@@ -437,32 +437,6 @@ export function MapDashboard() {
     setPlaying(false);
   }, []);
 
-  // Search result picked: select it into the panel *and* switch it on. Always
-  // on, never a toggle — someone who searched for a layer wants to see it, not
-  // to turn off what they found. Search is the one route that skips the
-  // picker, which is the point of it: naming a layer should not require
-  // knowing which section holds it, so `path` goes unused here.
-  const revealLayer = useCallback(
-    (_path: string[], key: string) => {
-      // An option is revealed through its group: the group row goes into the
-      // panel, switched on with just the option that was searched for.
-      const rowKey = owners[key] ?? key;
-      // Search is the one route that skips both dropdowns, so it opens the
-      // layer's own section on the way past: without that the layer would be
-      // in the panel and on the map but missing from the dropdown that is
-      // supposed to list it.
-      const owner = sections.find((section) =>
-        sectionLayers(section).some((layer) => layer.key === rowKey),
-      );
-      if (owner) setActiveSections((a) => ({ ...a, [owner.id]: true }));
-      setSelected((sel) => ({ ...sel, [rowKey]: true }));
-      setPanelOpen(true);
-      requestKeys(rowKey === key ? keysFor(key) : [rowKey, key], true);
-      setMobileSheet(null);
-    },
-    [requestKeys, sections, owners, keysFor],
-  );
-
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
     setRasterYear((y) => ({ ...y, [sectionId]: year }));
   }, []);
@@ -764,10 +738,7 @@ export function MapDashboard() {
           <div className="hidden shrink-0 items-center gap-2 md:flex">{pickers}</div>
         }
         search={
-          <LayerSearch
-            sections={sections}
-            visibility={visible}
-            onSelect={revealLayer}
+          <CoordinateSearch
             onGoTo={(point) => {
               setPin({ ...point });
               setMobileSheet(null);

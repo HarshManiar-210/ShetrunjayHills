@@ -44,8 +44,8 @@ const STEPS: Step[] = [
   },
   {
     target: "search",
-    title: "Find a layer fast",
-    body: "Rather than working through the sections, type part of a layer's name here and pick it — the dashboard adds it to your panel and switches it on, leaving whatever else you have on alone.",
+    title: "Go to coordinates",
+    body: "Type a latitude and longitude — “21.51, 71.80”, or with N/S/E/W — and press Enter. The map flies there and drops a pin you can click to read the point back.",
   },
   {
     target: "legend",

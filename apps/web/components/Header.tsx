@@ -45,8 +45,8 @@ export function Header({
   /** Replays the dashboard walkthrough. Omitted on pages that have no tour. */
   onHelpClick?: () => void;
   /**
-   * Layer search. Only the dashboard has layers to search, so pages without
-   * them simply pass nothing and the right-hand controls keep their place.
+   * Coordinate search. Only the dashboard has a map to move, so pages without
+   * one simply pass nothing and the right-hand controls keep their place.
    */
   search?: React.ReactNode;
   /**
@@ -111,10 +111,9 @@ export function Header({
         )}
       </div>
 
-      {/* Capped rather than free-growing: past about 28rem a search field
-          stops looking like a field and starts looking like a gap. What it
-          does not take stays as space before the controls on the right. */}
-      {search && <div className="min-w-0 max-w-md flex-1">{search}</div>}
+      {/* Sized for a coordinate pair, not a sentence: it holds
+          "21.51234, 71.80123" and no more, leaving the bar to the pickers. */}
+      {search && <div className="w-52 min-w-0 shrink">{search}</div>}
 
       {layerPicker}
 
