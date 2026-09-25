@@ -139,11 +139,7 @@ export function LegendContent({
   const categoricalOverlays = overlays.filter((o) => o.categories?.length);
 
   if (rows.length === 0 && overlays.length === 0 && rasterLayers.length === 0) {
-    return (
-      <p className={cn("text-xs text-muted-foreground", className)}>
-        No layers switched on yet — turn one on to see its legend.
-      </p>
-    );
+    return null;
   }
 
   return (

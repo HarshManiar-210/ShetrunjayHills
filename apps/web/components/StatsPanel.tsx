@@ -191,11 +191,7 @@ export function StatsPanel({
   const vectorCounts = countByLayer(vectorFeatures);
 
   if (rasterLayers.length === 0 && vectorCounts.length === 0) {
-    return (
-      <p className={cn("text-xs text-muted-foreground", className)}>
-        No statistics yet — switch on a layer to see its breakdown.
-      </p>
-    );
+    return null;
   }
 
   return (

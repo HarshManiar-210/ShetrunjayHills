@@ -28,12 +28,14 @@ function PickerTrigger({
   label,
   count,
   tour,
+  disabled,
   className,
 }: {
   icon: LucideIcon;
   label: string;
   count: number;
   tour?: string;
+  disabled?: boolean;
   className?: string;
 }) {
   return (
@@ -43,6 +45,7 @@ function PickerTrigger({
       <Button
         variant="outline"
         data-tour={tour}
+        disabled={disabled}
         className={cn(
           "h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium",
           "shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)]",
@@ -127,7 +130,7 @@ export function SectionPicker({
   /** Section id → picked. */
   active: Record<string, boolean>;
   onToggleSection: (id: string, on: boolean) => void;
-  /** The section tree failed to load, so an empty list is an error, not the seed. */
+  /** The section tree failed to load: shows an error and a retry. */
   loadError?: boolean;
   onRetry?: () => void;
   className?: string;
@@ -153,17 +156,10 @@ export function SectionPicker({
         }}
         footer="Pick a section to choose layers from it."
       >
-        {sections.length === 0 && (
+        {loadError && (
           <div className="flex flex-col items-start gap-2 px-2.5 py-3">
-            <p
-              className={cn(
-                "text-xs leading-relaxed",
-                loadError ? "text-destructive" : "text-muted-foreground",
-              )}
-            >
-              {loadError ? "Could not load sections." : "No sections available."}
-            </p>
-            {loadError && onRetry && (
+            <p className="text-xs leading-relaxed text-destructive">Could not load sections.</p>
+            {onRetry && (
               <Button size="sm" variant="outline" onClick={onRetry}>
                 Retry
               </Button>
@@ -283,6 +279,8 @@ export function LayerPicker({
         label="Layers"
         count={count}
         tour="layer-picker"
+        // Nothing to list until a section is picked.
+        disabled={groups.length === 0}
         className={className}
       />
       <PickerBody
@@ -297,14 +295,7 @@ export function LayerPicker({
         }}
         footer="Selected layers draw on the map and appear in its layers panel."
       >
-        {groups.length === 0 ? (
-          <p className="px-2.5 py-3 text-xs leading-relaxed text-muted-foreground">
-            No sections picked yet. Open{" "}
-            <span className="font-medium text-foreground">Sections</span> and tick one to choose
-            layers from it.
-          </p>
-        ) : (
-          groups.map(({ section, layers }, i) => (
+        {groups.map(({ section, layers }, i) => (
             <div key={section.id} className={cn(i > 0 && "mt-1 border-t border-border/60 pt-1")}>
               {layers.map((layer) => (
                 <LayerOption
@@ -316,8 +307,7 @@ export function LayerPicker({
                 />
               ))}
             </div>
-          ))
-        )}
+          ))}
       </PickerBody>
     </Popover>
   );

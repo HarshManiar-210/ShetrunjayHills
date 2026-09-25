@@ -655,6 +655,11 @@ export function MapDashboard() {
   // Legend and Statistics are two independent cards now, not two tabs of one.
   // The legend is what makes the map readable, so it should never be the thing
   // you switch away from to check a number.
+  // A card with nothing to show is left out rather than drawn empty.
+  const hasLegend =
+    visibleFeatures.length > 0 || legendOverlays.length > 0 || legendRasterLayers.length > 0;
+  const hasStats = visibleFeatures.length > 0 || statsRasterLayers.length > 0;
+
   const infoPanel = (className?: string, ref?: React.Ref<HTMLDivElement>) => (
     <div ref={ref} className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
       {/* Each card scrolls its own body rather than the column scrolling as a
@@ -664,17 +669,21 @@ export function MapDashboard() {
           — that is what makes its body scroll — while `max-h-fit` stops it
           claiming more than its content, so a short legend does not sit in
           half the column with empty space under it. */}
-      <LegendCard
-        layers={visibleFeatures}
-        overlays={legendOverlays}
-        rasterLayers={legendRasterLayers}
-        className="min-h-0 max-h-fit flex-1"
-      />
-      <StatsCard
-        rasterLayers={statsRasterLayers}
-        vectorFeatures={visibleFeatures}
-        className="min-h-0 max-h-fit flex-1"
-      />
+      {hasLegend && (
+        <LegendCard
+          layers={visibleFeatures}
+          overlays={legendOverlays}
+          rasterLayers={legendRasterLayers}
+          className="min-h-0 max-h-fit flex-1"
+        />
+      )}
+      {hasStats && (
+        <StatsCard
+          rasterLayers={statsRasterLayers}
+          vectorFeatures={visibleFeatures}
+          className="min-h-0 max-h-fit flex-1"
+        />
+      )}
     </div>
   );
 
