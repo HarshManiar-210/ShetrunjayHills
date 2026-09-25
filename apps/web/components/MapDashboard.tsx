@@ -592,14 +592,20 @@ export function MapDashboard() {
   const legendOverlays: LegendOverlay[] = useMemo(
     () =>
       allSections
-        .flatMap((section) => section.items)
+        .flatMap((section) =>
+          section.items.map((item) => ({
+            ...item,
+            group: section.mode === "options" ? section.label : undefined,
+          })),
+        )
         .filter((item) => overlays[item.key])
-        .map(({ key, label, color, geometryKind, categories }) => ({
+        .map(({ key, label, color, geometryKind, categories, group }) => ({
           key,
           label,
           color,
           geometryKind,
           categories,
+          group,
         })),
     [allSections, overlays],
   );

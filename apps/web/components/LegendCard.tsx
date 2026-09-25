@@ -51,6 +51,8 @@ export interface LegendOverlay {
   label: string;
   color: string;
   geometryKind: SwatchGeometryKind;
+  /** The options group it was picked from, when names repeat across groups (two Matipalas). */
+  group?: string;
   /** Set for a per-feature overlay (Forest Cover/Forest Type FSI) — see SectionItem.categories. */
   categories?: LegendClass[];
 }
@@ -160,7 +162,12 @@ export function LegendContent({
           {plainOverlays.map((overlay) => (
             <div key={overlay.key} className="flex items-center gap-2 text-sm">
               <LayerSwatch color={overlay.color} geometryKind={overlay.geometryKind} />
-              <span>{overlay.label}</span>
+              <span>
+                {overlay.label}
+                {overlay.group && (
+                  <span className="text-muted-foreground"> · {overlay.group}</span>
+                )}
+              </span>
             </div>
           ))}
         </div>

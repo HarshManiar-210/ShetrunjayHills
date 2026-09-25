@@ -366,7 +366,8 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
   blocks.push((c) => {
     sectionHeading(c, "Legend");
     for (const v of vectors) swatchRow(c, v.color, v.kind, v.label);
-    for (const o of input.overlays) swatchRow(c, o.color, o.geometryKind, o.label);
+    for (const o of input.overlays)
+      swatchRow(c, o.color, o.geometryKind, o.group ? `${o.label} · ${o.group}` : o.label);
     if (nothingOn) emptyLine(c, "No layers switched on.");
     c.y += 6;
   });
