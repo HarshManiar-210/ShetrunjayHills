@@ -206,6 +206,8 @@ export function MapDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, retryTick]);
 
+  const defaultsAppliedRef = useRef(false);
+
   // The sidebar's whole shape — the tree, its order, every row's colour —
   // comes from these two seed-backed lists, so adding a layer or restructuring
   // the tree stays a data change.
@@ -216,6 +218,16 @@ export function MapDashboard() {
         if (cancelled) return;
         setLayerGroups(groups);
         setOverlayMeta(meta);
+        // Seeded `default_on` layers start selected and drawing — once, so a
+        // retry never switches back on a layer someone has since turned off.
+        if (!defaultsAppliedRef.current) {
+          defaultsAppliedRef.current = true;
+          const on = Object.fromEntries(
+            meta.filter((o) => o.default_on && o.status !== "pending").map((o) => [o.key, true]),
+          );
+          setSelected((sel) => ({ ...on, ...sel }));
+          setVisible((v) => ({ ...on, ...v }));
+        }
       })
       .catch(() => {
         if (cancelled) return;
