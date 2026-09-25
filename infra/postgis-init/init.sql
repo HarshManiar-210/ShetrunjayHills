@@ -126,7 +126,10 @@ CREATE TABLE static_overlays (
     categories  JSONB,
     -- The GeoJSON properties a clicked feature's popup shows, in order. NULL
     -- shows every meaningful property (see apps/web/lib/feature-popup.ts).
-    popup_fields TEXT[]
+    popup_fields TEXT[],
+    -- Selected and switched on when the dashboard opens, before anything is
+    -- picked. Which layers start on is this flag, not a key in the frontend.
+    default_on BOOLEAN NOT NULL DEFAULT false
 );
 
 -- ---------------------------------------------------------------------------
@@ -577,3 +580,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- Boundary, and this is the taluka layer that should have sat beside it.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('talukaBoundary', 'Taluka Boundary', grp('administrative-boundaries'), 'vector', 'outline', '#C98BDB', 'vector-data/Talukas.geojson', 6, 71.352470, 21.144960, 72.298580, 22.353210);
+
+-- The study area frames everything else on the map, so it is on from the start.
+UPDATE static_overlays SET default_on = true WHERE key = 'studyArea';

@@ -55,6 +55,8 @@ type StaticOverlay struct {
 	// PopupFields names the GeoJSON properties a clicked feature shows, in
 	// order. Empty means show every meaningful property.
 	PopupFields []string `json:"popup_fields,omitempty"`
+	// DefaultOn marks a layer the dashboard switches on when it opens.
+	DefaultOn bool `json:"default_on,omitempty"`
 	// SizeBytes is the asset's size on disk, filled in by the Overlays
 	// handler rather than stored in the DB — statting the file cannot drift
 	// out of step with it the way a seeded column would. Lets the frontend

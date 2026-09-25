@@ -15,7 +15,7 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, key, label, group_id, asset_type, COALESCE(kind, ''), COALESCE(color, ''),
 			COALESCE(color_field, ''), categories, COALESCE(popup_fields, '{}'),
-			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status
+			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status, default_on
 		FROM static_overlays
 		ORDER BY group_id, sort_order
 	`)
@@ -30,7 +30,7 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 		if err := rows.Scan(
 			&o.ID, &o.Key, &o.Label, &o.GroupID, &o.AssetType, &o.Kind, &o.Color,
 			&o.ColorField, &o.Categories, &o.PopupFields,
-			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status,
+			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status, &o.DefaultOn,
 		); err != nil {
 			return nil, fmt.Errorf("repository: scan static overlay: %w", err)
 		}
