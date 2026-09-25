@@ -313,6 +313,61 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     ],
     note: "VDF very dense · MDF moderately dense · OF open forest · NF non forest.",
   },
+  "flood-0-5m": {
+    layerId: "flood-0-5m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "0.5 m"],
+    classes: [
+      { value: 1, label: "0 – 0.12 m", color: "#28bceb" },
+      { value: 2, label: "0.12 – 0.25 m", color: "#a4fc3c" },
+      { value: 3, label: "0.25 – 0.37 m", color: "#fb7e21" },
+      { value: 4, label: "0.37 – 0.50 m", color: "#7a0403" },
+    ],
+  },
+  "flood-1m": {
+    layerId: "flood-1m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "1 m"],
+    classes: [
+      { value: 1, label: "0 – 0.25 m", color: "#28bceb" },
+      { value: 2, label: "0.25 – 0.50 m", color: "#a4fc3c" },
+      { value: 3, label: "0.50 – 0.75 m", color: "#fb7e21" },
+      { value: 4, label: "0.75 – 1.0 m", color: "#7a0403" },
+    ],
+  },
+  "flood-2m": {
+    layerId: "flood-2m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "2 m"],
+    classes: [
+      { value: 1, label: "0 – 0.5 m", color: "#28bceb" },
+      { value: 2, label: "0.5 – 1.0 m", color: "#a4fc3c" },
+      { value: 3, label: "1.0 – 1.5 m", color: "#fb7e21" },
+      { value: 4, label: "1.5 – 2 m", color: "#7a0403" },
+    ],
+  },
+  "flood-5m": {
+    layerId: "flood-5m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "5 m"],
+    classes: [
+      { value: 1, label: "0 – 1.25 m", color: "#28bceb" },
+      { value: 2, label: "1.25 – 2.50 m", color: "#a4fc3c" },
+      { value: 3, label: "2.50 – 3.75 m", color: "#fb7e21" },
+      { value: 4, label: "3.75 – 5.0 m", color: "#7a0403" },
+    ],
+  },
+  "flood-10m": {
+    layerId: "flood-10m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "10 m"],
+    classes: [
+      { value: 1, label: "0 – 2.5 m", color: "#28bceb" },
+      { value: 2, label: "2.5 – 5.0 m", color: "#a4fc3c" },
+      { value: 3, label: "5.0 – 7.5 m", color: "#fb7e21" },
+      { value: 4, label: "7.5 – 10 m", color: "#7a0403" },
+    ],
+  },
   chm: {
     layerId: "chm",
     ramp: "low-to-high",
