@@ -119,7 +119,10 @@ CREATE TABLE static_overlays (
     -- theme's classes, so the legend renders it the same way. NULL/NULL for
     -- every flat-colour row, which is still the common case.
     color_field TEXT,
-    categories  JSONB
+    categories  JSONB,
+    -- The GeoJSON properties a clicked feature's popup shows, in order. NULL
+    -- shows every meaningful property (see apps/web/lib/feature-popup.ts).
+    popup_fields TEXT[]
 );
 
 -- ---------------------------------------------------------------------------
@@ -415,6 +418,12 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
     ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
+-- Proposed Conservation Sites: the popup shows each feature's Zone_2 only.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('proposedMatipala',    'Matipala',    grp('proposed-conservation-sites'), 'vector', 'fill', '#A3C45A', 'vector-data/matipala-proposed-conservation-sites.geojson',  1, 71.730361, 21.458872, 71.820895, 21.489651, '{Zone_2}'),
+    ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', 'fill', '#C77DBA', 'vector-data/vantalavdi-proposed-conservation-sites.geojson', 2, 71.736501, 21.465143, 71.814602, 21.501276, '{Zone_2}'),
+    ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', 'fill', '#E0A030', 'vector-data/checkdam-proposed-conservation-sites.geojson',  3, 71.759037, 21.458173, 71.814519, 21.502023, '{Zone_2}');
+
 -- Single-image drone themes: each is its own one-raster group (single on/off
 -- switch, no year picker), which keeps the rule that a group holding rasters
 -- holds exactly one theme's. Ortho needs no legend entry (RGB band
@@ -516,13 +525,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     -- the rest of the brief's list for that group.
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
     ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
-
-    -- Proposed Conservation Sites. potentialSMC.geojson is already delivered
-    -- and its features carry a Name ("Check Dam", ...), so it may already
-    -- cover all three of these -- confirm with the client before filling in.
-    ('proposedMatipala',    'Matipala',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 2, 'pending'),
-    ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 3, 'pending'),
-    ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 4, 'pending'),
 
     ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
 
