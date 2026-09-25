@@ -522,9 +522,12 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
     ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
 
-    ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
+    ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending');
 
-    ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
+-- Gochar: exported from KML, so every feature also carries KML plumbing
+-- (tessellate, extrude, visibility, ...); the popup shows only its Name.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', 'fill', '#C2A35A', 'vector-data/gochar.geojson', 9, 71.757347, 21.458765, 71.820685, 21.489645, '{Name}');
 
 -- Taluka Boundary. Talukas.geojson was delivered but never seeded, which is
 -- half of why the client reported "Zone File is showing District boundary" --
