@@ -402,17 +402,18 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
--- flat vector-section pattern as Forest Boundary/Cadastral Map. Mati Pala
--- hasn't arrived yet, so it's seeded 'pending' like Tree Species above.
+-- flat vector-section pattern as Forest Boundary/Cadastral Map. File names
+-- carry the "-existing-water-conservation" suffix because Proposed
+-- Conservation Sites seeds its own Matipala/Vantalavadi/Checkdam placeholders
+-- below with the same feature names -- the suffix is what keeps the two
+-- sites' files apart once both are delivered.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1, 71.728402, 21.450967, 71.820940, 21.505128),
-    ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2, 71.737601, 21.456108, 71.821241, 21.509884),
+    ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway-existing-water-conservation.geojson',      4, 71.728402, 21.450967, 71.820940, 21.505128),
+    ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam-existing-water-conservation.geojson',     3, 71.737601, 21.456108, 71.821241, 21.509884),
     ('fireline',      'Fireline',      grp('reference'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
-    ('potentialSmc',  'Potential SMC', grp('proposed-conservation-sites'), 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4, 71.730361, 21.458173, 71.820895, 21.502023),
-    ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5, 71.733656, 21.463890, 71.819923, 21.510452);
-
-INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
-    ('matiPala', 'Matipala', grp('existing-water-conservation'), 'vector', NULL, NULL, '', 6, 'pending');
+    ('potentialSmc',  'Potential SMC', grp('proposed-conservation-sites'), 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  5, 71.730361, 21.458173, 71.820895, 21.502023),
+    ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
+    ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
 -- Single-image drone themes: each is its own one-raster group (single on/off
 -- switch, no year picker), which keeps the rule that a group holding rasters
