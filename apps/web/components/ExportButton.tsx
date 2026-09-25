@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Exports the map, its legend and its statistics — as a PNG file, or as a PDF
+ * Exports the map, its legend and its statistics — as a JPG file, or as a PDF
  * by way of the browser's print dialog, where "Save as PDF" is the
  * destination.
  *
@@ -46,12 +46,12 @@ export function ExportButton({
 }) {
   const [state, setState] = useState<"idle" | "working" | "failed">("idle");
 
-  async function run(format: "png" | "pdf") {
+  async function run(format: "jpg" | "pdf") {
     const request = input();
     if (!request) return;
     setState("working");
     try {
-      await (format === "png"
+      await (format === "jpg"
         ? downloadDashboardSheet(request)
         : printDashboardSheet(request));
       setState("idle");
@@ -117,9 +117,9 @@ export function ExportButton({
       <DropdownMenuContent align="end" className="w-60">
         <ExportChoice
           icon={FileImage}
-          label="PNG image"
+          label="JPG image"
           hint="Downloads the sheet as a file"
-          onSelect={() => run("png")}
+          onSelect={() => run("jpg")}
         />
         <ExportChoice
           icon={FileText}

@@ -162,7 +162,7 @@ export function MapDashboard() {
   const [preferredTheme, setPreferredTheme] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
 
-  // The live map, for the PNG export: it needs the actual canvas, and the
+  // The live map, for the JPG export: it needs the actual canvas, and the
   // camera as it is at the moment of the click. A ref rather than state —
   // nothing renders from it, and it must not re-render the dashboard when the
   // map finishes mounting.

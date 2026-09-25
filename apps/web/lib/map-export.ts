@@ -10,10 +10,10 @@ import { geometryKindOf } from "@/lib/sections";
 
 /**
  * Exports the dashboard as one sheet — the map exactly as it is on screen,
- * with the legend and the statistics beside it — as either a PNG file or a
+ * with the legend and the statistics beside it — as either a JPG file or a
  * PDF.
  *
- * Both come from the same composed canvas. The PNG is downloaded directly;
+ * Both come from the same composed canvas. The JPG is downloaded directly;
  * the PDF goes through the browser's own print pipeline, which is what turns
  * it into a PDF without a PDF library and leaves the user the page size and
  * destination controls they already know.
@@ -594,14 +594,26 @@ export async function renderDashboardSheet(input: ExportInput): Promise<HTMLCanv
   return canvas;
 }
 
-function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+/**
+ * JPEG for the download — a fraction of the PNG's size for a sheet that is
+ * mostly photographic basemap, and safe because the sheet is painted on
+ * opaque PAPER first. The print path keeps PNG, where text stays crisp.
+ */
+function toBlob(
+  canvas: HTMLCanvasElement,
+  type: "image/png" | "image/jpeg" = "image/png",
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("could not encode the sheet"))),
-      "image/png",
+      type,
+      JPEG_QUALITY,
     );
   });
 }
+
+/** High enough that legend text shows no ringing. Ignored for PNG. */
+const JPEG_QUALITY = 0.92;
 
 /** Filename stamp: sortable, and distinct enough for repeated exports. */
 function stampFor(date: Date): string {
@@ -611,18 +623,18 @@ function stampFor(date: Date): string {
 }
 
 /**
- * Composes the sheet and downloads it as a PNG.
+ * Composes the sheet and downloads it as a JPG.
  *
  * The same sheet the PDF is made from, handed over as a file instead of to
  * the print dialog — for dropping into a slide or a chat, where a PDF is the
  * wrong shape.
  */
 export async function downloadDashboardSheet(input: ExportInput): Promise<void> {
-  const blob = await toBlob(await renderDashboardSheet(input));
+  const blob = await toBlob(await renderDashboardSheet(input), "image/jpeg");
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `shatrunjay-hills-${stampFor(new Date())}.png`;
+  link.download = `shatrunjay-hills-${stampFor(new Date())}.jpg`;
   link.click();
   // Revoked on the next tick rather than immediately: Safari reads the href
   // after the click handler returns.
