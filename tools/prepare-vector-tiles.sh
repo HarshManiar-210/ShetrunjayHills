@@ -57,7 +57,7 @@ lines = open(src).read().split("\n")
 
 # Only the one-feature-per-line layout ogr2ogr and QGIS emit can be shuffled
 # this cheaply. Anything else is left alone rather than silently mangled.
-idx = [i for i, l in enumerate(lines) if l.startswith('{"type":"Feature"')]
+idx = [i for i, l in enumerate(lines) if l.startswith(('{"type":"Feature"', '{ "type": "Feature"'))]
 if len(idx) < 2 or idx != list(range(idx[0], idx[0] + len(idx))):
     sys.stderr.write("not one feature per line — tiling unshuffled\n")
     open(dst, "w").write("\n".join(lines))

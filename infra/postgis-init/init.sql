@@ -522,8 +522,22 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     -- Drone Analysis. Tree Height and Tree Species are seeded above, Tree
     -- Density and Growing Stock are their own raster groups below; these are
     -- the rest of the brief's list for that group.
-    ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
-    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending');
+    ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending');
+
+-- TOF (Trees Outside Forests): 212,969 tree polygons, delivered as
+-- TreeOutsideForest.parquet (UTM 42N) and served as PMTiles like Tree Height.
+-- Built with:
+--   ogr2ogr -f GeoJSON tof.geojson TreeOutsideForest.parquet -t_srs EPSG:4326 \
+--     -select TOF_Class,Max_Height -lco COORDINATE_PRECISION=7
+--   tools/prepare-vector-tiles.sh treesOutsideForests tof.geojson
+-- Mean_Dens is dropped: it is 0 on every feature.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', 'fill', '#875400', 'TOF_Class', '[
+        {"value": "Block TOF", "label": "Block TOF", "color": "#234f1a"},
+        {"value": "Built-up TOF", "label": "Built-up TOF", "color": "#00ffeb"},
+        {"value": "Linear TOF", "label": "Linear TOF", "color": "#ffff00"},
+        {"value": "Scattered TOF", "label": "Scattered TOF", "color": "#875400"}
+    ]'::jsonb, 'vector-data/tree-outside-forest.pmtiles', 7, 71.730263, 21.464732, 71.822354, 21.512495, '{TOF_Class,Max_Height}');
 
 -- Gochar: exported from KML, so every feature also carries KML plumbing
 -- (tessellate, extrude, visibility, ...); the popup shows only its Name.
