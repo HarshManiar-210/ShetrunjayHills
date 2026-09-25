@@ -45,7 +45,9 @@ import type { LegendClass } from "@/lib/legend-config";
  *
  * A group whose rows are rasters is one layer with a year picker, not a list
  * of layers; that is why the seed gives each unrelated raster theme its own
- * group. A group can hold layers and child groups at once.
+ * group. A nested group of vector rows is likewise one layer, its rows picked
+ * as options in the side panel. A group can hold layers and child groups at
+ * once.
  */
 
 /** Subject colour for a group, resolved to the --sec-* tokens in globals.css. */
@@ -69,9 +71,20 @@ export type SectionAccent =
  *   `raster:<group>`  a raster theme, keyed by its group, not by year:
  *                     the year is a separate choice, held in `rasterYear`
  *   `layer:<id>`      a role-permissioned `layers` row
+ *   `group:<group>`   a nested vector group's one switch; each option in it
+ *                     keeps its own overlay key, drawn only while this is on
  */
 const LAYER_PREFIX = "layer:";
 const RASTER_PREFIX = "raster:";
+const GROUP_PREFIX = "group:";
+
+export function groupToggleKey(groupKey: string): string {
+  return `${GROUP_PREFIX}${groupKey}`;
+}
+
+export function isGroupToggleKey(key: string): boolean {
+  return key.startsWith(GROUP_PREFIX);
+}
 
 export function layerIdOf(key: string): number | null {
   return key.startsWith(LAYER_PREFIX) ? Number(key.slice(LAYER_PREFIX.length)) : null;
@@ -122,8 +135,10 @@ export interface SectionDef {
    * layer — the group *is* one layer: a switch, plus a year picker when it
    *         holds more than one image.
    * multi — a heading over layers and/or nested groups.
+   * options — a nested group of vector layers, offered as one layer whose
+   *         rows are picked as options in the side panel.
    */
-  mode: "layer" | "multi";
+  mode: "layer" | "multi" | "options";
   /** Layers hanging directly off this group. */
   items: SectionItem[];
   /** Per-year imagery, when this group is a raster theme. */
@@ -143,7 +158,6 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   "forest-layers": { accent: "forest", icon: Trees },
   "green-cover": { accent: "forest", icon: Leaf },
   "forest-cover": { accent: "forest", icon: Trees },
-  "forest-type": { accent: "canopy", icon: TreePine },
   "vegetation-change": { accent: "change", icon: TrendingUp },
   "forest-fragmentation": { accent: "change", icon: Puzzle },
   "satellite-imagery": { accent: "imagery", icon: Aperture },
@@ -166,8 +180,10 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   hydrogeology: { accent: "water", icon: Droplets },
   "existing-water-conservation": { accent: "water", icon: Dam },
   "proposed-conservation-sites": { accent: "water", icon: Target },
+  "flood-depth": { accent: "water", icon: Waves },
   "wildlife-movement": { accent: "fauna", icon: Route },
   "habitat-suitability": { accent: "fauna", icon: Layers },
+  "wildlife-corridors": { accent: "fauna", icon: Route },
   "administrative-boundaries": { accent: "infra", icon: MapIcon },
   reference: { accent: "infra", icon: Layers },
   toposheet: { accent: "imagery", icon: ScrollText },
@@ -183,7 +199,6 @@ const ITEM_STYLE: Record<string, LucideIcon> = {
   causeway: Waypoints,
   checkDam: Dam,
   fireline: Flame,
-  potentialSmc: Target,
   vantalawadi: MapPinned,
   streams: Waves,
   watershed: Droplets,
@@ -318,7 +333,9 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       label: group.label,
       id: group.key,
       ...style,
-      mode: "multi",
+      // Nested and holding layers of its own: one entry in the dropdown, its
+      // rows chosen in the side panel (Existing/Proposed Conservation).
+      mode: depth > 0 && rows.length > 0 ? "options" : "multi",
       years: [],
       children,
       depth,
@@ -362,6 +379,8 @@ export interface SectionLayer {
   accent: SectionAccent;
   /** Set when this layer *is* a raster theme, whose years and opacity it owns. */
   raster?: SectionDef;
+  /** Set when this layer is an options group: the rows picked in the side panel. */
+  options?: SectionItem[];
 }
 
 /**
@@ -384,7 +403,19 @@ export function sectionLayers(section: SectionDef): SectionLayer[] {
             raster: section,
           },
         ]
-      : section.items.map((item) => ({
+      : section.mode === "options"
+        ? [
+            {
+              key: groupToggleKey(section.id),
+              label: section.label,
+              pending: section.items.every((item) => item.pending),
+              color: section.items.find((item) => !item.pending)?.color,
+              icon: section.icon,
+              accent: section.accent,
+              options: section.items,
+            },
+          ]
+        : section.items.map((item) => ({
           key: item.key,
           label: item.label,
           pending: Boolean(item.pending),
@@ -396,6 +427,16 @@ export function sectionLayers(section: SectionDef): SectionLayer[] {
   // Children are walked either way: a raster theme can still have groups
   // seeded beneath it.
   return [...own, ...section.children.flatMap(sectionLayers)];
+}
+
+/** Option overlay key → the toggle key of the options group it belongs to. */
+export function optionOwners(allSections: SectionDef[]): Record<string, string> {
+  const owners: Record<string, string> = {};
+  for (const section of allSections) {
+    if (section.mode !== "options") continue;
+    for (const item of section.items) owners[item.key] = groupToggleKey(section.id);
+  }
+  return owners;
 }
 
 /** What a raster theme draws at until its opacity slider is touched. */

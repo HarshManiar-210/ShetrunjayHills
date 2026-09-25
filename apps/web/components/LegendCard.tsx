@@ -36,6 +36,12 @@ export interface LegendRasterLayer {
    * otherwise read "Orthomosaic · Orthomosaic".
    */
   yearLabel?: string;
+  /**
+   * The static_overlays key for the image on screen, when the theme's
+   * classes vary by image (Flood Depth) rather than being fixed per theme —
+   * see legendFor's imageKey param.
+   */
+  imageKey?: string;
   isPhotographic?: boolean;
 }
 
@@ -45,6 +51,8 @@ export interface LegendOverlay {
   label: string;
   color: string;
   geometryKind: SwatchGeometryKind;
+  /** The options group it was picked from, when names repeat across groups (two Matipalas). */
+  group?: string;
   /** Set for a per-feature overlay (Forest Cover/Forest Type FSI) — see SectionItem.categories. */
   categories?: LegendClass[];
 }
@@ -154,7 +162,12 @@ export function LegendContent({
           {plainOverlays.map((overlay) => (
             <div key={overlay.key} className="flex items-center gap-2 text-sm">
               <LayerSwatch color={overlay.color} geometryKind={overlay.geometryKind} />
-              <span>{overlay.label}</span>
+              <span>
+                {overlay.label}
+                {overlay.group && (
+                  <span className="text-muted-foreground"> · {overlay.group}</span>
+                )}
+              </span>
             </div>
           ))}
         </div>
@@ -177,7 +190,7 @@ export function LegendContent({
       ))}
 
       {rasterLayers.map((raster) => {
-        const legend = legendFor(raster.id);
+        const legend = legendFor(raster.id, raster.imageKey);
         const scale = legend && rampScale(legend);
         return (
           <div key={raster.id} className="flex flex-col gap-1.5">

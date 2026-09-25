@@ -99,12 +99,11 @@ func OverlayData(repo overlayFilePathGetter, dataRoot string) http.HandlerFunc {
 		root := filepath.Clean(dataRoot)
 		full := filepath.Join(root, filepath.Clean(string(filepath.Separator)+relPath))
 
-		// Overlay files are deployment assets, not per-request data, and the
-		// vector ones run to tens of megabytes — re-downloading one because
-		// its switch was flipped off and on again is the most avoidable wait
-		// in the app. ServeFile still sends Last-Modified, so the
-		// revalidation once max-age lapses is a 304 rather than a re-send.
-		w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
+		// Cached, but revalidated on every use: ServeFile sends Last-Modified,
+		// so an unchanged file costs a 304 rather than a re-send. A max-age
+		// here kept serving the old file for up to a day after a data file
+		// was replaced on disk, which is exactly when it must not.
+		w.Header().Set("Cache-Control", "no-cache")
 
 		// Go's mime table has no .geojson or .pmtiles entry, so ServeFile
 		// would otherwise sniff these to text/plain. ServeFile leaves an

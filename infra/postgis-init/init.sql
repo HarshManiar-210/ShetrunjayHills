@@ -119,7 +119,10 @@ CREATE TABLE static_overlays (
     -- theme's classes, so the legend renders it the same way. NULL/NULL for
     -- every flat-colour row, which is still the common case.
     color_field TEXT,
-    categories  JSONB
+    categories  JSONB,
+    -- The GeoJSON properties a clicked feature's popup shows, in order. NULL
+    -- shows every meaningful property (see apps/web/lib/feature-popup.ts).
+    popup_fields TEXT[]
 );
 
 -- ---------------------------------------------------------------------------
@@ -230,9 +233,6 @@ WHERE
 --     the only satellite imagery stack delivered.
 --   * "Forest Cover FSI" / "Forest Type FSI" read as naming the source of
 --     those themes rather than separate layers, so they are not own groups.
---   * "Proposed Conservation Sites" already has one delivered file
---     (potentialSMC.geojson, whose features carry a Name like "Check Dam"),
---     so it is seeded as one layer beside the three named placeholders.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
@@ -251,7 +251,6 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('green-cover',          'Green Cover (Yearwise)',  grp('forest-layers'), 1),
     ('forest-cover',         'Forest Cover (Yearwise)', grp('forest-layers'), 2),
-    ('forest-type',          'Forest Type (Yearwise)',  grp('forest-layers'), 3),
     ('vegetation-change',    'Vegetation Change',       grp('forest-layers'), 4),
     ('forest-fragmentation', 'Forest Fragmentation',    grp('forest-layers'), 5),
     ('satellite-imagery',    'Satellite Imagery',       grp('forest-layers'), 6),
@@ -268,10 +267,12 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('toposheet',   'Toposheet',                   grp('reference'), 2),
 
-    ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 1),
-    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 2),
+    ('flood-depth',                 'Flood Depth (m)',             grp('hydrogeology'), 1),
+    ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 2),
+    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 3),
 
-    ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
+    ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1),
+    ('wildlife-corridors',  'Wildlife Corridors',  grp('wildlife-movement'), 2);
 
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
@@ -309,12 +310,30 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- Nothing here says "this layer is tiled": the API stamps that from the file
 -- extension, so switching a layer to tiles is this one path edit.
 --
--- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
--- file_path stay unset until a follow-up row update supplies real data, no
--- code change required either way.
+-- Tree Species: 822,994 trees from Tree_Statistics.parquet (UTM 42N), built
+-- the same way as TOF (ogr2ogr to EPSG:4326 keeping Predicted_SN, Max_Height,
+-- Carbon_kg, then tools/prepare-vector-tiles.sh). Coloured by the ten most
+-- common species (91% of trees); the other 24 and the unnamed fall through to
+-- `color`, which the "Other species" legend row names.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
-    ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
+    ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', 'point', '#bab0ac', 'vector-data/tree-species.pmtiles', 2, 'available', 71.728574, 21.451984, 71.821788, 21.511942);
+
+UPDATE static_overlays SET color_field = 'Predicted_SN', popup_fields = '{Predicted_SN,Max_Height,Carbon_kg}',
+    categories = '[
+        {"value": "Butea monosperma", "label": "Butea monosperma", "color": "#f28e2b"},
+        {"value": "Senegalia senegal", "label": "Senegalia senegal", "color": "#4e79a7"},
+        {"value": "Dichrostachys cinerea", "label": "Dichrostachys cinerea", "color": "#e15759"},
+        {"value": "Acacia nilotica", "label": "Acacia nilotica", "color": "#76b7b2"},
+        {"value": "Ficus benjamina L.", "label": "Ficus benjamina", "color": "#59a14f"},
+        {"value": "Anogeissus latifolia", "label": "Anogeissus latifolia", "color": "#edc948"},
+        {"value": "Azadirachta indica", "label": "Azadirachta indica", "color": "#b07aa1"},
+        {"value": "Prosopis juliflora", "label": "Prosopis juliflora", "color": "#ff9da7"},
+        {"value": "Boswellia serrata", "label": "Boswellia serrata", "color": "#9c755f"},
+        {"value": "Mangifera indica", "label": "Mangifera indica", "color": "#17becf"},
+        {"value": "Other", "label": "Other species", "color": "#bab0ac"}
+    ]'::jsonb
+WHERE key = 'treeSpecies';
 
 -- Forest Survey of India (FSI) 2023 notification: official density-class and
 -- species-type polygons, delivered as vector data rather than as imagery.
@@ -402,17 +421,23 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
 
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
--- flat vector-section pattern as Forest Boundary/Cadastral Map. Mati Pala
--- hasn't arrived yet, so it's seeded 'pending' like Tree Species above.
+-- flat vector-section pattern as Forest Boundary/Cadastral Map. File names
+-- carry the "-existing-water-conservation" suffix because Proposed
+-- Conservation Sites seeds its own Matipala/Vantalavadi/Checkdam placeholders
+-- below with the same feature names -- the suffix is what keeps the two
+-- sites' files apart once both are delivered.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway.geojson',      1, 71.728402, 21.450967, 71.820940, 21.505128),
-    ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam.geojson',     2, 71.737601, 21.456108, 71.821241, 21.509884),
+    ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway-existing-water-conservation.geojson',      4, 71.728402, 21.450967, 71.820940, 21.505128),
+    ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam-existing-water-conservation.geojson',     3, 71.737601, 21.456108, 71.821241, 21.509884),
     ('fireline',      'Fireline',      grp('reference'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
-    ('potentialSmc',  'Potential SMC', grp('proposed-conservation-sites'), 'vector', 'fill', '#5B8C5A', 'vector-data/potentialSMC.geojson',  4, 71.730361, 21.458173, 71.820895, 21.502023),
-    ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi.geojson',   5, 71.733656, 21.463890, 71.819923, 21.510452);
+    ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
+    ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
-INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
-    ('matiPala', 'Matipala', grp('existing-water-conservation'), 'vector', NULL, NULL, '', 6, 'pending');
+-- Proposed Conservation Sites: the popup shows each feature's Zone_2 only.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('proposedMatipala',    'Matipala',    grp('proposed-conservation-sites'), 'vector', 'fill', '#A3C45A', 'vector-data/matipala-proposed-conservation-sites.geojson',  1, 71.730361, 21.458872, 71.820895, 21.489651, '{Zone_2}'),
+    ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', 'fill', '#C77DBA', 'vector-data/vantalavdi-proposed-conservation-sites.geojson', 2, 71.736501, 21.465143, 71.814602, 21.501276, '{Zone_2}'),
+    ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', 'fill', '#E0A030', 'vector-data/checkdam-proposed-conservation-sites.geojson',  3, 71.759037, 21.458173, 71.814519, 21.502023, '{Zone_2}');
 
 -- Single-image drone themes: each is its own one-raster group (single on/off
 -- switch, no year picker), which keeps the rule that a group holding rasters
@@ -481,7 +506,22 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
     -- Habitat Suitability: extent supplied with the raster.
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390),
+    -- Wildlife Corridors: same extent as Habitat Suitability.
+    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
+
+-- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
+-- 5/10 m) picked the same way Forest/Green Cover pick a year -- all sharing
+-- the same delivered extent ("Flood All Layers"). Each level's four colour
+-- classes cover different depth ranges (see legend-config.ts's flood0_5m/
+-- flood1m/flood2m/flood5m/flood10m entries, resolved by the selected image's
+-- own key rather than the theme's).
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.
@@ -496,28 +536,31 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- placeholder. Each goes live by updating its row; nothing else changes.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, status) VALUES
-    ('forestType', 'Forest Type', grp('forest-type'),   'raster', '', 1, 'pending');
-
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
     -- Drone Analysis. Tree Height and Tree Species are seeded above, Tree
     -- Density and Growing Stock are their own raster groups below; these are
     -- the rest of the brief's list for that group.
-    ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
-    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
+    ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending');
 
-    ('floodDepth', 'Flood Depth (m)', grp('hydrogeology'), 'vector', NULL, NULL, '', 7, 'pending'),
+-- TOF (Trees Outside Forests): 212,969 tree polygons, delivered as
+-- TreeOutsideForest.parquet (UTM 42N) and served as PMTiles like Tree Height.
+-- Built with:
+--   ogr2ogr -f GeoJSON tof.geojson TreeOutsideForest.parquet -t_srs EPSG:4326 \
+--     -select TOF_Class,Max_Height -lco COORDINATE_PRECISION=7
+--   tools/prepare-vector-tiles.sh treesOutsideForests tof.geojson
+-- Mean_Dens is dropped: it is 0 on every feature.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', 'fill', '#875400', 'TOF_Class', '[
+        {"value": "Block TOF", "label": "Block TOF", "color": "#234f1a"},
+        {"value": "Built-up TOF", "label": "Built-up TOF", "color": "#00ffeb"},
+        {"value": "Linear TOF", "label": "Linear TOF", "color": "#ffff00"},
+        {"value": "Scattered TOF", "label": "Scattered TOF", "color": "#875400"}
+    ]'::jsonb, 'vector-data/tree-outside-forest.pmtiles', 7, 71.730263, 21.464732, 71.822354, 21.512495, '{TOF_Class,Max_Height}');
 
-    -- Proposed Conservation Sites. potentialSMC.geojson is already delivered
-    -- and its features carry a Name ("Check Dam", ...), so it may already
-    -- cover all three of these -- confirm with the client before filling in.
-    ('proposedMatipala',    'Matipala',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 2, 'pending'),
-    ('proposedVantalavadi', 'Vantalavadi', grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 3, 'pending'),
-    ('proposedCheckdam',    'Checkdam',    grp('proposed-conservation-sites'), 'vector', NULL, NULL, '', 4, 'pending'),
-
-    ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending'),
-
-    ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', NULL, NULL, '', 9, 'pending');
+-- Gochar: exported from KML, so every feature also carries KML plumbing
+-- (tessellate, extrude, visibility, ...); the popup shows only its Name.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('grazingLand', 'Grazing Land (Gochar)', grp('administrative-boundaries'), 'vector', 'fill', '#C2A35A', 'vector-data/gochar.geojson', 9, 71.757347, 21.458765, 71.820685, 21.489645, '{Name}');
 
 -- Taluka Boundary. Talukas.geojson was delivered but never seeded, which is
 -- half of why the client reported "Zone File is showing District boundary" --

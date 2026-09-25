@@ -76,8 +76,12 @@ const MATCH_TOLERANCE = 3 * 45 ** 2;
  * within tolerance is kept and labelled by its hex rather than dropped —
  * silently discarding pixels would make the shares lie.
  */
-export function nameClasses(themeId: string, measured: RasterClassStat[]): NamedClassStat[] {
-  const legend = legendFor(themeId);
+export function nameClasses(
+  themeId: string,
+  measured: RasterClassStat[],
+  imageKey?: string,
+): NamedClassStat[] {
+  const legend = legendFor(themeId, imageKey);
   const palette: { cls: LegendClass; rgb: [number, number, number] }[] = [];
   for (const cls of legend?.classes ?? []) {
     const rgb = parseHex(cls.color);

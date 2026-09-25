@@ -44,8 +44,11 @@ import { vectorOverlayDefs } from "@/lib/static-overlays";
 import {
   buildSections,
   flattenSections,
+  groupToggleKey,
+  isGroupToggleKey,
   isRasterToggleKey,
   layerIdOf,
+  optionOwners,
   rasterToggleKey,
   sectionLayers,
   DEFAULT_RASTER_OPACITY,
@@ -271,6 +274,18 @@ export function MapDashboard() {
   // Flattened once, because almost everything downstream asks a question of
   // the whole tree rather than of one level of it.
   const allSections = useMemo(() => flattenSections(sections), [sections]);
+  const owners = useMemo(() => optionOwners(allSections), [allSections]);
+
+  // An options group switches on with every option that has data, so picking
+  // it draws something straight away; the side panel narrows it from there.
+  const keysFor = useCallback(
+    (key: string) => {
+      if (!isGroupToggleKey(key)) return [key];
+      const group = allSections.find((s) => groupToggleKey(s.id) === key);
+      return [key, ...(group?.items ?? []).filter((i) => !i.pending).map((i) => i.key)];
+    },
+    [allSections],
+  );
   const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
 
   /**
@@ -353,18 +368,18 @@ export function MapDashboard() {
   const toggleSelected = useCallback(
     (key: string, picked: boolean) => {
       setSelected((sel) => ({ ...sel, [key]: picked }));
+      const keys = keysFor(key);
       if (picked) {
-        requestKeys([key], true);
+        requestKeys(keys, true);
         return;
       }
       setVisible((v) => {
-        if (!v[key]) return v;
         const next = { ...v };
-        delete next[key];
+        for (const k of keys) delete next[k];
         return next;
       });
     },
-    [requestKeys],
+    [requestKeys, keysFor],
   );
 
   const deselectLayer = useCallback(
@@ -403,20 +418,23 @@ export function MapDashboard() {
   // knowing which section holds it, so `path` goes unused here.
   const revealLayer = useCallback(
     (_path: string[], key: string) => {
+      // An option is revealed through its group: the group row goes into the
+      // panel, switched on with just the option that was searched for.
+      const rowKey = owners[key] ?? key;
       // Search is the one route that skips both dropdowns, so it opens the
       // layer's own section on the way past: without that the layer would be
       // in the panel and on the map but missing from the dropdown that is
       // supposed to list it.
       const owner = sections.find((section) =>
-        sectionLayers(section).some((layer) => layer.key === key),
+        sectionLayers(section).some((layer) => layer.key === rowKey),
       );
       if (owner) setActiveSections((a) => ({ ...a, [owner.id]: true }));
-      setSelected((sel) => ({ ...sel, [key]: true }));
+      setSelected((sel) => ({ ...sel, [rowKey]: true }));
       setPanelOpen(true);
-      requestKeys([key], true);
+      requestKeys(rowKey === key ? keysFor(key) : [rowKey, key], true);
       setMobileSheet(null);
     },
-    [requestKeys, sections],
+    [requestKeys, sections, owners, keysFor],
   );
 
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
@@ -437,13 +455,15 @@ export function MapDashboard() {
     const overlayKeys: Record<string, boolean> = {};
     const layerIds: Record<number, boolean> = {};
     for (const [key, on] of Object.entries(visible)) {
-      if (!on || isRasterToggleKey(key)) continue;
+      if (!on || isRasterToggleKey(key) || isGroupToggleKey(key)) continue;
+      // An option draws only while its group's own switch is on.
+      if (owners[key] && !visible[owners[key]]) continue;
       const layerId = layerIdOf(key);
       if (layerId === null) overlayKeys[key] = true;
       else layerIds[layerId] = true;
     }
     return { overlays: overlayKeys, visibility: layerIds };
-  }, [visible]);
+  }, [visible, owners]);
 
   const visibleFeatures = useMemo(
     () => (layers ?? EMPTY).features.filter((f) => visibility[f.properties.id]),
@@ -516,6 +536,7 @@ export function MapDashboard() {
           url: overlayDataUrl(image.key),
           bounds: image.bounds,
           opacity,
+          label: image.label === section.label ? section.label : `${section.label} · ${image.label}`,
         };
 
         // Compare mode draws the second year as its own layer stacked over the
@@ -532,6 +553,7 @@ export function MapDashboard() {
             url: overlayDataUrl(other.key),
             bounds: other.bounds,
             opacity: opacity * blend,
+            label: `${section.label} · ${other.label}`,
           },
         ];
       }),
@@ -546,6 +568,8 @@ export function MapDashboard() {
         // A single-image theme labels its one row with the theme's own name,
         // so repeating it would read "Orthomosaic · Orthomosaic".
         yearLabel: image.label === section.label ? undefined : image.label,
+        // The overlay row for the image on screen — see LegendRasterLayer.imageKey.
+        imageKey: image.key,
       })),
     [activeRasters],
   );
@@ -570,14 +594,20 @@ export function MapDashboard() {
   const legendOverlays: LegendOverlay[] = useMemo(
     () =>
       allSections
-        .flatMap((section) => section.items)
+        .flatMap((section) =>
+          section.items.map((item) => ({
+            ...item,
+            group: section.mode === "options" ? section.label : undefined,
+          })),
+        )
         .filter((item) => overlays[item.key])
-        .map(({ key, label, color, geometryKind, categories }) => ({
+        .map(({ key, label, color, geometryKind, categories, group }) => ({
           key,
           label,
           color,
           geometryKind,
           categories,
+          group,
         })),
     [allSections, overlays],
   );

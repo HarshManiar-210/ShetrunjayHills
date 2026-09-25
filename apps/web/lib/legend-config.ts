@@ -313,6 +313,83 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     ],
     note: "VDF very dense · MDF moderately dense · OF open forest · NF non forest.",
   },
+  // Flood Depth is one raster theme with five selectable images (see
+  // sections.ts's "flood-depth" group), one per simulated depth -- like
+  // Forest/Green Cover's Yearwise groups, but where a year's legend never
+  // changes, each flood image's four classes cover different depth ranges.
+  // So these are keyed by the overlay's own key (legendFor's imageKey
+  // param), not by the theme id, and legendFor is asked for the image key
+  // first everywhere a specific image is on screen.
+  flood0_5m: {
+    layerId: "flood0_5m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "0.5 m"],
+    classes: [
+      { value: 1, label: "0 – 0.12 m", color: "#28bceb" },
+      { value: 2, label: "0.12 – 0.25 m", color: "#a4fc3c" },
+      { value: 3, label: "0.25 – 0.37 m", color: "#fb7e21" },
+      { value: 4, label: "0.37 – 0.50 m", color: "#7a0403" },
+    ],
+  },
+  flood1m: {
+    layerId: "flood1m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "1 m"],
+    classes: [
+      { value: 1, label: "0 – 0.25 m", color: "#28bceb" },
+      { value: 2, label: "0.25 – 0.50 m", color: "#a4fc3c" },
+      { value: 3, label: "0.50 – 0.75 m", color: "#fb7e21" },
+      { value: 4, label: "0.75 – 1.0 m", color: "#7a0403" },
+    ],
+  },
+  flood2m: {
+    layerId: "flood2m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "2 m"],
+    classes: [
+      { value: 1, label: "0 – 0.5 m", color: "#28bceb" },
+      { value: 2, label: "0.5 – 1.0 m", color: "#a4fc3c" },
+      { value: 3, label: "1.0 – 1.5 m", color: "#fb7e21" },
+      { value: 4, label: "1.5 – 2.0 m", color: "#7a0403" },
+    ],
+  },
+  flood5m: {
+    layerId: "flood5m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "5 m"],
+    classes: [
+      { value: 1, label: "0 – 1.25 m", color: "#28bceb" },
+      { value: 2, label: "1.25 – 2.50 m", color: "#a4fc3c" },
+      { value: 3, label: "2.50 – 3.75 m", color: "#fb7e21" },
+      { value: 4, label: "3.75 – 5.0 m", color: "#7a0403" },
+    ],
+  },
+  flood10m: {
+    layerId: "flood10m",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "10 m"],
+    classes: [
+      { value: 1, label: "0 – 2.5 m", color: "#28bceb" },
+      { value: 2, label: "2.5 – 5.0 m", color: "#a4fc3c" },
+      { value: 3, label: "5.0 – 7.5 m", color: "#fb7e21" },
+      { value: 4, label: "7.5 – 10 m", color: "#7a0403" },
+    ],
+  },
+  // Theme-level fallback: same four colours, level-agnostic labels. Used
+  // wherever the theme is shown without a specific image picked (the
+  // sidebar/picker swatch dot) -- see legendFor.
+  "flood-depth": {
+    layerId: "flood-depth",
+    ramp: "low-to-high",
+    rampLabels: ["Shallowest", "Deepest"],
+    classes: [
+      { value: 1, label: "Shallowest", color: "#28bceb" },
+      { value: 2, label: "Shallow-mid", color: "#a4fc3c" },
+      { value: 3, label: "Mid-deep", color: "#fb7e21" },
+      { value: 4, label: "Deepest", color: "#7a0403" },
+    ],
+    note: "Exact depth ranges depend on the selected flood level.",
+  },
   chm: {
     layerId: "chm",
     ramp: "low-to-high",
@@ -400,7 +477,6 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
 // were only given as named external palette references ("cpt-city
 // DEM_screen", "cpt-city wiki-knutux") rather than literal hex stops.
 const PROVISIONAL_IDS = [
-  "forest-type",
   "ecological-degradation",
   "tof",
   "growing-stock",
@@ -500,6 +576,12 @@ export function legendDot(legend: RasterLegend | undefined): LayerDot {
  * key in the seed therefore means renaming its entry here; renaming only its
  * *label* does not.
  */
-export function legendFor(layerId: string): RasterLegend | undefined {
-  return LEGEND_CONFIG[layerId];
+/**
+ * Looks up a raster theme's legend, or a specific image's own legend when
+ * one exists and the theme's classes vary by the image on screen (Flood
+ * Depth's five levels each cover different ranges under the same theme id).
+ * Falls back to the theme id, which is all every other theme has ever set.
+ */
+export function legendFor(layerId: string, imageKey?: string): RasterLegend | undefined {
+  return (imageKey && LEGEND_CONFIG[imageKey]) || LEGEND_CONFIG[layerId];
 }

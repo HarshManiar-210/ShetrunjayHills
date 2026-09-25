@@ -52,6 +52,9 @@ type StaticOverlay struct {
 	// rows, straight out of the DB. nil/nil for every flat-colour row.
 	ColorField string          `json:"color_field,omitempty"`
 	Categories json.RawMessage `json:"categories,omitempty"`
+	// PopupFields names the GeoJSON properties a clicked feature shows, in
+	// order. Empty means show every meaningful property.
+	PopupFields []string `json:"popup_fields,omitempty"`
 	// SizeBytes is the asset's size on disk, filled in by the Overlays
 	// handler rather than stored in the DB — statting the file cannot drift
 	// out of step with it the way a seeded column would. Lets the frontend

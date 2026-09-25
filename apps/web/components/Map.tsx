@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
   LngLatBounds,
@@ -15,7 +15,7 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { addProtocol } from "maplibre-gl";
 import { Protocol } from "pmtiles";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { boundsOfFeature } from "@/lib/geo";
 import { popupHtml } from "@/lib/feature-popup";
 import {
@@ -86,7 +86,21 @@ export interface RasterOverlay {
   url: string;
   bounds: LngLatBoundsLike;
   opacity: number;
+  /** What the loading indicator calls it while the image downloads. */
+  label?: string;
 }
+
+/**
+ * A source stays "loading" at least this long before it can count as done.
+ * A tiled source reports loaded in the instant between its layer turning
+ * visible and its first tile request, which would drop the indicator before
+ * anything had actually arrived.
+ */
+const MIN_LOADING_MS = 400;
+/** Past this a load is abandoned rather than spinning forever. */
+const MAX_LOADING_MS = 90_000;
+/** How long a "couldn't load" notice stays up. */
+const LOAD_FAILED_MS = 5_000;
 
 const RASTER_SOURCE_PREFIX = "raster-overlay-";
 const RASTER_LAYER_PREFIX = "raster-overlay-layer-";
@@ -303,7 +317,7 @@ function attachPopups(
 
     popup
       .setLngLat(e.lngLat)
-      .setHTML(popupHtml(label, feature.properties, def?.color))
+      .setHTML(popupHtml(label, feature.properties, def?.color, def?.popupFields))
       .addTo(map);
   });
 
@@ -676,7 +690,36 @@ export default function Map({
   // any overlays change).
   const shownKeysRef = useRef<Set<string>>(new Set());
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [loadingOverlays, setLoadingOverlays] = useState<Set<string>>(new Set());
+  // Source id → what is loading and since when. One tracker for every kind
+  // of layer — whole-file GeoJSON, tiled PMTiles and raster images — cleared
+  // only when MapLibre itself reports the source loaded, so the indicator
+  // stays up for exactly as long as the map is still waiting on data.
+  const loadingRef = useRef(new globalThis.Map<string, { label: string; since: number }>());
+  const [loadingLabels, setLoadingLabels] = useState<string[]>([]);
+  const [loadFailed, setLoadFailed] = useState<string | null>(null);
+
+  const syncLoading = useCallback(() => {
+    setLoadingLabels([...new Set([...loadingRef.current.values()].map((v) => v.label))]);
+  }, []);
+
+  const markLoading = useCallback(
+    (sourceId: string, label: string) => {
+      loadingRef.current.set(sourceId, { label, since: performance.now() });
+      syncLoading();
+    },
+    [syncLoading],
+  );
+
+  const clearLoading = useCallback(
+    (sourceId: string, failed = false) => {
+      const entry = loadingRef.current.get(sourceId);
+      if (!entry) return;
+      loadingRef.current.delete(sourceId);
+      syncLoading();
+      if (failed) setLoadFailed(entry.label);
+    },
+    [syncLoading],
+  );
   // Seeded from the reduced-motion media query and then kept in sync with it,
   // so turning the OS setting on stops the loop without a reload. Safe to read
   // during the initial render: this component is only ever loaded client-side
@@ -745,6 +788,54 @@ export default function Map({
     if (map && mapLoaded) render(map, data, fitOnceRef.current);
   }, [data, mapLoaded]);
 
+  // Clears what has finished loading. Checked on MapLibre's own data events
+  // and on a slow timer as well, since the timer is what guarantees nothing
+  // stays stuck when an event is missed (e.g. a source removed mid-load).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const check = () => {
+      const pending = loadingRef.current;
+      if (pending.size === 0) return;
+      const now = performance.now();
+      let changed = false;
+      for (const [id, { since }] of pending) {
+        const gone = !map.getSource(id);
+        const done =
+          !gone && !map.isMoving() && now - since > MIN_LOADING_MS && map.isSourceLoaded(id);
+        if (gone || done || now - since > MAX_LOADING_MS) {
+          pending.delete(id);
+          changed = true;
+        }
+      }
+      if (changed) syncLoading();
+    };
+
+    const onError = (e: { sourceId?: string }) => {
+      if (e.sourceId) clearLoading(e.sourceId, true);
+    };
+
+    map.on("sourcedata", check);
+    map.on("idle", check);
+    map.on("moveend", check);
+    map.on("error", onError);
+    const timer = window.setInterval(check, 300);
+    return () => {
+      map.off("sourcedata", check);
+      map.off("idle", check);
+      map.off("moveend", check);
+      map.off("error", onError);
+      window.clearInterval(timer);
+    };
+  }, [mapLoaded, syncLoading, clearLoading]);
+
+  useEffect(() => {
+    if (!loadFailed) return;
+    const timer = window.setTimeout(() => setLoadFailed(null), LOAD_FAILED_MS);
+    return () => window.clearTimeout(timer);
+  }, [loadFailed]);
+
   // Basemap switch. Pure layout visibility over layers that are all already
   // in the style, so nothing the dashboard has added is disturbed —
   // map.setStyle() would drop every overlay source, every loaded geometry and
@@ -795,6 +886,7 @@ export default function Map({
       if (existing) {
         if (live[raster.id] !== raster.url) {
           existing.updateImage({ url: raster.url, coordinates: imageCoordinates(raster.bounds) });
+          markLoading(sourceId, raster.label ?? "layer");
         }
         if (map.getLayer(layerId)) {
           map.setPaintProperty(layerId, "raster-opacity", raster.opacity);
@@ -805,6 +897,7 @@ export default function Map({
           url: raster.url,
           coordinates: imageCoordinates(raster.bounds),
         });
+        markLoading(sourceId, raster.label ?? "layer");
         // beforeId, so imagery can never cover the vector geometry —
         // see firstVectorLayerId.
         map.addLayer(
@@ -831,7 +924,7 @@ export default function Map({
       const layerId = rasterLayerId(raster.id);
       if (map.getLayer(layerId)) map.moveLayer(layerId, floor);
     }
-  }, [rasterOverlays, mapLoaded]);
+  }, [rasterOverlays, mapLoaded, markLoading]);
 
   // The overlay-metadata fetch (MapDashboard's fetchOverlays) typically lands
   // after the map's own "load" event, so a def arriving later than mount
@@ -869,26 +962,23 @@ export default function Map({
       // A tiled overlay has nothing to load on demand: its source already
       // points at the archive, and MapLibre pulls tiles for the viewport as
       // the camera moves. Only whole-file overlays have a one-shot fetch.
-      if (visible && !def.tiled && !loadedKeysRef.current.has(def.key)) {
+      const firstLoad = visible && !def.tiled && !loadedKeysRef.current.has(def.key);
+      if (firstLoad) {
         // Marked before the load rather than after, so a re-render mid-load
         // doesn't start the same fetch a second time.
         loadedKeysRef.current.add(def.key);
-        setLoadingOverlays((s) => new Set(s).add(def.key));
-        source
-          .setData(def.url, true)
-          .catch(() => {
-            // Forget it, so flipping the switch off and on retries rather
-            // than leaving the layer permanently empty.
-            loadedKeysRef.current.delete(def.key);
-          })
-          .finally(() => {
-            setLoadingOverlays((s) => {
-              const next = new Set(s);
-              next.delete(def.key);
-              return next;
-            });
-          });
+        source.setData(def.url, true).catch(() => {
+          // Forget it, so flipping the switch off and on retries rather
+          // than leaving the layer permanently empty.
+          loadedKeysRef.current.delete(def.key);
+          clearLoading(sourceId, true);
+        });
       }
+
+      // A whole-file layer already in memory draws instantly on re-show; a
+      // tiled one may still need tiles for wherever the camera lands.
+      if (firstLoad || (justShown && def.tiled)) markLoading(sourceId, def.label);
+      if (!visible) clearLoading(sourceId);
 
       // Framed from the seeded extent, so the camera moves the instant the
       // switch is flipped rather than after the geometry has arrived.
@@ -901,7 +991,7 @@ export default function Map({
         if (map.getLayer(layerId)) map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
       }
     }
-  }, [overlays, overlayDefs, mapLoaded]);
+  }, [overlays, overlayDefs, mapLoaded, markLoading, clearLoading]);
 
   // visibility toggles: filter, never re-fetch or refit. No layer is
   // selected by default, so this shows only ids explicitly switched on
@@ -1014,10 +1104,25 @@ export default function Map({
         </div>
       )}
 
-      {mapLoaded && loadingOverlays.size > 0 && (
-        <div className="absolute top-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm text-foreground shadow-e2 ring-1 ring-foreground/10">
-          <Loader2 className="size-4 animate-spin text-primary" strokeWidth={1.75} />
-          Loading layer…
+      {mapLoaded && (loadingLabels.length > 0 || loadFailed) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute top-4 left-1/2 z-10 flex max-w-[min(90%,28rem)] -translate-x-1/2 items-center gap-2 rounded-full bg-card px-3 py-1.5 text-sm text-foreground shadow-e2 ring-1 ring-foreground/10"
+        >
+          {loadingLabels.length > 0 ? (
+            <>
+              <Loader2 className="size-4 shrink-0 animate-spin text-primary" strokeWidth={1.75} />
+              <span className="truncate">
+                Loading {loadingLabels.length === 1 ? loadingLabels[0] : `${loadingLabels.length} layers`}…
+              </span>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="size-4 shrink-0 text-destructive" strokeWidth={1.75} />
+              <span className="truncate">Couldn&apos;t load {loadFailed}. Switch it off and on to retry.</span>
+            </>
+          )}
         </div>
       )}
     </div>
