@@ -536,6 +536,7 @@ export function MapDashboard() {
           url: overlayDataUrl(image.key),
           bounds: image.bounds,
           opacity,
+          label: image.label === section.label ? section.label : `${section.label} · ${image.label}`,
         };
 
         // Compare mode draws the second year as its own layer stacked over the
@@ -552,6 +553,7 @@ export function MapDashboard() {
             url: overlayDataUrl(other.key),
             bounds: other.bounds,
             opacity: opacity * blend,
+            label: `${section.label} · ${other.label}`,
           },
         ];
       }),
