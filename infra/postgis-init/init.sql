@@ -58,7 +58,11 @@ CREATE TABLE layer_groups (
     label      TEXT NOT NULL,
     -- NULL for a top-level heading. A group is deleted with its subtree.
     parent_id  INTEGER REFERENCES layer_groups (id) ON DELETE CASCADE,
-    sort_order INTEGER NOT NULL DEFAULT 0
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    -- A top-level group set true gets a navbar dropdown of its own, listing
+    -- its layers directly, instead of being one entry in the Sections/Layers
+    -- pair. Which groups do is this flag, never a key check in the frontend.
+    own_picker BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE INDEX layer_groups_parent_idx ON layer_groups (parent_id);
@@ -244,6 +248,10 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
     ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
     ('reference',                   'Reference',                   NULL, 9);
+
+-- Boundaries are reference context laid over whatever else is on, not a
+-- subject of their own, so they get a dropdown of their own in the navbar.
+UPDATE layer_groups SET own_picker = true WHERE key = 'administrative-boundaries';
 
 -- Second level. Each of these holds one theme's rasters, so the frontend
 -- renders it as a single layer with a year picker -- which is why the six

@@ -80,4 +80,6 @@ type LayerGroup struct {
 	Label     string `json:"label"`
 	ParentID  *int   `json:"parent_id,omitempty"`
 	SortOrder int    `json:"sort_order"`
+	// OwnPicker gives a top-level group a navbar dropdown of its own.
+	OwnPicker bool `json:"own_picker"`
 }
