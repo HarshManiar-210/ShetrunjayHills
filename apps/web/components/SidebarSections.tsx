@@ -9,6 +9,7 @@ import {
   type RasterYear,
   type SectionAccent,
   type SectionDef,
+  type SectionItem,
   type SectionLayer,
 } from "@/lib/sections";
 import { cn } from "@/lib/utils";
@@ -137,6 +138,50 @@ function OpacityControl({
       <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
         {Math.round(opacity * 100)}%
       </span>
+    </div>
+  );
+}
+
+/**
+ * An options group's rows, as chips under its switch. Any number can be on,
+ * unlike a year. A row with no data yet is shown but can't be picked.
+ */
+function OptionChips({
+  label,
+  options,
+  visibility,
+  onToggle,
+}: {
+  label: string;
+  options: SectionItem[];
+  visibility: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1" role="group" aria-label={`${label} options`}>
+      {options.map((option) => {
+        const active = !option.pending && Boolean(visibility[option.key]);
+        return (
+          <button
+            key={option.key}
+            type="button"
+            aria-pressed={active}
+            disabled={option.pending}
+            title={option.pending ? "Coming soon" : undefined}
+            onClick={() => onToggle(option.key)}
+            className={cn(
+              "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] transition-colors",
+              active
+                ? "bg-brand font-semibold text-brand-foreground"
+                : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
+              option.pending && "pointer-events-none opacity-40",
+            )}
+          >
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: option.color }} />
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -402,6 +447,14 @@ function SidebarSectionsImpl({
                     onToggle={() => onToggleLayer(row.key)}
                     onRemove={() => onDeselectLayer(row.key)}
                   >
+                    {row.options && (
+                      <OptionChips
+                        label={row.label}
+                        options={row.options}
+                        visibility={visibility}
+                        onToggle={onToggleLayer}
+                      />
+                    )}
                     {row.raster && (
                       <div className="flex flex-col gap-2">
                         {row.raster.years.length > 1 && (
