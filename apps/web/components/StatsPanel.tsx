@@ -107,7 +107,10 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
     };
   }, [layer.imageKey]);
 
-  const classes = stats && !stats.photographic ? nameClasses(layer.id, stats.classes ?? []) : [];
+  const classes =
+    stats && !stats.photographic
+      ? nameClasses(layer.id, stats.classes ?? [], layer.imageKey)
+      : [];
 
   return (
     <div className="flex flex-col gap-1.5">

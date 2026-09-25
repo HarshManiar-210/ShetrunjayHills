@@ -36,6 +36,12 @@ export interface LegendRasterLayer {
    * otherwise read "Orthomosaic · Orthomosaic".
    */
   yearLabel?: string;
+  /**
+   * The static_overlays key for the image on screen, when the theme's
+   * classes vary by image (Flood Depth) rather than being fixed per theme —
+   * see legendFor's imageKey param.
+   */
+  imageKey?: string;
   isPhotographic?: boolean;
 }
 
@@ -177,7 +183,7 @@ export function LegendContent({
       ))}
 
       {rasterLayers.map((raster) => {
-        const legend = legendFor(raster.id);
+        const legend = legendFor(raster.id, raster.imageKey);
         const scale = legend && rampScale(legend);
         return (
           <div key={raster.id} className="flex flex-col gap-1.5">

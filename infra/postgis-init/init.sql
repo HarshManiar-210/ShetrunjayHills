@@ -281,18 +281,6 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('tree-density',  'Tree Density',   grp('drone-analysis'), 1),
     ('growing-stock', 'Growing Stock',  grp('drone-analysis'), 2);
 
--- Flood Depth: five simulated flood extents, one raster each. Each level's
--- four colour classes cover different depth ranges (see LEGEND_CONFIG), so
--- unlike Forest/Green Cover's Yearwise groups -- one legend for every year --
--- these can't share a group and a legend; each level gets its own, exactly
--- like Tree Density/Growing Stock above.
-INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
-    ('flood-0-5m', '0.5 Meter Flood', grp('flood-depth'), 1),
-    ('flood-1m',   '1 Meter Flood',   grp('flood-depth'), 2),
-    ('flood-2m',   '2 Meter Flood',   grp('flood-depth'), 3),
-    ('flood-5m',   '5 Meter Flood',   grp('flood-depth'), 4),
-    ('flood-10m',  '10 Meter Flood',  grp('flood-depth'), 5);
-
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
 -- file_path is relative to DATA_ROOT (see apps/api/cmd/api/main.go), which
@@ -495,14 +483,18 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     -- Habitat Suitability: extent supplied with the raster.
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
 
--- Flood Depth: five simulated flood extents (0.5/1/2/5/10 m), one raster
--- each, all sharing the same delivered extent ("Flood All Layers").
+-- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
+-- 5/10 m) picked the same way Forest/Green Cover pick a year -- all sharing
+-- the same delivered extent ("Flood All Layers"). Each level's four colour
+-- classes cover different depth ranges (see legend-config.ts's flood0_5m/
+-- flood1m/flood2m/flood5m/flood10m entries, resolved by the selected image's
+-- own key rather than the theme's).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('flood0_5m', '0.5 Meter Flood', grp('flood-0-5m'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood1m',   '1 Meter Flood',   grp('flood-1m'),   'raster', 'raster-data/flood/1MeterFlood.png',   1, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood2m',   '2 Meter Flood',   grp('flood-2m'),   'raster', 'raster-data/flood/2MeterFlood.png',   1, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood5m',   '5 Meter Flood',   grp('flood-5m'),   'raster', 'raster-data/flood/5MeterFlood.png',   1, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood10m',  '10 Meter Flood',  grp('flood-10m'),  'raster', 'raster-data/flood/10MeterFlood.png',  1, 71.7282, 21.4169, 71.8245, 21.4756);
+    ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above.

@@ -546,6 +546,8 @@ export function MapDashboard() {
         // A single-image theme labels its one row with the theme's own name,
         // so repeating it would read "Orthomosaic · Orthomosaic".
         yearLabel: image.label === section.label ? undefined : image.label,
+        // The overlay row for the image on screen — see LegendRasterLayer.imageKey.
+        imageKey: image.key,
       })),
     [activeRasters],
   );

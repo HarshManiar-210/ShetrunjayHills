@@ -373,7 +373,7 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
 
   for (const raster of input.rasterLegends) {
     blocks.push((c) => {
-      const legend = legendFor(raster.id);
+      const legend = legendFor(raster.id, raster.imageKey);
       themeTitle(c, raster.name, raster.yearLabel);
       const scale = legend && rampScale(legend);
       if (scale) {
