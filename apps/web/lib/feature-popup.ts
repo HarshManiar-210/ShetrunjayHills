@@ -142,6 +142,7 @@ const UNTRUNCATED: Record<string, string> = {
   strmdrop: "Stream drop",
   cat: "Category",
   polygonid: "Polygon ID",
+  predicted_sn: "Species",
 };
 
 /**
@@ -161,6 +162,7 @@ const UNITS: Record<string, string> = {
   length_km: "km",
   from_km: "km",
   to_km: "km",
+  carbon_kg: "kg",
 };
 
 /**

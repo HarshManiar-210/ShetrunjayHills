@@ -310,12 +310,30 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- Nothing here says "this layer is tiled": the API stamps that from the file
 -- extension, so switching a layer to tiles is this one path edit.
 --
--- Tree Species hasn't arrived yet, so it's seeded 'pending' — kind/color/
--- file_path stay unset until a follow-up row update supplies real data, no
--- code change required either way.
+-- Tree Species: 822,994 trees from Tree_Statistics.parquet (UTM 42N), built
+-- the same way as TOF (ogr2ogr to EPSG:4326 keeping Predicted_SN, Max_Height,
+-- Carbon_kg, then tools/prepare-vector-tiles.sh). Coloured by the ten most
+-- common species (91% of trees); the other 24 and the unnamed fall through to
+-- `color`, which the "Other species" legend row names.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
-    ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', NULL,    NULL,      '',                                2, 'pending',   NULL,      NULL,      NULL,      NULL);
+    ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', 'point', '#bab0ac', 'vector-data/tree-species.pmtiles', 2, 'available', 71.728574, 21.451984, 71.821788, 21.511942);
+
+UPDATE static_overlays SET color_field = 'Predicted_SN', popup_fields = '{Predicted_SN,Max_Height,Carbon_kg}',
+    categories = '[
+        {"value": "Butea monosperma", "label": "Butea monosperma", "color": "#f28e2b"},
+        {"value": "Senegalia senegal", "label": "Senegalia senegal", "color": "#4e79a7"},
+        {"value": "Dichrostachys cinerea", "label": "Dichrostachys cinerea", "color": "#e15759"},
+        {"value": "Acacia nilotica", "label": "Acacia nilotica", "color": "#76b7b2"},
+        {"value": "Ficus benjamina L.", "label": "Ficus benjamina", "color": "#59a14f"},
+        {"value": "Anogeissus latifolia", "label": "Anogeissus latifolia", "color": "#edc948"},
+        {"value": "Azadirachta indica", "label": "Azadirachta indica", "color": "#b07aa1"},
+        {"value": "Prosopis juliflora", "label": "Prosopis juliflora", "color": "#ff9da7"},
+        {"value": "Boswellia serrata", "label": "Boswellia serrata", "color": "#9c755f"},
+        {"value": "Mangifera indica", "label": "Mangifera indica", "color": "#17becf"},
+        {"value": "Other", "label": "Other species", "color": "#bab0ac"}
+    ]'::jsonb
+WHERE key = 'treeSpecies';
 
 -- Forest Survey of India (FSI) 2023 notification: official density-class and
 -- species-type polygons, delivered as vector data rather than as imagery.
