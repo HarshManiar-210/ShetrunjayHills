@@ -24,7 +24,7 @@ BEGIN;
 DELETE FROM static_overlays WHERE key = 'floodDepth';
 
 INSERT INTO layer_groups (key, label, parent_id, sort_order)
-SELECT 'flood-depth', 'Flood Depth (m)', id, 3 FROM layer_groups WHERE key = 'hydrogeology'
+SELECT 'flood-depth', 'Flood Depth (m)', id, 1 FROM layer_groups WHERE key = 'hydrogeology'
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat)

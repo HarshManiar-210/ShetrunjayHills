@@ -267,9 +267,9 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('toposheet',   'Toposheet',                   grp('reference'), 2),
 
-    ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 1),
-    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 2),
-    ('flood-depth',                 'Flood Depth (m)',             grp('hydrogeology'), 3),
+    ('flood-depth',                 'Flood Depth (m)',             grp('hydrogeology'), 1),
+    ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 2),
+    ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 3),
 
     ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
 
