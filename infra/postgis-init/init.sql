@@ -251,7 +251,6 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('green-cover',          'Green Cover (Yearwise)',  grp('forest-layers'), 1),
     ('forest-cover',         'Forest Cover (Yearwise)', grp('forest-layers'), 2),
-    ('forest-type',          'Forest Type (Yearwise)',  grp('forest-layers'), 3),
     ('vegetation-change',    'Vegetation Change',       grp('forest-layers'), 4),
     ('forest-fragmentation', 'Forest Fragmentation',    grp('forest-layers'), 5),
     ('satellite-imagery',    'Satellite Imagery',       grp('forest-layers'), 6),
@@ -495,9 +494,6 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- colour, file or extent, and the sidebar renders them as a disabled
 -- placeholder. Each goes live by updating its row; nothing else changes.
 -- ---------------------------------------------------------------------------
-
-INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, status) VALUES
-    ('forestType', 'Forest Type', grp('forest-type'),   'raster', '', 1, 'pending');
 
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
     -- Drone Analysis. Tree Height and Tree Species are seeded above, Tree

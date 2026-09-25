@@ -400,7 +400,6 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
 // were only given as named external palette references ("cpt-city
 // DEM_screen", "cpt-city wiki-knutux") rather than literal hex stops.
 const PROVISIONAL_IDS = [
-  "forest-type",
   "ecological-degradation",
   "tof",
   "growing-stock",
