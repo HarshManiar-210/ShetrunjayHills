@@ -183,6 +183,7 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   "flood-depth": { accent: "water", icon: Waves },
   "wildlife-movement": { accent: "fauna", icon: Route },
   "habitat-suitability": { accent: "fauna", icon: Layers },
+  "wildlife-corridors": { accent: "fauna", icon: Route },
   "administrative-boundaries": { accent: "infra", icon: MapIcon },
   reference: { accent: "infra", icon: Layers },
   toposheet: { accent: "imagery", icon: ScrollText },

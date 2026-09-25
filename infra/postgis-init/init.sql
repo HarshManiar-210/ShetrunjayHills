@@ -271,7 +271,8 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 2),
     ('proposed-conservation-sites', 'Proposed Conservation Sites', grp('hydrogeology'), 3),
 
-    ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1);
+    ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1),
+    ('wildlife-corridors',  'Wildlife Corridors',  grp('wildlife-movement'), 2);
 
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
@@ -487,7 +488,9 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
     -- Habitat Suitability: extent supplied with the raster.
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390),
+    -- Wildlife Corridors: same extent as Habitat Suitability.
+    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
 
 -- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
 -- 5/10 m) picked the same way Forest/Green Cover pick a year -- all sharing
@@ -520,9 +523,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     -- Density and Growing Stock are their own raster groups below; these are
     -- the rest of the brief's list for that group.
     ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending'),
-    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending'),
-
-    ('wildlifeCorridors',  'Wildlife Corridors',         grp('wildlife-movement'), 'vector', NULL, NULL, '', 2, 'pending');
+    ('treesOutsideForests', 'TOF (Trees Outside Forests)', grp('drone-analysis'), 'vector', NULL, NULL, '', 7, 'pending');
 
 -- Gochar: exported from KML, so every feature also carries KML plumbing
 -- (tessellate, extrude, visibility, ...); the popup shows only its Name.
