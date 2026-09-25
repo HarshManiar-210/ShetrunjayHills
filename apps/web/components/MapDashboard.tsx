@@ -110,6 +110,9 @@ export function MapDashboard() {
   const [overlayMeta, setOverlayMeta] = useState<OverlayMeta[]>([]);
   const [layerGroups, setLayerGroups] = useState<LayerGroup[]>([]);
   const [error, setError] = useState(false);
+  // The tree fetch failing leaves the section list empty; this is what tells
+  // an empty seed apart from a failed load, so the picker can offer a retry.
+  const [treeError, setTreeError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
@@ -213,9 +216,11 @@ export function MapDashboard() {
         if (cancelled) return;
         setLayerGroups([]);
         setOverlayMeta([]);
+        setTreeError(true);
       });
     return () => {
       cancelled = true;
+      setTreeError(false);
     };
   }, [retryTick]);
 
@@ -696,6 +701,8 @@ export function MapDashboard() {
         sections={sections}
         active={activeSections}
         onToggleSection={toggleSectionActive}
+        loadError={treeError}
+        onRetry={() => setRetryTick((t) => t + 1)}
       />
       <LayerPicker
         sections={sections}

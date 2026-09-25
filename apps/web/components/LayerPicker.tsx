@@ -119,12 +119,17 @@ export function SectionPicker({
   sections,
   active,
   onToggleSection,
+  loadError = false,
+  onRetry,
   className,
 }: {
   sections: SectionDef[];
   /** Section id → picked. */
   active: Record<string, boolean>;
   onToggleSection: (id: string, on: boolean) => void;
+  /** The section tree failed to load, so an empty list is an error, not the seed. */
+  loadError?: boolean;
+  onRetry?: () => void;
   className?: string;
 }) {
   const count = sections.filter((s) => active[s.id]).length;
@@ -148,6 +153,23 @@ export function SectionPicker({
         }}
         footer="Pick a section to choose layers from it."
       >
+        {sections.length === 0 && (
+          <div className="flex flex-col items-start gap-2 px-2.5 py-3">
+            <p
+              className={cn(
+                "text-xs leading-relaxed",
+                loadError ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {loadError ? "Could not load sections." : "No sections available."}
+            </p>
+            {loadError && onRetry && (
+              <Button size="sm" variant="outline" onClick={onRetry}>
+                Retry
+              </Button>
+            )}
+          </div>
+        )}
         {sections.map((section) => (
           <label
             key={section.id}
