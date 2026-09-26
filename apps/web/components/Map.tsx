@@ -1081,15 +1081,16 @@ export default function Map({
         }}
       />
 
-      {/* Bottom-centre: the coordinate readout, and the year bar below it
-          when a temporal theme is on — the timeline is the thing anchored to
-          the map's edge, and the readout rides above it.
+      {/* Bottom-centre: the year bar anchored to the map's bottom edge when a
+          temporal theme is on, with the coordinate readout riding above it
+          (and the measure panel above that).
 
           One flex column rather than two panels each at their own inset. The
           bar's height is not a constant — it grows a row when compare mode
           opens, and changed again when it was rebuilt as a timeline — so any
           fixed offset for the readout is a collision waiting to happen, as it
-          duly was. Stacked, the gap holds itself.
+          duly was. Stacked, the gap holds itself. The readout keeps its space
+          even while hidden, so the bar never jumps when it appears.
 
           Centred in the band the corner controls leave free: the basemap
           switcher on the left, the tool stack on the right. When the legend
@@ -1105,7 +1106,7 @@ export default function Map({
           them. */}
       <div
         className={cn(
-          "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-12 md:left-[13.5rem]",
+          "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-3 md:left-[13.5rem]",
           infoReachesCorner
             ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+5rem)]"
             : "md:right-14",
@@ -1126,17 +1127,9 @@ export default function Map({
           measuringRef={measuringRef}
           className="pointer-events-auto"
         />
+        <CoordinateReadout mapRef={mapRef} mapLoaded={mapLoaded} className="hidden md:block" />
         {bottomCenter}
       </div>
-
-      {/* The readout is centred on the map itself, not on the band above, so
-          it sits at the true bottom-middle of the screen. The band lifts clear
-          of it at md, where the readout shows. */}
-      <CoordinateReadout
-        mapRef={mapRef}
-        mapLoaded={mapLoaded}
-        className="absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 md:block"
-      />
 
       {!mapLoaded && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
