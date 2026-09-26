@@ -1103,7 +1103,7 @@ export default function Map({
           them. */}
       <div
         className={cn(
-          "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-3 md:left-[13.5rem]",
+          "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-12 md:left-[13.5rem]",
           infoReachesCorner ? "md:right-14 xl:right-[23rem]" : "md:right-14",
         )}
       >
@@ -1122,9 +1122,17 @@ export default function Map({
           measuringRef={measuringRef}
           className="pointer-events-auto"
         />
-        <CoordinateReadout mapRef={mapRef} mapLoaded={mapLoaded} className="hidden md:block" />
         {bottomCenter}
       </div>
+
+      {/* The readout is centred on the map itself, not on the band above, so
+          it sits at the true bottom-middle of the screen. The band lifts clear
+          of it at md, where the readout shows. */}
+      <CoordinateReadout
+        mapRef={mapRef}
+        mapLoaded={mapLoaded}
+        className="absolute bottom-3 left-1/2 z-10 hidden -translate-x-1/2 md:block"
+      />
 
       {!mapLoaded && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">

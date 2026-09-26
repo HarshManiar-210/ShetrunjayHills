@@ -5,7 +5,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import { cn } from "@/lib/utils";
 
 /** How long the pointer must stay still before its position is shown. */
-const DWELL_MS = 1000;
+const DWELL_MS = 2000;
 
 /**
  * Pointer position, bottom-centre of the map.
