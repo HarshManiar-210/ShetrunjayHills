@@ -131,6 +131,9 @@ CREATE TABLE static_overlays (
     -- The GeoJSON properties a clicked feature's popup shows, in order. NULL
     -- shows every meaningful property (see apps/web/lib/feature-popup.ts).
     popup_fields TEXT[],
+    -- A 'line' row drawn dotted rather than solid (Fireline), in the map and
+    -- in its legend swatch.
+    dotted BOOLEAN NOT NULL DEFAULT false,
     -- Selected and switched on when the dashboard opens, before anything is
     -- picked. Which layers start on is this flag, not a key in the frontend.
     default_on BOOLEAN NOT NULL DEFAULT false
@@ -481,9 +484,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway-existing-water-conservation.geojson',      4, 71.728402, 21.450967, 71.820940, 21.505128),
     ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam-existing-water-conservation.geojson',     3, 71.737601, 21.456108, 71.821241, 21.509884),
-    ('fireline',      'Fireline',      grp('administrative-boundaries'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      11,71.729119, 21.453405, 71.820934, 21.510580),
+    ('fireline',      'Fireline',      grp('administrative-boundaries'), 'vector', 'line', '#fa8609', 'vector-data/fireline.geojson',      11,71.729119, 21.453405, 71.820934, 21.510580),
     ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
     ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
+
+UPDATE static_overlays SET dotted = true WHERE key = 'fireline';
 
 -- Proposed Conservation Sites: the popup shows each feature's Zone_2 only.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
@@ -553,11 +558,27 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- pattern as Forest Boundary/Cadastral Map above) - no handler or component
 -- code needed.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#8B4513', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
-    ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#8E44AD', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#D2691E', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
-    ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
+    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#289acc', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
+    ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#bb856c', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#e77aae', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#00340a', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
+    ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#ff0000', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
+
+-- The client's per-class colours for the two classed geology layers.
+UPDATE static_overlays SET color_field = 'descriptio',
+    categories = '[
+        {"value": "Moderately Dissected Denudational Hills and Valleys", "label": "Moderately Dissected Denudational Hills and Valleys", "color": "#e7ba9f"},
+        {"value": "Moderately Dissected Structural Lower Plateau", "label": "Moderately Dissected Structural Lower Plateau", "color": "#e77aae"},
+        {"value": "Pediment Pediplain Complex", "label": "Pediment Pediplain Complex", "color": "#fffd45"}
+    ]'::jsonb
+WHERE key = 'geomorphology';
+
+UPDATE static_overlays SET color_field = 'lithologic',
+    categories = '[
+        {"value": "PAHOEHOE BASALT", "label": "Pahoehoe Basalt", "color": "#bb856c"},
+        {"value": "SAND, SILT AND CLAY", "label": "Sand, Silt and Clay", "color": "#b2bf74"}
+    ]'::jsonb
+WHERE key = 'geology';
 
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 for that box
