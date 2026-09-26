@@ -586,15 +586,23 @@ export function MapDashboard() {
 
   const statsRasterLayers: StatsRasterLayer[] = useMemo(
     () => [
-      ...activeRasters.map(({ section, image }) => ({
-        id: section.id,
-        name: section.label,
-        // The overlay row for the year on screen — what the statistics
-        // endpoint measures.
-        imageKey: image.key,
-        year: image.year,
-        years: section.years.map((y) => y.year),
-      })),
+      ...activeRasters.map(({ section, image }) => {
+        // Same lookup the map uses to draw the compared year.
+        const against = compareYear[section.id];
+        const other = against != null ? section.years.find((y) => y.year === against) : undefined;
+        return {
+          id: section.id,
+          name: section.label,
+          // The overlay row for the year on screen — what the statistics
+          // endpoint measures.
+          imageKey: image.key,
+          year: image.year,
+          // A single-image theme labels its one row with the theme's own name.
+          yearLabel: image.label === section.label ? undefined : image.label,
+          years: section.years.map((y) => y.year),
+          compare: other && { imageKey: other.key, year: other.year, label: other.label },
+        };
+      }),
       // Switched-on vector overlays the client delivered class figures for
       // (the FSI layers). Which ones is the overlay's has_stats flag, not a
       // key list.
@@ -610,8 +618,13 @@ export function MapDashboard() {
           categories: item.categories,
         })),
     ],
-    [activeRasters, allSections, overlays],
+    [activeRasters, allSections, overlays, compareYear],
   );
+
+  // Two charts side by side, over a table with a column per year and one for
+  // the change, don't fit the usual 18rem column — it widens while a
+  // comparison is on the statistics panel, and narrows back after.
+  const comparingStats = statsRasterLayers.some((layer) => layer.compare);
 
   // Static overlays carry a colour but no geometry in React state, so the
   // legend takes their swatches straight off the section definitions — now
@@ -861,7 +874,10 @@ export function MapDashboard() {
                   the stack steps aside for it rather than the column stopping
                   short. It still stops clear of the year bar's own row. */}
               {infoPanel(
-                "pointer-events-auto hidden max-h-[calc(100%-4.5rem)] w-72 shrink-0 xl:flex",
+                cn(
+                  "pointer-events-auto hidden max-h-[calc(100%-4.5rem)] shrink-0 transition-[width] xl:flex",
+                  comparingStats ? "w-96" : "w-72",
+                ),
                 infoRef,
               )}
             </div>
@@ -889,7 +905,13 @@ export function MapDashboard() {
       </nav>
 
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
-        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 pt-12 scrollbar-thin">
+        <SheetContent
+          side="left"
+          className={cn(
+            "flex flex-col overflow-y-auto p-0 pt-12 scrollbar-thin",
+            comparingStats ? "w-full sm:w-96" : "w-72",
+          )}
+        >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pb-3 md:hidden">
             {pickers}

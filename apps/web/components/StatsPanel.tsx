@@ -28,9 +28,13 @@ export interface StatsRasterLayer {
   name: string;
   imageKey: string;
   year: number | null;
+  /** What the year picker calls this image — a bare year, or a "1980 → 1989" range. */
+  yearLabel?: string;
   years: number[];
   /** A vector overlay's own class list, standing in for a raster legend. */
   categories?: LegendClass[];
+  /** The second image while the year bar is comparing two years. */
+  compare?: { imageKey: string; year: number; label: string };
 }
 
 /**
@@ -98,16 +102,19 @@ function ClassTable({ classes }: { classes: NamedClassStat[] }) {
   );
 }
 
-function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
+/**
+ * One image's statistics. Changing image remounts the block that asked
+ * (StatsPanel keys blocks on their images), so there is nothing to reset here
+ * — only the async callbacks set state, and the guard drops a response that
+ * lost the race.
+ */
+function useOverlayStats(imageKey: string) {
   const [stats, setStats] = useState<OverlayStats | null>(null);
   const [failed, setFailed] = useState(false);
 
-  // One fetch per image. Changing year remounts this block (StatsPanel keys
-  // it on imageKey), so there is nothing to reset here — only the async
-  // callbacks set state, and the guard drops a response that lost the race.
   useEffect(() => {
     let cancelled = false;
-    fetchOverlayStats(layer.imageKey)
+    fetchOverlayStats(imageKey)
       .then((result) => {
         if (!cancelled) setStats(result);
       })
@@ -117,7 +124,44 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
     return () => {
       cancelled = true;
     };
-  }, [layer.imageKey]);
+  }, [imageKey]);
+
+  return { stats, failed };
+}
+
+function BlockHeading({ name, detail }: { name: string; detail?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="min-w-0 text-xs leading-tight font-medium">{name}</span>
+      {detail && (
+        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{detail}</span>
+      )}
+    </div>
+  );
+}
+
+function StatsLoading() {
+  return (
+    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <Loader2 className="size-3 animate-spin" strokeWidth={2} />
+      Loading…
+    </span>
+  );
+}
+
+function StatsFailed() {
+  return (
+    <span className="text-[11px] text-muted-foreground/70 italic">
+      Could not measure this layer.
+    </span>
+  );
+}
+
+const sourceLabel = (stats: OverlayStats) =>
+  stats.source === "delivered" ? "Official figures" : "Measured from imagery";
+
+function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
+  const { stats, failed } = useOverlayStats(layer.imageKey);
 
   const classes = stats
     ? classStatsFor(stats, layer.id, layer.imageKey, layer.categories)
@@ -125,27 +169,13 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="min-w-0 text-xs leading-tight font-medium">{layer.name}</span>
-        {layer.year != null && (
-          <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-            {layer.year}
-          </span>
-        )}
-      </div>
+      <BlockHeading
+        name={layer.name}
+        detail={layer.yearLabel ?? (layer.year != null ? String(layer.year) : undefined)}
+      />
 
-      {!stats && !failed && (
-        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" strokeWidth={2} />
-          Loading…
-        </span>
-      )}
-
-      {failed && (
-        <span className="text-[11px] text-muted-foreground/70 italic">
-          Could not measure this layer.
-        </span>
-      )}
+      {!stats && !failed && <StatsLoading />}
+      {failed && <StatsFailed />}
 
       {classes.length > 0 && (
         <>
@@ -156,7 +186,7 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
             </span>
           </div>
           <span className="-mt-1 text-[10px] text-muted-foreground/70">
-            {stats!.source === "delivered" ? "Official figures" : "Measured from imagery"}
+            {sourceLabel(stats!)}
           </span>
 
           {/* Ring above the table, not beside it. The panel is 18rem wide and
@@ -173,6 +203,182 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
               <ClassTable classes={classes} />
             </>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A class's figures in each of the two compared years; absent where it isn't mapped. */
+interface ComparedClass {
+  key: string;
+  label: string;
+  fullLabel?: string;
+  color: string;
+  group?: string;
+  before?: NamedClassStat;
+  after?: NamedClassStat;
+}
+
+/**
+ * Lines the two years' classes up by class: the earlier year's order first,
+ * then any class only the later year has — so delivered legend order and
+ * Vegetation Change's group runs survive.
+ */
+function compareClasses(before: NamedClassStat[], after: NamedClassStat[]): ComparedClass[] {
+  const rows = new globalThis.Map<string, ComparedClass>();
+  for (const [side, classes] of [
+    ["before", before],
+    ["after", after],
+  ] as const) {
+    for (const cls of classes) {
+      const row = rows.get(cls.key) ?? {
+        key: cls.key,
+        label: cls.label,
+        fullLabel: cls.fullLabel,
+        color: cls.color,
+        group: cls.group,
+      };
+      row[side] = cls;
+      rows.set(cls.key, row);
+    }
+  }
+  return [...rows.values()];
+}
+
+const SIGNED = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 0,
+  signDisplay: "exceptZero",
+});
+
+const shareText = (cls?: NamedClassStat) =>
+  cls ? `${PERCENT.format(cls.share * 100)}%` : "not mapped";
+
+/**
+ * Both years' hectares per class and the change between them — the numbers
+ * the two charts above it can only show as proportions. Shares are in each
+ * row's tooltip.
+ */
+function CompareTable({
+  rows,
+  before,
+  after,
+}: {
+  rows: ComparedClass[];
+  before: string;
+  after: string;
+}) {
+  const cell = "w-12 shrink-0 text-right tabular-nums";
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+        <span className="min-w-0 flex-1">Class · ha</span>
+        <span className={cell}>{before}</span>
+        <span className={cell}>{after}</span>
+        <span className={cell}>Change</span>
+      </div>
+      {rows.map((row, i) => {
+        const a = row.before ? toHectares(row.before.areaSqM) : 0;
+        const b = row.after ? toHectares(row.after.areaSqM) : 0;
+        return (
+          <Fragment key={row.key}>
+            {row.group && row.group !== rows[i - 1]?.group && (
+              <span className="pt-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                {row.group}
+              </span>
+            )}
+            <div
+              className="flex items-center gap-1.5 text-xs"
+              title={`${row.fullLabel ?? row.label}: ${before} ${shareText(row.before)} → ${after} ${shareText(row.after)}`}
+            >
+              <LayerSwatch color={row.color} geometryKind="raster" />
+              <span className="min-w-0 flex-1 truncate">{row.label}</span>
+              <span className={cn(cell, "text-muted-foreground")}>
+                {row.before ? COUNT.format(a) : "–"}
+              </span>
+              <span className={cn(cell, "text-muted-foreground")}>
+                {row.after ? COUNT.format(b) : "–"}
+              </span>
+              <span className={cn(cell, "font-medium")}>{SIGNED.format(b - a)}</span>
+            </div>
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The year bar's compare mode, in numbers: the two years' class shares as two
+ * charts side by side — rings, or bars for a theme with too many classes to
+ * ring — over one table of both years' areas and the change between them.
+ * Earlier year on the left whichever of the two is the base, so the change
+ * always reads forwards in time.
+ */
+function CompareStatsBlock({
+  layer,
+  compare,
+}: {
+  layer: StatsRasterLayer;
+  compare: NonNullable<StatsRasterLayer["compare"]>;
+}) {
+  const base = useOverlayStats(layer.imageKey);
+  const other = useOverlayStats(compare.imageKey);
+
+  const sides = [
+    {
+      imageKey: layer.imageKey,
+      year: layer.year ?? 0,
+      label: layer.yearLabel ?? String(layer.year ?? ""),
+      ...base,
+    },
+    { imageKey: compare.imageKey, year: compare.year, label: compare.label, ...other },
+  ]
+    .sort((a, b) => a.year - b.year)
+    .map((side) => ({
+      ...side,
+      classes: side.stats
+        ? classStatsFor(side.stats, layer.id, side.imageKey, layer.categories)
+        : [],
+    }));
+  const [before, after] = sides;
+
+  const loading = sides.some((side) => !side.stats && !side.failed);
+  const failed = sides.some((side) => side.failed);
+  const rows = compareClasses(before.classes, after.classes);
+  const ring = Math.max(before.classes.length, after.classes.length) <= MAX_DONUT_CLASSES;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <BlockHeading name={layer.name} detail={`${before.label} vs ${after.label}`} />
+
+      {loading && <StatsLoading />}
+      {!loading && failed && <StatsFailed />}
+
+      {!loading && !failed && rows.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            {sides.map((side) => (
+              <div key={side.imageKey} className="flex min-w-0 flex-col items-center gap-1">
+                <span className="text-[11px] font-medium tabular-nums">{side.label}</span>
+                {ring ? (
+                  <ClassDonut
+                    classes={side.classes}
+                    caption={`${layer.name} ${side.label} class shares`}
+                  />
+                ) : (
+                  <StackedBar classes={side.classes} />
+                )}
+                <span className="text-[11px] tabular-nums">
+                  {COUNT.format(toHectares(side.stats!.area_sq_m))} ha
+                </span>
+                <span className="-mt-1 text-[10px] text-muted-foreground/70">
+                  {sourceLabel(side.stats!)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <CompareTable rows={rows} before={before.label} after={after.label} />
         </>
       )}
     </div>
@@ -213,9 +419,17 @@ export function StatsPanel({
       {/* Keyed on the image, so stepping the year remounts the block with
           clean state rather than an effect clearing the previous year's
           numbers after the fact. */}
-      {rasterLayers.map((layer) => (
-        <RasterStatsBlock key={`${layer.id}:${layer.imageKey}`} layer={layer} />
-      ))}
+      {rasterLayers.map((layer) =>
+        layer.compare ? (
+          <CompareStatsBlock
+            key={`${layer.id}:${layer.imageKey}:${layer.compare.imageKey}`}
+            layer={layer}
+            compare={layer.compare}
+          />
+        ) : (
+          <RasterStatsBlock key={`${layer.id}:${layer.imageKey}`} layer={layer} />
+        ),
+      )}
 
       {vectorCounts.length > 0 && (
         <div className="flex flex-col gap-1">
