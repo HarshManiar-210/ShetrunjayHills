@@ -97,9 +97,9 @@ const SHOW_PANEL_COLLAPSE = true;
 /**
  * Vertical room the tool stack needs in the bottom-right corner: its six 28px
  * buttons, a separator and padding come to 205px, plus its own inset and the
- * gap a panel above it should keep.
+ * gap a panel above it should keep. Measured from the map card's bottom edge.
  */
-const TOOL_STACK_CLEARANCE = 248;
+const TOOL_STACK_CLEARANCE = 232;
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
@@ -137,9 +137,19 @@ export function MapDashboard() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
 
-  // The floating panel can be folded away to clear the map. Open by default:
-  // it is the way into the dashboard.
-  const [panelOpen, setPanelOpen] = useState(true);
+  // The floating panel can be folded away to clear the map. It follows the
+  // selection: folded while nothing is picked (an empty panel is just clutter
+  // over the map), opened when the first layer is picked, and folded again
+  // when the last one goes. In between, the user's own fold/unfold stands.
+  // Adjusted during render rather than in an effect, so there is no frame
+  // with the stale state.
+  const hasSelection = Object.values(selected).some(Boolean);
+  const [panelOpen, setPanelOpen] = useState(hasSelection);
+  const [prevHasSelection, setPrevHasSelection] = useState(hasSelection);
+  if (hasSelection !== prevHasSelection) {
+    setPrevHasSelection(hasSelection);
+    setPanelOpen(hasSelection);
+  }
 
   // Whether the legend and statistics column has grown down into the corner
   // the tool stack sits in, which moves the stack left of it.
@@ -750,8 +760,11 @@ export function MapDashboard() {
       {/* No docked column any more: the layers panel floats over the map's
           top-left corner, so the map has the full width of the window. */}
       <div className="flex min-h-0 flex-1">
-        <div ref={mapAreaRef} className="relative min-w-0 flex-1 p-4">
-          <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
+        <div className="relative min-w-0 flex-1 p-4">
+          <div
+            ref={mapAreaRef}
+            className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3"
+          >
             <Map
               onReady={(map) => {
                 mapRef.current = map;
@@ -796,39 +809,48 @@ export function MapDashboard() {
               onChange={setBasemap}
               className="absolute bottom-3 left-3 z-10"
             />
-          </div>
 
-          {/* Top-left, mirroring the info panel's inset on the other edge.
-              The tool stack has left this side, so all that shares its column
-              below is the basemap switcher and the left end of the year bar's
-              row — which the bar does reach, since it fills its band at any
-              width narrower than its 72rem cap. It scrolls inside that. */}
-          {panelOpen || !SHOW_PANEL_COLLAPSE ? (
-            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-11rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
-              {/* Null for everyone but admins, who get the users link here. */}
-              <Sidebar variant="combined" user={auth.user} />
-              {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
+            {/* The layers panel (top-left) and the legend column (top-right)
+                share one row inside the map card, so they are clipped to the
+                map's own boundary and can never overlap each other: when the
+                map narrows, the layers panel gives up width before the two
+                meet. Click-through, so the gap between them still drags the
+                map. */}
+            <div className="pointer-events-none absolute inset-3 z-10 hidden items-start justify-between gap-3 md:flex">
+              {/* The tool stack has left this side, so all that shares its
+                  column below is the basemap switcher and the left end of the
+                  year bar's row. It scrolls inside that. */}
+              {panelOpen || !SHOW_PANEL_COLLAPSE ? (
+                <div className="pointer-events-auto flex max-h-[calc(100%-8.5rem)] w-[var(--layers-panel-w)] min-w-0 shrink flex-col overflow-hidden rounded-2xl bg-card shadow-e3 ring-1 ring-foreground/10">
+                  {/* Null for everyone but admins, who get the users link here. */}
+                  <Sidebar variant="combined" user={auth.user} />
+                  {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="pointer-events-auto gap-2 bg-card shadow-e2 hover:bg-accent dark:bg-card dark:hover:bg-accent"
+                  onClick={() => setPanelOpen(true)}
+                  // Stands in for the folded panel as the walkthrough's
+                  // "sections" stop, so that step still has something to
+                  // spotlight.
+                  data-tour="sections"
+                >
+                  <PanelLeftOpen className="size-3.5" strokeWidth={2} />
+                  Layers
+                </Button>
+              )}
+
+              {/* It may grow down past the tool stack in the corner below —
+                  the stack steps aside for it rather than the column stopping
+                  short. It still stops clear of the year bar's own row. */}
+              {infoPanel(
+                "pointer-events-auto hidden max-h-[calc(100%-4.5rem)] w-72 shrink-0 xl:flex",
+                infoRef,
+              )}
             </div>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute top-3 left-3 z-10 hidden gap-2 shadow-e2 md:flex"
-              onClick={() => setPanelOpen(true)}
-            >
-              <PanelLeftOpen className="size-3.5" strokeWidth={2} />
-              Layers
-            </Button>
-          )}
-
-          {/* Top-right. It may grow down past the tool stack in the corner
-              below — the stack steps aside for it rather than the column
-              stopping short, which is what the cap used to do. It still stops
-              clear of the year bar's own row. */}
-          {infoPanel(
-            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-7rem)] w-72 xl:flex",
-            infoRef,
-          )}
+          </div>
         </div>
       </div>
 
