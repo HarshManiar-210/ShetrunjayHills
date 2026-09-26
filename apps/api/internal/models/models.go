@@ -104,4 +104,6 @@ type LayerGroup struct {
 	SortOrder int    `json:"sort_order"`
 	// OwnPicker gives a top-level group a navbar dropdown of its own.
 	OwnPicker bool `json:"own_picker"`
+	// DrawBelow puts a raster group beneath every other raster on the map.
+	DrawBelow bool `json:"draw_below"`
 }

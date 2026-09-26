@@ -151,6 +151,8 @@ export interface SectionDef {
   depth: number;
   /** Listed in a navbar dropdown of its own rather than under Sections. */
   ownPicker: boolean;
+  /** Drawn beneath every other raster — see layer_groups.draw_below. */
+  drawBelow: boolean;
 }
 
 /**
@@ -330,6 +332,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         children,
         depth,
         ownPicker: Boolean(group.own_picker),
+        drawBelow: Boolean(group.draw_below),
       };
     }
 
@@ -344,6 +347,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       children,
       depth,
       ownPicker: Boolean(group.own_picker),
+      drawBelow: Boolean(group.draw_below),
       items: rows.map((o) => ({
         key: o.key,
         label: o.label,

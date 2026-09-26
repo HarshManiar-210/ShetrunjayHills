@@ -62,7 +62,11 @@ CREATE TABLE layer_groups (
     -- A top-level group set true gets a navbar dropdown of its own, listing
     -- its layers directly, instead of being one entry in the Sections/Layers
     -- pair. Which groups do is this flag, never a key check in the frontend.
-    own_picker BOOLEAN NOT NULL DEFAULT false
+    own_picker BOOLEAN NOT NULL DEFAULT false,
+    -- A raster group set true draws beneath every other raster (the
+    -- Toposheet, a full-sheet reference map that would otherwise cover
+    -- them). Vectors always draw above all rasters regardless.
+    draw_below BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE INDEX layer_groups_parent_idx ON layer_groups (parent_id);
@@ -312,6 +316,8 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('habitat-suitability', 'Habitat Suitability', grp('wildlife-movement'), 1),
     ('wildlife-corridors',  'Wildlife Corridors',  grp('wildlife-movement'), 2);
+
+UPDATE layer_groups SET draw_below = true WHERE key = 'toposheet';
 
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single

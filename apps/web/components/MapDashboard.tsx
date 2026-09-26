@@ -480,11 +480,17 @@ export function MapDashboard() {
     [layers, visibility],
   );
 
-  /** Every raster theme currently switched on, with the year each is showing. */
+  /**
+   * Every raster theme currently switched on, with the year each is showing.
+   * The map stacks rasters in this order, last on top, so a draw_below theme
+   * (the Toposheet) sorts first; the sort is stable, keeping the rest in tree
+   * order.
+   */
   const activeRasters = useMemo(
     () =>
       allSections
         .filter((section) => section.mode === "layer" && visible[rasterToggleKey(section.id)])
+        .toSorted((a, b) => Number(b.drawBelow) - Number(a.drawBelow))
         .flatMap((section) => {
           // Falls back to the newest year, which is what the sidebar's own
           // year control shows when nothing has been picked yet.
