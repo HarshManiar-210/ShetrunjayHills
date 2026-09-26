@@ -2,12 +2,13 @@ import { API_URL } from "@/lib/layers-api";
 import { legendFor, type LegendClass } from "@/lib/legend-config";
 
 /**
- * Real class areas for a raster theme, measured by the API.
+ * Class areas for an overlay: the client's delivered figures where they
+ * exist, otherwise measured by the API from the raster's pixels.
  *
- * The server counts pixels and converts them to ground area; it deliberately
- * does not know what any colour means. Naming the classes happens here,
- * because the palettes belong to the legend — which is also what keeps the
- * chart's colours identical to the map's.
+ * Either way the server does not know what any class looks like. A measured
+ * class arrives as a colour and a delivered one as its legend value; naming
+ * and colouring both happens here, because the palettes belong to the legend
+ * — which is also what keeps the chart's colours identical to the map's.
  */
 
 export interface RasterClassStat {
@@ -31,20 +32,47 @@ export interface RasterStats {
   classes: RasterClassStat[] | null;
 }
 
-export async function fetchRasterStats(overlayKey: string): Promise<RasterStats> {
+/** One class of the client's official statistics. */
+export interface DeliveredClassStat {
+  /** The class's value in the theme's legend, or in a vector layer's categories. */
+  value: string;
+  /** The delivered name — shown only when no legend class matches `value`. */
+  label: string;
+  /** Heads a run of classes (Vegetation Change's Improvement / Degradation / Stable). */
+  group?: string;
+  area_sq_m: number;
+  /** Share of the classified area, 0..1. */
+  share: number;
+}
+
+/** The client's official figures for an overlay, from overlay_class_stats. */
+export interface DeliveredStats {
+  source: "delivered";
+  /** The classes' total. */
+  area_sq_m: number;
+  classes: DeliveredClassStat[];
+}
+
+export type OverlayStats = (RasterStats & { source?: undefined }) | DeliveredStats;
+
+export async function fetchOverlayStats(overlayKey: string): Promise<OverlayStats> {
   const res = await fetch(`${API_URL}/api/overlays/${overlayKey}/stats`);
   if (!res.ok) throw new Error(`failed to load statistics for ${overlayKey}`);
   return res.json();
 }
 
-/** A measured colour, named against the theme's legend. */
+/** A class's area and share, named and coloured against the theme's legend. */
 export interface NamedClassStat {
   key: string;
   label: string;
+  /** The legend's full name, where `label` is its compact form. */
+  fullLabel?: string;
   /** The colour as it appears on the map — matched, not the legend's nominal value. */
   color: string;
   areaSqM: number;
   share: number;
+  /** Heads a run of classes — see DeliveredClassStat.group. */
+  group?: string;
 }
 
 function parseHex(hex: string): [number, number, number] | null {
@@ -134,4 +162,55 @@ export function nameClasses(
   }
 
   return [...merged.values()].sort((a, b) => b.share - a.share);
+}
+
+/** For a delivered class whose value no legend entry carries. */
+const UNMATCHED_COLOR = "#9CA3AF";
+
+/**
+ * Names delivered classes by their legend value. Kept in delivered order
+ * rather than re-sorted by share: that order is the legend's, and Vegetation
+ * Change's rows run in Improvement / Degradation / Stable runs that sorting
+ * would scatter.
+ *
+ * `categories` is a classed vector layer's own class list, which stands in
+ * for the legend a raster theme would have.
+ */
+export function nameDeliveredClasses(
+  themeId: string,
+  delivered: DeliveredClassStat[],
+  imageKey?: string,
+  categories?: LegendClass[],
+): NamedClassStat[] {
+  const classes = categories ?? legendFor(themeId, imageKey)?.classes ?? [];
+  const byValue = new globalThis.Map(classes.map((cls) => [String(cls.value), cls]));
+
+  return delivered.map((stat) => {
+    const cls = byValue.get(stat.value);
+    return {
+      key: stat.value,
+      // Vegetation Change's full names ("Moderately Dense Forest → Very
+      // Dense Forest") don't fit the panel; its compact ones do.
+      label: cls?.shortLabel ?? cls?.label ?? stat.label,
+      fullLabel: cls?.label ?? stat.label,
+      color: cls?.color ?? UNMATCHED_COLOR,
+      areaSqM: stat.area_sq_m,
+      share: stat.share,
+      group: stat.group,
+    };
+  });
+}
+
+/** An overlay's statistics as named classes, whichever source they came from. */
+export function classStatsFor(
+  stats: OverlayStats,
+  themeId: string,
+  imageKey?: string,
+  categories?: LegendClass[],
+): NamedClassStat[] {
+  if (stats.source === "delivered") {
+    return nameDeliveredClasses(themeId, stats.classes, imageKey, categories);
+  }
+  if (stats.photographic) return [];
+  return nameClasses(themeId, stats.classes ?? [], imageKey);
 }

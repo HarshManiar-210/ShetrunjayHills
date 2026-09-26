@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Exports the map, its legend and its statistics — as a PNG file, or as a PDF
+ * Exports the map, its legend and its statistics — as a JPG file, or as a PDF
  * by way of the browser's print dialog, where "Save as PDF" is the
  * destination.
  *
@@ -46,12 +46,12 @@ export function ExportButton({
 }) {
   const [state, setState] = useState<"idle" | "working" | "failed">("idle");
 
-  async function run(format: "png" | "pdf") {
+  async function run(format: "jpg" | "pdf") {
     const request = input();
     if (!request) return;
     setState("working");
     try {
-      await (format === "png"
+      await (format === "jpg"
         ? downloadDashboardSheet(request)
         : printDashboardSheet(request));
       setState("idle");
@@ -117,14 +117,12 @@ export function ExportButton({
       <DropdownMenuContent align="end" className="w-60">
         <ExportChoice
           icon={FileImage}
-          label="PNG image"
-          hint="Downloads the sheet as a file"
-          onSelect={() => run("png")}
+          label="JPG image"
+          onSelect={() => run("jpg")}
         />
         <ExportChoice
           icon={FileText}
           label="PDF document"
-          hint="Opens the print dialog — choose Save as PDF"
           onSelect={() => run("pdf")}
         />
       </DropdownMenuContent>
@@ -140,21 +138,16 @@ export function ExportButton({
 function ExportChoice({
   icon: Icon,
   label,
-  hint,
   onSelect,
 }: {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   label: string;
-  hint: string;
   onSelect: () => void;
 }) {
   return (
-    <DropdownMenuItem className="items-start gap-2.5 py-2" onSelect={onSelect}>
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm">{label}</span>
-        <span className="block text-[11px] leading-snug text-muted-foreground">{hint}</span>
-      </span>
+    <DropdownMenuItem className="items-center gap-2.5 py-2" onSelect={onSelect}>
+      <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={2} />
+      <span className="min-w-0 flex-1 text-sm">{label}</span>
     </DropdownMenuItem>
   );
 }

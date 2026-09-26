@@ -37,12 +37,19 @@ export function ClassDonut({
   classes,
   /** Announced to screen readers and shown in the ring when nothing is hovered. */
   caption,
+  /** Rendered size. The drawing scales with it, text included. */
+  className = "size-[104px]",
 }: {
   classes: NamedClassStat[];
   caption: string;
+  className?: string;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
-  const active = classes.find((c) => c.key === hovered) ?? null;
+  // The hovered class, else the largest: classes can arrive in legend order
+  // (delivered figures) rather than sorted by share.
+  const shown =
+    classes.find((c) => c.key === hovered) ??
+    classes.reduce<NamedClassStat | null>((top, c) => (!top || c.share > top.share ? c : top), null);
 
   // Each slice starts where the ones before it end. Computed by scanning the
   // preceding shares rather than by accumulating into a variable during the
@@ -61,7 +68,7 @@ export function ClassDonut({
     <div className="flex items-center gap-3">
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="size-[104px] shrink-0"
+        className={`${className} shrink-0`}
         role="img"
         aria-label={`${caption}. ${summary}`}
       >
@@ -101,7 +108,7 @@ export function ClassDonut({
           textAnchor="middle"
           className="fill-foreground text-[15px] font-semibold tabular-nums"
         >
-          {PERCENT.format(((active ?? classes[0])?.share ?? 0) * 100)}%
+          {PERCENT.format((shown?.share ?? 0) * 100)}%
         </text>
         <text
           x={SIZE / 2}
@@ -109,7 +116,7 @@ export function ClassDonut({
           textAnchor="middle"
           className="fill-muted-foreground text-[7px]"
         >
-          {truncate((active ?? classes[0])?.label ?? "", 18)}
+          {truncate(shown?.label ?? "", 18)}
         </text>
       </svg>
     </div>

@@ -9,7 +9,7 @@ import { BasemapSwitcher } from "@/components/BasemapSwitcher";
 import { YearBar, type TemporalTheme } from "@/components/YearBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SidebarSections } from "@/components/SidebarSections";
-import { LayerPicker, SectionPicker } from "@/components/LayerPicker";
+import { LayerPicker, SectionLayerPicker, SectionPicker } from "@/components/LayerPicker";
 import { ExportButton } from "@/components/ExportButton";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { LegendCard } from "@/components/LegendCard";
 import { StatsCard } from "@/components/StatsPanel";
-import { LayerSearch } from "@/components/LayerSearch";
+import { CoordinateSearch } from "@/components/CoordinateSearch";
 import {
   Walkthrough,
   shouldAutoRunWalkthrough,
@@ -59,6 +59,7 @@ import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { RasterOverlay } from "@/components/Map";
 import type { ExportInput } from "@/lib/map-export";
 import type { Map as MapLibreMap } from "maplibre-gl";
+import type { LatLng } from "@/lib/coords";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -96,9 +97,9 @@ const SHOW_PANEL_COLLAPSE = true;
 /**
  * Vertical room the tool stack needs in the bottom-right corner: its six 28px
  * buttons, a separator and padding come to 205px, plus its own inset and the
- * gap a panel above it should keep.
+ * gap a panel above it should keep. Measured from the map card's bottom edge.
  */
-const TOOL_STACK_CLEARANCE = 248;
+const TOOL_STACK_CLEARANCE = 232;
 
 const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
@@ -110,6 +111,9 @@ export function MapDashboard() {
   const [overlayMeta, setOverlayMeta] = useState<OverlayMeta[]>([]);
   const [layerGroups, setLayerGroups] = useState<LayerGroup[]>([]);
   const [error, setError] = useState(false);
+  // The tree fetch failing leaves the section list empty; this is what tells
+  // an empty seed apart from a failed load, so the picker can offer a retry.
+  const [treeError, setTreeError] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
@@ -133,15 +137,29 @@ export function MapDashboard() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
 
-  // The floating panel can be folded away to clear the map. Open by default:
-  // it is the way into the dashboard.
-  const [panelOpen, setPanelOpen] = useState(true);
+  // The floating panel can be folded away to clear the map. It follows the
+  // selection: folded while nothing is picked (an empty panel is just clutter
+  // over the map), opened when the first layer is picked, and folded again
+  // when the last one goes. In between, the user's own fold/unfold stands.
+  // Adjusted during render rather than in an effect, so there is no frame
+  // with the stale state.
+  const hasSelection = Object.values(selected).some(Boolean);
+  const [panelOpen, setPanelOpen] = useState(hasSelection);
+  const [prevHasSelection, setPrevHasSelection] = useState(hasSelection);
+  if (hasSelection !== prevHasSelection) {
+    setPrevHasSelection(hasSelection);
+    setPanelOpen(hasSelection);
+  }
 
   // Whether the legend and statistics column has grown down into the corner
   // the tool stack sits in, which moves the stack left of it.
   const [infoReachesCorner, setInfoReachesCorner] = useState(false);
   const infoRef = useRef<HTMLDivElement | null>(null);
   const mapAreaRef = useRef<HTMLDivElement | null>(null);
+
+  // The last coordinate searched for, pinned on the map. Replaced, never
+  // stacked: one pin at a time.
+  const [pin, setPin] = useState<LatLng | null>(null);
 
   const [rasterYear, setRasterYear] = useState<Record<string, number>>({});
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
@@ -154,7 +172,7 @@ export function MapDashboard() {
   const [preferredTheme, setPreferredTheme] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
 
-  // The live map, for the PNG export: it needs the actual canvas, and the
+  // The live map, for the JPG export: it needs the actual canvas, and the
   // camera as it is at the moment of the click. A ref rather than state —
   // nothing renders from it, and it must not re-render the dashboard when the
   // map finishes mounting.
@@ -198,6 +216,8 @@ export function MapDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, retryTick]);
 
+  const defaultsAppliedRef = useRef(false);
+
   // The sidebar's whole shape — the tree, its order, every row's colour —
   // comes from these two seed-backed lists, so adding a layer or restructuring
   // the tree stays a data change.
@@ -208,14 +228,26 @@ export function MapDashboard() {
         if (cancelled) return;
         setLayerGroups(groups);
         setOverlayMeta(meta);
+        // Seeded `default_on` layers start selected and drawing — once, so a
+        // retry never switches back on a layer someone has since turned off.
+        if (!defaultsAppliedRef.current) {
+          defaultsAppliedRef.current = true;
+          const on = Object.fromEntries(
+            meta.filter((o) => o.default_on && o.status !== "pending").map((o) => [o.key, true]),
+          );
+          setSelected((sel) => ({ ...on, ...sel }));
+          setVisible((v) => ({ ...on, ...v }));
+        }
       })
       .catch(() => {
         if (cancelled) return;
         setLayerGroups([]);
         setOverlayMeta([]);
+        setTreeError(true);
       });
     return () => {
       cancelled = true;
+      setTreeError(false);
     };
   }, [retryTick]);
 
@@ -271,6 +303,10 @@ export function MapDashboard() {
     () => buildSections(layerGroups, overlayMeta),
     [layerGroups, overlayMeta],
   );
+  // Groups the seed gives a dropdown of their own leave the Sections/Layers
+  // pair, so a layer is only ever listed in one navbar picker.
+  const pickerSections = useMemo(() => sections.filter((s) => !s.ownPicker), [sections]);
+  const ownPickerSections = useMemo(() => sections.filter((s) => s.ownPicker), [sections]);
   // Flattened once, because almost everything downstream asks a question of
   // the whole tree rather than of one level of it.
   const allSections = useMemo(() => flattenSections(sections), [sections]);
@@ -411,32 +447,6 @@ export function MapDashboard() {
     setPlaying(false);
   }, []);
 
-  // Search result picked: select it into the panel *and* switch it on. Always
-  // on, never a toggle — someone who searched for a layer wants to see it, not
-  // to turn off what they found. Search is the one route that skips the
-  // picker, which is the point of it: naming a layer should not require
-  // knowing which section holds it, so `path` goes unused here.
-  const revealLayer = useCallback(
-    (_path: string[], key: string) => {
-      // An option is revealed through its group: the group row goes into the
-      // panel, switched on with just the option that was searched for.
-      const rowKey = owners[key] ?? key;
-      // Search is the one route that skips both dropdowns, so it opens the
-      // layer's own section on the way past: without that the layer would be
-      // in the panel and on the map but missing from the dropdown that is
-      // supposed to list it.
-      const owner = sections.find((section) =>
-        sectionLayers(section).some((layer) => layer.key === rowKey),
-      );
-      if (owner) setActiveSections((a) => ({ ...a, [owner.id]: true }));
-      setSelected((sel) => ({ ...sel, [rowKey]: true }));
-      setPanelOpen(true);
-      requestKeys(rowKey === key ? keysFor(key) : [rowKey, key], true);
-      setMobileSheet(null);
-    },
-    [requestKeys, sections, owners, keysFor],
-  );
-
   const changeRasterYear = useCallback((sectionId: string, year: number) => {
     setRasterYear((y) => ({ ...y, [sectionId]: year }));
   }, []);
@@ -575,18 +585,46 @@ export function MapDashboard() {
   );
 
   const statsRasterLayers: StatsRasterLayer[] = useMemo(
-    () =>
-      activeRasters.map(({ section, image }) => ({
-        id: section.id,
-        name: section.label,
-        // The overlay row for the year on screen — what the statistics
-        // endpoint measures.
-        imageKey: image.key,
-        year: image.year,
-        years: section.years.map((y) => y.year),
-      })),
-    [activeRasters],
+    () => [
+      ...activeRasters.map(({ section, image }) => {
+        // Same lookup the map uses to draw the compared year.
+        const against = compareYear[section.id];
+        const other = against != null ? section.years.find((y) => y.year === against) : undefined;
+        return {
+          id: section.id,
+          name: section.label,
+          // The overlay row for the year on screen — what the statistics
+          // endpoint measures.
+          imageKey: image.key,
+          year: image.year,
+          // A single-image theme labels its one row with the theme's own name.
+          yearLabel: image.label === section.label ? undefined : image.label,
+          years: section.years.map((y) => y.year),
+          compare: other && { imageKey: other.key, year: other.year, label: other.label },
+        };
+      }),
+      // Switched-on vector overlays the client delivered class figures for
+      // (the FSI layers). Which ones is the overlay's has_stats flag, not a
+      // key list.
+      ...allSections
+        .flatMap((section) => section.items)
+        .filter((item) => item.hasStats && overlays[item.key])
+        .map((item) => ({
+          id: item.key,
+          name: item.label,
+          imageKey: item.key,
+          year: null,
+          years: [],
+          categories: item.categories,
+        })),
+    ],
+    [activeRasters, allSections, overlays, compareYear],
   );
+
+  // Two charts side by side, over a table with a column per year and one for
+  // the change, don't fit the usual 18rem column — it widens while a
+  // comparison is on the statistics panel, and narrows back after.
+  const comparingStats = statsRasterLayers.some((layer) => layer.compare);
 
   // Static overlays carry a colour but no geometry in React state, so the
   // legend takes their swatches straight off the section definitions — now
@@ -641,6 +679,11 @@ export function MapDashboard() {
   // Legend and Statistics are two independent cards now, not two tabs of one.
   // The legend is what makes the map readable, so it should never be the thing
   // you switch away from to check a number.
+  // A card with nothing to show is left out rather than drawn empty.
+  const hasLegend =
+    visibleFeatures.length > 0 || legendOverlays.length > 0 || legendRasterLayers.length > 0;
+  const hasStats = visibleFeatures.length > 0 || statsRasterLayers.length > 0;
+
   const infoPanel = (className?: string, ref?: React.Ref<HTMLDivElement>) => (
     <div ref={ref} className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
       {/* Each card scrolls its own body rather than the column scrolling as a
@@ -650,17 +693,21 @@ export function MapDashboard() {
           — that is what makes its body scroll — while `max-h-fit` stops it
           claiming more than its content, so a short legend does not sit in
           half the column with empty space under it. */}
-      <LegendCard
-        layers={visibleFeatures}
-        overlays={legendOverlays}
-        rasterLayers={legendRasterLayers}
-        className="min-h-0 max-h-fit flex-1"
-      />
-      <StatsCard
-        rasterLayers={statsRasterLayers}
-        vectorFeatures={visibleFeatures}
-        className="min-h-0 max-h-fit flex-1"
-      />
+      {hasLegend && (
+        <LegendCard
+          layers={visibleFeatures}
+          overlays={legendOverlays}
+          rasterLayers={legendRasterLayers}
+          className="min-h-0 max-h-fit flex-1"
+        />
+      )}
+      {hasStats && (
+        <StatsCard
+          rasterLayers={statsRasterLayers}
+          vectorFeatures={visibleFeatures}
+          className="min-h-0 max-h-fit flex-1"
+        />
+      )}
     </div>
   );
 
@@ -693,16 +740,26 @@ export function MapDashboard() {
   const pickers = (
     <>
       <SectionPicker
-        sections={sections}
+        sections={pickerSections}
         active={activeSections}
         onToggleSection={toggleSectionActive}
+        loadError={treeError}
+        onRetry={() => setRetryTick((t) => t + 1)}
       />
       <LayerPicker
-        sections={sections}
+        sections={pickerSections}
         active={activeSections}
         selected={selected}
         onToggleLayer={toggleSelected}
       />
+      {ownPickerSections.map((section) => (
+        <SectionLayerPicker
+          key={section.id}
+          section={section}
+          selected={selected}
+          onToggleLayer={toggleSelected}
+        />
+      ))}
     </>
   );
 
@@ -719,15 +776,27 @@ export function MapDashboard() {
           <div className="hidden shrink-0 items-center gap-2 md:flex">{pickers}</div>
         }
         search={
-          <LayerSearch sections={sections} visibility={visible} onSelect={revealLayer} />
+          <CoordinateSearch
+            onGoTo={(point) => {
+              setPin({ ...point });
+              setMobileSheet(null);
+            }}
+          />
         }
       />
 
       {/* No docked column any more: the layers panel floats over the map's
           top-left corner, so the map has the full width of the window. */}
       <div className="flex min-h-0 flex-1">
-        <div ref={mapAreaRef} className="relative min-w-0 flex-1 p-4">
-          <div className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3">
+        <div className="relative min-w-0 flex-1 p-4">
+          <div
+            ref={mapAreaRef}
+            className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3"
+            // The info column's width, in one place: the column itself and
+            // the map's corner controls and year bar, which step aside for it,
+            // all read it.
+            style={{ "--info-col-w": comparingStats ? "24rem" : "18rem" } as React.CSSProperties}
+          >
             <Map
               onReady={(map) => {
                 mapRef.current = map;
@@ -739,6 +808,7 @@ export function MapDashboard() {
               overlayDefs={overlayDefs}
               basemap={basemap}
               infoReachesCorner={infoReachesCorner}
+              pin={pin}
               // Handed to the map rather than positioned here, so it shares
               // the bottom-centre stack with the coordinate readout: the
               // readout then rides above whatever height the bar happens to
@@ -771,42 +841,48 @@ export function MapDashboard() {
               onChange={setBasemap}
               className="absolute bottom-3 left-3 z-10"
             />
-          </div>
 
-          {/* Top-left, mirroring the info panel's inset on the other edge.
-              The tool stack has left this side, so all that shares its column
-              below is the basemap switcher and the left end of the year bar's
-              row — which the bar does reach, since it fills its band at any
-              width narrower than its 72rem cap. It scrolls inside that. */}
-          {panelOpen || !SHOW_PANEL_COLLAPSE ? (
-            <div className="absolute top-3 left-3 z-10 hidden max-h-[calc(100%-11rem)] w-[var(--layers-panel-w)] flex-col overflow-hidden rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 backdrop-blur-sm md:flex">
-              {/* Null for everyone but admins, who get the users link here. */}
-              <Sidebar variant="combined" user={auth.user} />
-              {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
-              <p className="shrink-0 border-t border-border/60 px-3 py-2 text-center text-[10px] tracking-wide text-muted-foreground">
-                © Shatrunjay Hills {new Date().getFullYear()}
-              </p>
+            {/* The layers panel (top-left) and the legend column (top-right)
+                share one row inside the map card, so they are clipped to the
+                map's own boundary and can never overlap each other: when the
+                map narrows, the layers panel gives up width before the two
+                meet. Click-through, so the gap between them still drags the
+                map. */}
+            <div className="pointer-events-none absolute inset-3 z-10 hidden items-start justify-between gap-3 md:flex">
+              {/* The tool stack has left this side, so all that shares its
+                  column below is the basemap switcher and the left end of the
+                  year bar's row. It scrolls inside that. */}
+              {panelOpen || !SHOW_PANEL_COLLAPSE ? (
+                <div className="pointer-events-auto flex max-h-[calc(100%-8.5rem)] w-[var(--layers-panel-w)] min-w-0 shrink flex-col overflow-hidden rounded-2xl bg-card shadow-e3 ring-1 ring-foreground/10">
+                  {/* Null for everyone but admins, who get the users link here. */}
+                  <Sidebar variant="combined" user={auth.user} />
+                  {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="pointer-events-auto gap-2 bg-card shadow-e2 hover:bg-accent dark:bg-card dark:hover:bg-accent"
+                  onClick={() => setPanelOpen(true)}
+                  // Stands in for the folded panel as the walkthrough's
+                  // "sections" stop, so that step still has something to
+                  // spotlight.
+                  data-tour="sections"
+                >
+                  <PanelLeftOpen className="size-3.5" strokeWidth={2} />
+                  Layers
+                </Button>
+              )}
+
+              {/* It may grow down past the tool stack in the corner below —
+                  the stack steps aside for it rather than the column stopping
+                  short. It still stops clear of the year bar's own row. */}
+              {infoPanel(
+                "pointer-events-auto hidden max-h-[calc(100%-4.5rem)] w-(--info-col-w) shrink-0 xl:flex",
+                infoRef,
+              )}
             </div>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="absolute top-3 left-3 z-10 hidden gap-2 shadow-e2 md:flex"
-              onClick={() => setPanelOpen(true)}
-            >
-              <PanelLeftOpen className="size-3.5" strokeWidth={2} />
-              Layers
-            </Button>
-          )}
-
-          {/* Top-right. It may grow down past the tool stack in the corner
-              below — the stack steps aside for it rather than the column
-              stopping short, which is what the cap used to do. It still stops
-              clear of the year bar's own row. */}
-          {infoPanel(
-            "absolute top-3 right-3 z-10 hidden max-h-[calc(100%-7rem)] w-72 xl:flex",
-            infoRef,
-          )}
+          </div>
         </div>
       </div>
 
@@ -830,7 +906,13 @@ export function MapDashboard() {
       </nav>
 
       <Sheet open={mobileSheet === "menu"} onOpenChange={(o) => setMobileSheet(o ? "menu" : null)}>
-        <SheetContent side="left" className="flex w-72 flex-col overflow-y-auto p-0 pt-12 scrollbar-thin">
+        <SheetContent
+          side="left"
+          className={cn(
+            "flex flex-col overflow-y-auto p-0 pt-12 scrollbar-thin",
+            comparingStats ? "w-full sm:w-96" : "w-72",
+          )}
+        >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pb-3 md:hidden">
             {pickers}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
   LngLatBounds,
+  Marker,
   Popup,
   type FilterSpecification,
   type GeoJSONSource,
@@ -34,6 +35,7 @@ import type { OverlayDef } from "@/lib/static-overlays";
 import type { LegendClass } from "@/lib/legend-config";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 import { cn } from "@/lib/utils";
+import { formatLatLng, type LatLng } from "@/lib/coords";
 
 // Teaches MapLibre to resolve `pmtiles://<url>` by reading the archive with
 // Range requests instead of downloading it. Module scope, so it is registered
@@ -620,6 +622,9 @@ function render(map: MapLibreMap, data: LayerCollection, fitOnce: { done: boolea
   }
 }
 
+/** How close a coordinate search zooms: a few fields across. */
+const SEARCH_PIN_ZOOM = 15;
+
 export default function Map({
   data,
   visibility,
@@ -630,6 +635,7 @@ export default function Map({
   basemap = DEFAULT_BASEMAP,
   bottomCenter,
   infoReachesCorner = false,
+  pin = null,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -651,9 +657,16 @@ export default function Map({
   /**
    * Whether the legend and statistics column has grown down far enough to
    * reach the bottom-right corner. When it has, the tool stack steps left of
-   * it and the bottom-centre band gives up the width to match.
+   * it and the bottom-centre band gives up the width to match. Both read
+   * the column's width from `--info-col-w`, set by the dashboard, because
+   * the column widens while two years are being compared.
    */
   infoReachesCorner?: boolean;
+  /**
+   * A coordinate searched for in the header. The map flies to it and drops a
+   * marker; a new object for the same point flies there again.
+   */
+  pin?: LatLng | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -753,7 +766,7 @@ export default function Map({
       // MAX_MAP_ZOOM for why this gives up no real detail.
       maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
-      // Needed to read the canvas back for the PNG export. WebGL discards the
+      // Needed to read the canvas back for the JPG export. WebGL discards the
       // buffer after each frame unless asked not to, and reading a discarded
       // buffer yields a blank image rather than an error — so the export
       // would silently produce an empty map.
@@ -781,6 +794,23 @@ export default function Map({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A searched coordinate: fly there and mark it. Zooms in only as far as
+  // SEARCH_PIN_ZOOM, and never back out if the view is already closer. The
+  // marker's popup repeats the coordinate, so it can be read off the map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !pin) return;
+    const at: [number, number] = [pin.lng, pin.lat];
+    const marker = new Marker({ color: "#DC2626" })
+      .setLngLat(at)
+      .setPopup(new Popup({ offset: 28, closeButton: false }).setText(formatLatLng(pin)))
+      .addTo(map);
+    map.flyTo({ center: at, zoom: Math.max(map.getZoom(), SEARCH_PIN_ZOOM) });
+    return () => {
+      marker.remove();
+    };
+  }, [pin, mapLoaded]);
 
   // data updates: push into the already-running map without recreating it
   useEffect(() => {
@@ -1039,7 +1069,7 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
-        className={infoReachesCorner ? "xl:right-[19.5rem]" : undefined}
+        className={infoReachesCorner ? "xl:right-[calc(var(--info-col-w,18rem)+1.5rem)]" : undefined}
         measureMode={measureMode}
         onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
@@ -1051,15 +1081,16 @@ export default function Map({
         }}
       />
 
-      {/* Bottom-centre: the coordinate readout, and the year bar below it
-          when a temporal theme is on — the timeline is the thing anchored to
-          the map's edge, and the readout rides above it.
+      {/* Bottom-centre: the year bar anchored to the map's bottom edge when a
+          temporal theme is on, with the coordinate readout riding above it
+          (and the measure panel above that).
 
           One flex column rather than two panels each at their own inset. The
           bar's height is not a constant — it grows a row when compare mode
           opens, and changed again when it was rebuilt as a timeline — so any
           fixed offset for the readout is a collision waiting to happen, as it
-          duly was. Stacked, the gap holds itself.
+          duly was. Stacked, the gap holds itself. The readout keeps its space
+          even while hidden, so the bar never jumps when it appears.
 
           Centred in the band the corner controls leave free: the basemap
           switcher on the left, the tool stack on the right. When the legend
@@ -1076,7 +1107,9 @@ export default function Map({
       <div
         className={cn(
           "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-3 md:left-[13.5rem]",
-          infoReachesCorner ? "md:right-14 xl:right-[23rem]" : "md:right-14",
+          infoReachesCorner
+            ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+5rem)]"
+            : "md:right-14",
         )}
       >
         {/* The measure panel joins the stack rather than sitting beside the

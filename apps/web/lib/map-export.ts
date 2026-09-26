@@ -1,6 +1,6 @@
 import { basemapById, type BasemapId } from "@/lib/basemaps";
 import { legendFor, rampScale } from "@/lib/legend-config";
-import { fetchRasterStats, nameClasses, type NamedClassStat } from "@/lib/raster-stats-api";
+import { classStatsFor, fetchOverlayStats, type NamedClassStat } from "@/lib/raster-stats-api";
 import { STUDY_AREA_HA, countByLayer } from "@/lib/vector-stats";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { LegendOverlay, LegendRasterLayer } from "@/components/LegendCard";
@@ -10,10 +10,10 @@ import { geometryKindOf } from "@/lib/sections";
 
 /**
  * Exports the dashboard as one sheet — the map exactly as it is on screen,
- * with the legend and the statistics beside it — as either a PNG file or a
+ * with the legend and the statistics beside it — as either a JPG file or a
  * PDF.
  *
- * Both come from the same composed canvas. The PNG is downloaded directly;
+ * Both come from the same composed canvas. The JPG is downloaded directly;
  * the PDF goes through the browser's own print pipeline, which is what turns
  * it into a PDF without a PDF library and leaves the user the page size and
  * destination controls they already know.
@@ -112,22 +112,6 @@ function clip(ctx: Ctx, text: string, maxW: number): string {
   return `${cut}…`;
 }
 
-function wrap(ctx: Ctx, text: string, maxW: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const word of text.split(/\s+/)) {
-    const next = line ? `${line} ${word}` : word;
-    if (ctx.measureText(next).width > maxW && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = next;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
 function sectionHeading(c: Cursor, text: string) {
   setFont(c, 9, 600);
   if (!c.dry) {
@@ -195,17 +179,6 @@ function keyValue(c: Cursor, key: string, value: string) {
     c.ctx.fillText(value, c.x + c.w, c.y + 8);
   }
   c.y += 14;
-}
-
-function note(c: Cursor, text: string) {
-  setFont(c, 8.5);
-  const lines = wrap(c.ctx, text, c.w);
-  if (!c.dry) {
-    c.ctx.textAlign = "left";
-    c.ctx.fillStyle = FAINT;
-    lines.forEach((line, i) => c.ctx.fillText(line, c.x, c.y + 7 + i * 10));
-  }
-  c.y += lines.length * 10 + 2;
 }
 
 function emptyLine(c: Cursor, text: string) {
@@ -306,7 +279,7 @@ function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchG
   ctx.restore();
 }
 
-/** A raster theme's measured classes, or why there are none. */
+/** A theme's class statistics (delivered or measured), or why there are none. */
 interface MeasuredRaster {
   layer: StatsRasterLayer;
   areaSqM: number | null;
@@ -318,19 +291,11 @@ async function measure(rasterStats: StatsRasterLayer[]): Promise<MeasuredRaster[
   return Promise.all(
     rasterStats.map(async (layer) => {
       try {
-        const stats = await fetchRasterStats(layer.imageKey);
-        if (stats.photographic) {
-          return {
-            layer,
-            areaSqM: stats.area_sq_m,
-            classes: [],
-            message: "Photographic image — no classes to summarise",
-          };
-        }
+        const stats = await fetchOverlayStats(layer.imageKey);
         return {
           layer,
           areaSqM: stats.area_sq_m,
-          classes: nameClasses(layer.id, stats.classes ?? []),
+          classes: classStatsFor(stats, layer.id, layer.imageKey, layer.categories),
         };
       } catch {
         return { layer, areaSqM: null, classes: [], message: "Could not measure this layer." };
@@ -358,8 +323,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
     color: f.properties.color,
     kind: geometryKindOf(f.geometry.type),
   }));
-  const nothingOn =
-    vectors.length === 0 && input.overlays.length === 0 && input.rasterLegends.length === 0;
 
   // The heading travels with the first rows under it, so a column break can
   // never leave it stranded at the foot of a column.
@@ -368,7 +331,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
     for (const v of vectors) swatchRow(c, v.color, v.kind, v.label);
     for (const o of input.overlays)
       swatchRow(c, o.color, o.geometryKind, o.group ? `${o.label} · ${o.group}` : o.label);
-    if (nothingOn) emptyLine(c, "No layers switched on.");
     c.y += 6;
   });
 
@@ -387,8 +349,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
         );
       }
       for (const cls of legend?.classes ?? []) swatchRow(c, cls.color, "raster", cls.label);
-      if (legend?.note) note(c, legend.note);
-      if (!legend) emptyLine(c, "No class legend for this theme.");
       c.y += 6;
     });
   }
@@ -398,7 +358,6 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
   blocks.push((c) => {
     sectionHeading(c, "Statistics");
     keyValue(c, "Study area", `${COUNT.format(STUDY_AREA_HA)} ha`);
-    if (measured.length === 0 && counts.length === 0) emptyLine(c, "Nothing measured.");
     c.y += 4;
   });
 
@@ -594,14 +553,26 @@ export async function renderDashboardSheet(input: ExportInput): Promise<HTMLCanv
   return canvas;
 }
 
-function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+/**
+ * JPEG for the download — a fraction of the PNG's size for a sheet that is
+ * mostly photographic basemap, and safe because the sheet is painted on
+ * opaque PAPER first. The print path keeps PNG, where text stays crisp.
+ */
+function toBlob(
+  canvas: HTMLCanvasElement,
+  type: "image/png" | "image/jpeg" = "image/png",
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("could not encode the sheet"))),
-      "image/png",
+      type,
+      JPEG_QUALITY,
     );
   });
 }
+
+/** High enough that legend text shows no ringing. Ignored for PNG. */
+const JPEG_QUALITY = 0.92;
 
 /** Filename stamp: sortable, and distinct enough for repeated exports. */
 function stampFor(date: Date): string {
@@ -611,18 +582,18 @@ function stampFor(date: Date): string {
 }
 
 /**
- * Composes the sheet and downloads it as a PNG.
+ * Composes the sheet and downloads it as a JPG.
  *
  * The same sheet the PDF is made from, handed over as a file instead of to
  * the print dialog — for dropping into a slide or a chat, where a PDF is the
  * wrong shape.
  */
 export async function downloadDashboardSheet(input: ExportInput): Promise<void> {
-  const blob = await toBlob(await renderDashboardSheet(input));
+  const blob = await toBlob(await renderDashboardSheet(input), "image/jpeg");
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `shatrunjay-hills-${stampFor(new Date())}.png`;
+  link.download = `shatrunjay-hills-${stampFor(new Date())}.jpg`;
   link.click();
   // Revoked on the next tick rather than immediately: Safari reads the href
   // after the click handler returns.

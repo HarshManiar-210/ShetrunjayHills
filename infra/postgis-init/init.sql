@@ -58,7 +58,11 @@ CREATE TABLE layer_groups (
     label      TEXT NOT NULL,
     -- NULL for a top-level heading. A group is deleted with its subtree.
     parent_id  INTEGER REFERENCES layer_groups (id) ON DELETE CASCADE,
-    sort_order INTEGER NOT NULL DEFAULT 0
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    -- A top-level group set true gets a navbar dropdown of its own, listing
+    -- its layers directly, instead of being one entry in the Sections/Layers
+    -- pair. Which groups do is this flag, never a key check in the frontend.
+    own_picker BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE INDEX layer_groups_parent_idx ON layer_groups (parent_id);
@@ -122,7 +126,39 @@ CREATE TABLE static_overlays (
     categories  JSONB,
     -- The GeoJSON properties a clicked feature's popup shows, in order. NULL
     -- shows every meaningful property (see apps/web/lib/feature-popup.ts).
-    popup_fields TEXT[]
+    popup_fields TEXT[],
+    -- Selected and switched on when the dashboard opens, before anything is
+    -- picked. Which layers start on is this flag, not a key in the frontend.
+    default_on BOOLEAN NOT NULL DEFAULT false
+);
+
+-- The client's official class statistics: area and share per class, per
+-- overlay image (one year of Forest Cover, one Vegetation Change transition,
+-- one FSI vector layer). Where a row exists here the Statistics panel shows
+-- it instead of measuring the raster's pixels -- the delivered figures come
+-- from the source GIS data, which the pixel count of a reprojected PNG can
+-- only approximate, and the FSI vector layers have no pixels to count at all.
+-- Overlays without rows keep the measured statistics.
+--
+-- class_value is the class's value in the theme's legend (the raster legends
+-- in apps/web/lib/legend-config.ts, a vector layer's own `categories`): that
+-- is how the frontend finds the class's colour and display name. `label` is
+-- the delivered name, shown only if no legend class matches.
+-- class_group heads a run of classes (Vegetation Change's Improvement /
+-- Degradation / Stable); NULL elsewhere.
+-- Rows are generated from the delivered spreadsheets by
+-- tools/prepare-class-stats.py; a new delivery is a re-run of that script,
+-- not a code change.
+CREATE TABLE overlay_class_stats (
+    overlay_id  INTEGER NOT NULL REFERENCES static_overlays (id) ON DELETE CASCADE,
+    class_value TEXT NOT NULL,
+    label       TEXT NOT NULL,
+    class_group TEXT,
+    area_ha     DOUBLE PRECISION NOT NULL,
+    -- 0-100, as delivered.
+    percentage  DOUBLE PRECISION NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (overlay_id, class_value)
 );
 
 -- ---------------------------------------------------------------------------
@@ -242,8 +278,11 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
-    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
-    ('reference',                   'Reference',                   NULL, 9);
+    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8);
+
+-- Boundaries are reference context laid over whatever else is on, not a
+-- subject of their own, so they get a dropdown of their own in the navbar.
+UPDATE layer_groups SET own_picker = true WHERE key = 'administrative-boundaries';
 
 -- Second level. Each of these holds one theme's rasters, so the frontend
 -- renders it as a single layer with a year picker -- which is why the six
@@ -265,7 +304,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('aspect',      'Aspect',                      grp('drone-data'), 5),
     ('chm',         'CHM (Canopy Height Model)',   grp('drone-data'), 6),
 
-    ('toposheet',   'Toposheet',                   grp('reference'), 2),
+    ('toposheet',   'Toposheet',                   grp('administrative-boundaries'), 12),
 
     ('flood-depth',                 'Flood Depth (m)',             grp('hydrogeology'), 1),
     ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 2),
@@ -364,25 +403,32 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, colo
         {"value": "Water", "label": "Water", "color": "#00206d"}
     ]', 'vector-data/forest-type-FSI.geojson', 8, 71.728918, 21.451784, 71.821736, 21.511611);
 
+-- Placement of Forest Cover, Green Cover, Vegetation Change, LULC,
+-- Fragmentation, FCC and the Toposheet: all delivered north-up in UTM zone
+-- 42N rather than Web Mercator, ~1 deg rotated against the map, with no
+-- georeferencing. tools/prepare-study-area-rasters.py fits each one to the
+-- study-area outline (Fragmentation to its year's Green Cover), resamples
+-- it onto a Web Mercator grid and writes these bounds; the delivered PNGs
+-- are kept under raster-data/originals.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.7286101, 21.4518315, 71.8217471, 21.5128586),
+    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.7281532, 21.4513116, 71.8223030, 21.5130240),
+    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.7283231, 21.4512694, 71.8224318, 21.5130876),
+    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.7281749, 21.4513122, 71.8222409, 21.5128611),
+    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.7283457, 21.4512710, 71.8222194, 21.5130469),
+    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.7281567, 21.4513038, 71.8222886, 21.5129559),
+    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.7281667, 21.4513177, 71.8222078, 21.5128887);
 
 -- Green Cover: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Non-Forest/Forest two-class palette).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('green_cover_1980', '1980', grp('green-cover'), 'raster', 'raster-data/green-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('green_cover_1989', '1989', grp('green-cover'), 'raster', 'raster-data/green-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_1998', '1998', grp('green-cover'), 'raster', 'raster-data/green-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_2008', '2008', grp('green-cover'), 'raster', 'raster-data/green-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_2018', '2018', grp('green-cover'), 'raster', 'raster-data/green-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_2025', '2025', grp('green-cover'), 'raster', 'raster-data/green-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('green_cover_2026', '2026', grp('green-cover'), 'raster', 'raster-data/green-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('green_cover_1980', '1980', grp('green-cover'), 'raster', 'raster-data/green-cover/1980.png', 1980, 71.7280245, 21.4515512, 71.8222228, 21.5131147),
+    ('green_cover_1989', '1989', grp('green-cover'), 'raster', 'raster-data/green-cover/1989.png', 1989, 71.7281993, 21.4509904, 71.8225423, 21.5132563),
+    ('green_cover_1998', '1998', grp('green-cover'), 'raster', 'raster-data/green-cover/1998.png', 1998, 71.7281498, 21.4510152, 71.8224950, 21.5129437),
+    ('green_cover_2008', '2008', grp('green-cover'), 'raster', 'raster-data/green-cover/2008.png', 2008, 71.7282026, 21.4512816, 71.8224067, 21.5133099),
+    ('green_cover_2018', '2018', grp('green-cover'), 'raster', 'raster-data/green-cover/2018.png', 2018, 71.7283183, 21.4511984, 71.8226556, 21.5132668),
+    ('green_cover_2025', '2025', grp('green-cover'), 'raster', 'raster-data/green-cover/2025.png', 2025, 71.7282007, 21.4511068, 71.8225222, 21.5132757),
+    ('green_cover_2026', '2026', grp('green-cover'), 'raster', 'raster-data/green-cover/2026.png', 2026, 71.7283074, 21.4509080, 71.8223818, 21.5132622);
 
 -- Vegetation Change: same per-year-raster shape as Forest Cover, but each
 -- image is a from→to transition (see legend-config.ts's 25-class VDF/MDF/
@@ -391,34 +437,34 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- end year, which sections.ts falls back to for ordering/selection since the
 -- label itself isn't a bare number here.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('vegetation_change_1980_1989', '1980 → 1989', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.727577, 21.452491, 71.822678, 21.511575),
-    ('vegetation_change_1989_1998', '1989 → 1998', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_1998_2008', '1998 → 2008', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2008_2018', '2008 → 2018', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2018_2025', '2018 → 2025', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2025_2026', '2025 → 2026', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('vegetation_change_1980_1989', '1980 → 1989', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.7284859, 21.4517838, 71.8218672, 21.5126671),
+    ('vegetation_change_1989_1998', '1989 → 1998', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.7283106, 21.4512150, 71.8223453, 21.5129152),
+    ('vegetation_change_1998_2008', '1998 → 2008', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.7283242, 21.4511114, 71.8222454, 21.5129490),
+    ('vegetation_change_2008_2018', '2008 → 2018', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.7284728, 21.4513835, 71.8221158, 21.5128975),
+    ('vegetation_change_2018_2025', '2018 → 2025', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.7283716, 21.4512628, 71.8223480, 21.5129644),
+    ('vegetation_change_2025_2026', '2025 → 2026', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.7283717, 21.4512608, 71.8221552, 21.5130384);
 
 -- LULC: same per-year-raster shape as Forest Cover (see legend-config.ts's
 -- Barren/Builtup/Dense Vegetation/Scrub/Waterbody classes).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.7283997, 21.4516401, 71.8220819, 21.5128512),
+    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.7281485, 21.4513079, 71.8223060, 21.5130655),
+    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.7283244, 21.4513881, 71.8223362, 21.5129603),
+    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.7281451, 21.4512307, 71.8223022, 21.5129476),
+    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7281270, 21.4511610, 71.8223518, 21.5129177),
+    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7281446, 21.4513003, 71.8223723, 21.5130954),
+    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7281467, 21.4513031, 71.8224187, 21.5130212);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
-    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.7281994, 21.4514962, 71.8220053, 21.5129734),
+    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.7280945, 21.4510551, 71.8226199, 21.5130365),
+    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.7284686, 21.4513930, 71.8225164, 21.5131724),
+    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.7292832, 21.4511107, 71.8225409, 21.5129556),
+    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.7283721, 21.4510642, 71.8223312, 21.5131965),
+    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.7281198, 21.4512334, 71.8224232, 21.5128263),
+    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.7281140, 21.4511883, 71.8224237, 21.5132639);
 
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
 -- flat vector-section pattern as Forest Boundary/Cadastral Map. File names
@@ -429,7 +475,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway-existing-water-conservation.geojson',      4, 71.728402, 21.450967, 71.820940, 21.505128),
     ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam-existing-water-conservation.geojson',     3, 71.737601, 21.456108, 71.821241, 21.509884),
-    ('fireline',      'Fireline',      grp('reference'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
+    ('fireline',      'Fireline',      grp('administrative-boundaries'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      11,71.729119, 21.453405, 71.820934, 21.510580),
     ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
     ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
@@ -455,17 +501,25 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- now agree to within ~40 m north and ~200 m east, and each box matches its
 -- image's aspect exactly, so nothing is distorted.
 --
+-- That aspect is taken in EPSG:4326, the grid all the client's data is
+-- delivered in: each pixel spans equal degrees of longitude and latitude
+-- (measured on the delivered footprints, 1.004 in degrees vs 1.079 in Web
+-- Mercator). An earlier derivation matched the aspect in Web Mercator
+-- instead, which cut ~0.0045 deg (~500 m) off each south edge and squeezed
+-- the imagery ~7% north-south. The south edges below now sit within ~20-40 m
+-- of the delivered footprints.
+--
 -- These are still derived from the delivered numbers, which are the only
 -- georeferencing this imagery has — no GeoTIFF or world file was supplied.
 -- Ask the client for one to place these properly, and before building any
 -- tile pyramid, which would bake the current placement in.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4547790, 71.8240547, 21.5129591),
-    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
-    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
-    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4551430, 71.8234229, 21.5120913),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4558151, 71.8229114, 21.5120633);
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
+    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
+    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4514270, 71.8229114, 21.5118751);
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
@@ -480,13 +534,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- 1980 doesn't (literal Red→R, NIR→G and B) — as delivered, not a
 -- transcription error. 1980's G and B both "Band 6: Near Infrared" likewise.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fcc_1980', '1980', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
-    ('fcc_1989', '1989', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_1998', '1998', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1998.png', 1998, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2008', '2008', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2008.png', 2008, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2018', '2018', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2025', '2025', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2026', '2026', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
+    ('fcc_1980', '1980', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1980.png', 1980, 71.7281596, 21.4512176, 71.8221907, 21.5131104),
+    ('fcc_1989', '1989', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1989.png', 1989, 71.7282559, 21.4511450, 71.8223452, 21.5131101),
+    ('fcc_1998', '1998', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1998.png', 1998, 71.7281512, 21.4511578, 71.8223883, 21.5132250),
+    ('fcc_2008', '2008', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2008.png', 2008, 71.7282427, 21.4512579, 71.8223151, 21.5132120),
+    ('fcc_2018', '2018', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2018.png', 2018, 71.7281299, 21.4512684, 71.8226527, 21.5133135),
+    ('fcc_2025', '2025', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2025.png', 2025, 71.7281768, 21.4511377, 71.8223431, 21.5132342),
+    ('fcc_2026', '2026', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2026.png', 2026, 71.7283712, 21.4512347, 71.8223161, 21.5132302);
 
 -- Dyke/Geology/Geomorphology/Greenwash/Lineament: five newly delivered
 -- geology-themed vector layers, each its own one-layer section (same flat
@@ -499,16 +553,17 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
--- Tree Density and Growing Stock: both drone-derived, tight-cropped to the
--- flight footprint, so both take the Orthomosaic's bounds (pixel aspect 1.564
--- and 1.555 respectively vs 1.566 in Web Mercator).
+-- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
+-- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 for that box
+-- in EPSG:4326 degrees).
+-- Growing Stock, Habitat Suitability, Wildlife Corridors: EPSG:4326 grids
+-- clipped to the study area; bounds fitted to its outline by
+-- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    -- Habitat Suitability: extent supplied with the raster.
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390),
-    -- Wildlife Corridors: same extent as Habitat Suitability.
-    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
+    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
+    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033),
+    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7285633, 21.4520919, 71.8217935, 21.5118928);
 
 -- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
 -- 5/10 m) picked the same way Forest/Green Cover pick a year -- all sharing
@@ -524,9 +579,9 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
--- Ortho/DSM/etc above.
+-- Ortho/DSM/etc above. Placed like Forest Cover (see there).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.728494, 21.451980, 71.821804, 21.511973);
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.7281306, 21.4514600, 71.8226062, 21.5133095);
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers from the client's structure with no data delivered yet.
@@ -569,3 +624,253 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- Boundary, and this is the taluka layer that should have sat beside it.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('talukaBoundary', 'Taluka Boundary', grp('administrative-boundaries'), 'vector', 'outline', '#C98BDB', 'vector-data/Talukas.geojson', 6, 71.352470, 21.144960, 72.298580, 22.353210);
+
+-- The study area frames everything else on the map, so it is on from the start.
+UPDATE static_overlays SET default_on = true WHERE key = 'studyArea';
+
+-- ---------------------------------------------------------------------------
+-- Seed: delivered class statistics (see overlay_class_stats above). Joined on
+-- the overlay key so the rows survive any change to the overlays' ids.
+-- Forest Cover 2026 has no delivered figures yet and keeps the measured ones.
+-- ---------------------------------------------------------------------------
+INSERT INTO overlay_class_stats (overlay_id, class_value, label, class_group, area_ha, percentage, sort_order)
+SELECT o.id, v.class_value, v.label, v.class_group, v.area_ha, v.percentage, v.sort_order
+FROM (VALUES
+    ('forest_cover_1980', '1', 'Very Dense Forest', NULL, 186.51, 5.5, 1),
+    ('forest_cover_1980', '2', 'Moderately Dense Forest', NULL, 360.4, 10.62, 2),
+    ('forest_cover_1980', '3', 'Open Forest', NULL, 596.64, 17.58, 3),
+    ('forest_cover_1980', '4', 'Scrub', NULL, 1836.83, 54.13, 4),
+    ('forest_cover_1980', '5', 'Non Forest', NULL, 413.21, 12.18, 5),
+    ('forest_cover_1989', '1', 'Very Dense Forest', NULL, 206.21, 6.08, 1),
+    ('forest_cover_1989', '2', 'Moderately Dense Forest', NULL, 609.81, 17.97, 2),
+    ('forest_cover_1989', '3', 'Open Forest', NULL, 1144.65, 33.73, 3),
+    ('forest_cover_1989', '4', 'Scrub', NULL, 859.82, 25.34, 4),
+    ('forest_cover_1989', '5', 'Non Forest', NULL, 573.11, 16.89, 5),
+    ('forest_cover_1998', '1', 'Very Dense Forest', NULL, 202.02, 5.95, 1),
+    ('forest_cover_1998', '2', 'Moderately Dense Forest', NULL, 458.4, 13.51, 2),
+    ('forest_cover_1998', '3', 'Open Forest', NULL, 901.73, 26.57, 3),
+    ('forest_cover_1998', '4', 'Scrub', NULL, 1220.73, 35.97, 4),
+    ('forest_cover_1998', '5', 'Non Forest', NULL, 610.72, 18.0, 5),
+    ('forest_cover_2008', '1', 'Very Dense Forest', NULL, 558.44, 16.46, 1),
+    ('forest_cover_2008', '2', 'Moderately Dense Forest', NULL, 752.5, 22.17, 2),
+    ('forest_cover_2008', '3', 'Open Forest', NULL, 391.13, 11.53, 3),
+    ('forest_cover_2008', '4', 'Scrub', NULL, 1142.66, 33.67, 4),
+    ('forest_cover_2008', '5', 'Non Forest', NULL, 548.88, 16.17, 5),
+    ('forest_cover_2018', '1', 'Very Dense Forest', NULL, 456.68, 13.46, 1),
+    ('forest_cover_2018', '2', 'Moderately Dense Forest', NULL, 569.74, 16.79, 2),
+    ('forest_cover_2018', '3', 'Open Forest', NULL, 338.75, 9.98, 3),
+    ('forest_cover_2018', '4', 'Scrub', NULL, 1556.98, 45.88, 4),
+    ('forest_cover_2018', '5', 'Non Forest', NULL, 471.45, 13.89, 5),
+    ('forest_cover_2025', '1', 'Very Dense Forest', NULL, 464.74, 13.69, 1),
+    ('forest_cover_2025', '2', 'Moderately Dense Forest', NULL, 663.52, 19.55, 2),
+    ('forest_cover_2025', '3', 'Open Forest', NULL, 594.47, 17.52, 3),
+    ('forest_cover_2025', '4', 'Scrub', NULL, 1492.23, 43.97, 4),
+    ('forest_cover_2025', '5', 'Non Forest', NULL, 178.65, 5.26, 5),
+    ('lulc_1980', '1', 'Barren', NULL, 421.9, 12.43, 1),
+    ('lulc_1980', '2', 'Builtup', NULL, 8.7, 0.26, 2),
+    ('lulc_1980', '3', 'Dense Vegetation', NULL, 225.2, 6.64, 3),
+    ('lulc_1980', '4', 'Scrub / Sparse Vegetation', NULL, 2737.8, 80.68, 4),
+    ('lulc_1989', '1', 'Barren', NULL, 548.6, 16.17, 1),
+    ('lulc_1989', '2', 'Builtup', NULL, 8.85, 0.26, 2),
+    ('lulc_1989', '3', 'Dense Vegetation', NULL, 304.71, 8.98, 3),
+    ('lulc_1989', '4', 'Scrub / Sparse Vegetation', NULL, 2530.03, 74.55, 4),
+    ('lulc_1989', '5', 'Waterbody', NULL, 1.41, 0.04, 5),
+    ('lulc_1998', '1', 'Barren', NULL, 580.31, 17.1, 1),
+    ('lulc_1998', '2', 'Builtup', NULL, 8.94, 0.26, 2),
+    ('lulc_1998', '3', 'Dense Vegetation', NULL, 339.81, 10.01, 3),
+    ('lulc_1998', '4', 'Scrub / Sparse Vegetation', NULL, 2463.91, 72.6, 4),
+    ('lulc_1998', '5', 'Waterbody', NULL, 0.63, 0.02, 5),
+    ('lulc_2008', '1', 'Barren', NULL, 568.84, 16.76, 1),
+    ('lulc_2008', '2', 'Builtup', NULL, 9.03, 0.27, 2),
+    ('lulc_2008', '3', 'Dense Vegetation', NULL, 526.8, 15.52, 3),
+    ('lulc_2008', '4', 'Scrub / Sparse Vegetation', NULL, 2287.61, 67.41, 4),
+    ('lulc_2008', '5', 'Waterbody', NULL, 1.32, 0.04, 5),
+    ('lulc_2018', '1', 'Barren', NULL, 474.42, 13.98, 1),
+    ('lulc_2018', '2', 'Builtup', NULL, 9.11, 0.27, 2),
+    ('lulc_2018', '3', 'Dense Vegetation', NULL, 773.81, 22.8, 3),
+    ('lulc_2018', '4', 'Scrub / Sparse Vegetation', NULL, 2135.85, 62.94, 4),
+    ('lulc_2018', '5', 'Waterbody', NULL, 0.41, 0.01, 5),
+    ('lulc_2025', '1', 'Barren', NULL, 192.56, 5.67, 1),
+    ('lulc_2025', '2', 'Builtup', NULL, 9.64, 0.28, 2),
+    ('lulc_2025', '3', 'Dense Vegetation', NULL, 1051.58, 30.99, 3),
+    ('lulc_2025', '4', 'Scrub / Sparse Vegetation', NULL, 2137.9, 63.0, 4),
+    ('lulc_2025', '5', 'Waterbody', NULL, 1.92, 0.06, 5),
+    ('lulc_2026', '1', 'Barren', NULL, 1743.03, 51.3623, 1),
+    ('lulc_2026', '2', 'Builtup', NULL, 7.93, 0.2337, 2),
+    ('lulc_2026', '3', 'Dense Vegetation', NULL, 660.24, 19.4554, 3),
+    ('lulc_2026', '4', 'Scrub / Sparse Vegetation', NULL, 981.8, 28.9309, 4),
+    ('lulc_2026', '5', 'Waterbody', NULL, 0.6, 0.0177, 5),
+    ('fragmentation_1980', 'patch', 'Patch', NULL, 46.1, 4.11, 1),
+    ('fragmentation_1980', 'edge', 'Edge', NULL, 6.66, 0.59, 2),
+    ('fragmentation_1980', 'perforated', 'Perforated', NULL, 369.34, 32.9, 3),
+    ('fragmentation_1980', 'core-small', 'Core (<250 acres)', NULL, 376.36, 33.53, 4),
+    ('fragmentation_1980', 'core-medium', 'Core (250–500 acres)', NULL, 324.11, 28.87, 5),
+    ('fragmentation_1989', 'patch', 'Patch', NULL, 53.92, 2.7, 1),
+    ('fragmentation_1989', 'edge', 'Edge', NULL, 682.63, 34.12, 2),
+    ('fragmentation_1989', 'perforated', 'Perforated', NULL, 60.27, 3.01, 3),
+    ('fragmentation_1989', 'core-small', 'Core (<250 acres)', NULL, 858.56, 42.91, 4),
+    ('fragmentation_1989', 'core-large', 'Core (>500 acres)', NULL, 345.34, 17.26, 5),
+    ('fragmentation_1998', 'patch', 'Patch', NULL, 67.52, 4.24, 1),
+    ('fragmentation_1998', 'edge', 'Edge', NULL, 492.4, 30.92, 2),
+    ('fragmentation_1998', 'perforated', 'Perforated', NULL, 92.33, 5.8, 3),
+    ('fragmentation_1998', 'core-small', 'Core (<250 acres)', NULL, 237.37, 14.91, 4),
+    ('fragmentation_1998', 'core-large', 'Core (>500 acres)', NULL, 702.69, 44.13, 5),
+    ('fragmentation_2008', 'patch', 'Patch', NULL, 38.71, 2.27, 1),
+    ('fragmentation_2008', 'edge', 'Edge', NULL, 403.5, 23.71, 2),
+    ('fragmentation_2008', 'perforated', 'Perforated', NULL, 41.72, 2.45, 3),
+    ('fragmentation_2008', 'core-small', 'Core (<250 acres)', NULL, 247.17, 14.52, 4),
+    ('fragmentation_2008', 'core-large', 'Core (>500 acres)', NULL, 970.96, 57.05, 5),
+    ('fragmentation_2018', 'patch', 'Patch', NULL, 99.31, 7.27, 1),
+    ('fragmentation_2018', 'edge', 'Edge', NULL, 513.46, 37.61, 2),
+    ('fragmentation_2018', 'perforated', 'Perforated', NULL, 16.02, 1.17, 3),
+    ('fragmentation_2018', 'core-small', 'Core (<250 acres)', NULL, 479.79, 35.14, 4),
+    ('fragmentation_2018', 'core-large', 'Core (>500 acres)', NULL, 256.61, 18.8, 5),
+    ('fragmentation_2025', 'patch', 'Patch', NULL, 26.6, 1.54, 1),
+    ('fragmentation_2025', 'edge', 'Edge', NULL, 400.57, 23.25, 2),
+    ('fragmentation_2025', 'perforated', 'Perforated', NULL, 35.05, 2.03, 3),
+    ('fragmentation_2025', 'core-small', 'Core (<250 acres)', NULL, 306.87, 17.81, 4),
+    ('fragmentation_2025', 'core-large', 'Core (>500 acres)', NULL, 953.64, 55.36, 5),
+    ('fragmentation_2026', 'patch', 'Patch', NULL, 50.18, 3.9, 1),
+    ('fragmentation_2026', 'edge', 'Edge', NULL, 483.69, 37.59, 2),
+    ('fragmentation_2026', 'perforated', 'Perforated', NULL, 16.35, 1.27, 3),
+    ('fragmentation_2026', 'core-small', 'Core (<250 acres)', NULL, 393.57, 30.59, 4),
+    ('fragmentation_2026', 'core-large', 'Core (>500 acres)', NULL, 342.82, 26.65, 5),
+    ('vegetation_change_1980_1989', 'MDF-VDF', 'MDF → VDF', 'Improvement', 15.5232, 0.4574, 1),
+    ('vegetation_change_1980_1989', 'OF-VDF', 'OF → VDF', 'Improvement', 0.7056, 0.0208, 2),
+    ('vegetation_change_1980_1989', 'OF-MDF', 'OF → MDF', 'Improvement', 57.0752, 1.6818, 3),
+    ('vegetation_change_1980_1989', 'SCRUB-VDF', 'SCRUB → VDF', 'Improvement', 32.7712, 0.9657, 4),
+    ('vegetation_change_1980_1989', 'SCRUB-MDF', 'SCRUB → MDF', 'Improvement', 442.568, 13.0413, 5),
+    ('vegetation_change_1980_1989', 'SCRUB-OF', 'SCRUB → OF', 'Improvement', 787.0432, 23.192, 6),
+    ('vegetation_change_1980_1989', 'NF-MDF', 'NF → MDF', 'Improvement', 2.8224, 0.0832, 7),
+    ('vegetation_change_1980_1989', 'NF-OF', 'NF → OF', 'Improvement', 126.4592, 3.7264, 8),
+    ('vegetation_change_1980_1989', 'VDF-MDF', 'VDF → MDF', 'Degradation', 86.9456, 2.562, 9),
+    ('vegetation_change_1980_1989', 'VDF-OF', 'VDF → OF', 'Degradation', 1.176, 0.0347, 10),
+    ('vegetation_change_1980_1989', 'VDF-SCRUB', 'VDF → SCRUB', 'Degradation', 1.4112, 0.0416, 11),
+    ('vegetation_change_1980_1989', 'MDF-OF', 'MDF → OF', 'Degradation', 19.9136, 0.5868, 12),
+    ('vegetation_change_1980_1989', 'MDF-SCRUB', 'MDF → SCRUB', 'Degradation', 57.7024, 1.7003, 13),
+    ('vegetation_change_1980_1989', 'MDF-NF', 'MDF → NF', 'Degradation', 5.0176, 0.1479, 14),
+    ('vegetation_change_1980_1989', 'OF-SCRUB', 'OF → SCRUB', 'Degradation', 103.46, 3.0487, 15),
+    ('vegetation_change_1980_1989', 'OF-NF', 'OF → NF', 'Degradation', 44.7664, 1.3191, 16),
+    ('vegetation_change_1980_1989', 'SCRUB-NF', 'SCRUB → NF', 'Degradation', 259.21, 7.6382, 17),
+    ('vegetation_change_1980_1989', 'NF-SCRUB', 'NF → SCRUB', 'Degradation', 15.5232, 0.4574, 18),
+    ('vegetation_change_1980_1989', 'VDF-VDF', 'VDF → VDF', 'Stable', 135.7888, 4.0013, 19),
+    ('vegetation_change_1980_1989', 'MDF-MDF', 'MDF → MDF', 'Stable', 223.44, 6.5842, 20),
+    ('vegetation_change_1980_1989', 'OF-OF', 'OF → OF', 'Stable', 177.3408, 5.2257, 21),
+    ('vegetation_change_1980_1989', 'SCRUB-SCRUB', 'SCRUB → SCRUB', 'Stable', 482.0816, 14.2056, 22),
+    ('vegetation_change_1980_1989', 'NF-NF', 'NF → NF', 'Stable', 314.8544, 9.2779, 23),
+    ('vegetation_change_1989_1998', 'MDF-VDF', 'MDF → VDF', 'Improvement', 11.3867, 0.3355, 1),
+    ('vegetation_change_1989_1998', 'SCRUB-OF', 'SCRUB → OF', 'Improvement', 347.3758, 10.2362, 2),
+    ('vegetation_change_1989_1998', 'NF-OF', 'NF → OF', 'Improvement', 0.1627, 0.0048, 3),
+    ('vegetation_change_1989_1998', 'NF-SCRUB', 'NF → SCRUB', 'Improvement', 471.9789, 13.9079, 4),
+    ('vegetation_change_1989_1998', 'VDF-MDF', 'VDF → MDF', 'Degradation', 71.5736, 2.1091, 5),
+    ('vegetation_change_1989_1998', 'VDF-NF', 'VDF → NF', 'Degradation', 6.6694, 0.1965, 6),
+    ('vegetation_change_1989_1998', 'MDF-OF', 'MDF → OF', 'Degradation', 299.3077, 8.8198, 7),
+    ('vegetation_change_1989_1998', 'MDF-SCRUB', 'MDF → SCRUB', 'Degradation', 60.4309, 1.7807, 8),
+    ('vegetation_change_1989_1998', 'MDF-NF', 'MDF → NF', 'Degradation', 29.3614, 0.8652, 9),
+    ('vegetation_change_1989_1998', 'OF-MDF', 'OF → MDF', 'Degradation', 51.9722, 1.5315, 10),
+    ('vegetation_change_1989_1998', 'OF-SCRUB', 'OF → SCRUB', 'Degradation', 745.4224, 21.9656, 11),
+    ('vegetation_change_1989_1998', 'OF-NF', 'OF → NF', 'Degradation', 178.6, 5.2629, 12),
+    ('vegetation_change_1989_1998', 'SCRUB-NF', 'SCRUB → NF', 'Degradation', 137.82, 4.0612, 13),
+    ('vegetation_change_1989_1998', 'VDF-VDF', 'VDF → VDF', 'Stable', 111.915, 3.2978, 14),
+    ('vegetation_change_1989_1998', 'MDF-MDF', 'MDF → MDF', 'Stable', 332.5731, 9.8, 15),
+    ('vegetation_change_1989_1998', 'OF-OF', 'OF → OF', 'Stable', 94.1843, 2.7754, 16),
+    ('vegetation_change_1989_1998', 'SCRUB-SCRUB', 'SCRUB → SCRUB', 'Stable', 246.1155, 7.2524, 17),
+    ('vegetation_change_1989_1998', 'NF-NF', 'NF → NF', 'Stable', 196.746, 5.7976, 18),
+    ('vegetation_change_1998_2008', 'MDF-VDF', 'MDF → VDF', 'Improvement', 432.4507, 12.7319, 1),
+    ('vegetation_change_1998_2008', 'OF-VDF', 'OF → VDF', 'Improvement', 12.8507, 0.3783, 2),
+    ('vegetation_change_1998_2008', 'OF-MDF', 'OF → MDF', 'Improvement', 699.4689, 20.5932, 3),
+    ('vegetation_change_1998_2008', 'SCRUB-VDF', 'SCRUB → VDF', 'Improvement', 6.4254, 0.1892, 4),
+    ('vegetation_change_1998_2008', 'SCRUB-MDF', 'SCRUB → MDF', 'Improvement', 49.7762, 1.4655, 5),
+    ('vegetation_change_1998_2008', 'SCRUB-OF', 'SCRUB → OF', 'Improvement', 262.2195, 7.7201, 6),
+    ('vegetation_change_1998_2008', 'NF-VDF', 'NF → VDF', 'Improvement', 3.416, 0.1006, 7),
+    ('vegetation_change_1998_2008', 'NF-MDF', 'NF → MDF', 'Improvement', 2.3587, 0.0694, 8),
+    ('vegetation_change_1998_2008', 'NF-OF', 'NF → OF', 'Improvement', 17.4867, 0.5148, 9),
+    ('vegetation_change_1998_2008', 'NF-SCRUB', 'NF → SCRUB', 'Improvement', 226.1074, 6.6569, 10),
+    ('vegetation_change_1998_2008', 'MDF-SCRUB', 'MDF → SCRUB', 'Degradation', 0.244, 0.0072, 11),
+    ('vegetation_change_1998_2008', 'OF-SCRUB', 'OF → SCRUB', 'Degradation', 60.2682, 1.7744, 12),
+    ('vegetation_change_1998_2008', 'OF-NF', 'OF → NF', 'Degradation', 40.1788, 1.1829, 13),
+    ('vegetation_change_1998_2008', 'SCRUB-NF', 'SCRUB → NF', 'Degradation', 327.48, 9.6414, 14),
+    ('vegetation_change_1998_2008', 'VDF-VDF', 'VDF → VDF', 'Stable', 113.9484, 3.3548, 15),
+    ('vegetation_change_1998_2008', 'MDF-MDF', 'MDF → MDF', 'Stable', 12.1187, 0.3568, 16),
+    ('vegetation_change_1998_2008', 'OF-OF', 'OF → OF', 'Stable', 25.3761, 0.7471, 17),
+    ('vegetation_change_1998_2008', 'SCRUB-SCRUB', 'SCRUB → SCRUB', 'Stable', 789.5866, 23.2464, 18),
+    ('vegetation_change_1998_2008', 'NF-NF', 'NF → NF', 'Stable', 314.8424, 9.2693, 19),
+    ('vegetation_change_2008_2018', 'MDF-VDF', 'MDF → VDF', 'Improvement', 45.2215, 1.3326, 1),
+    ('vegetation_change_2008_2018', 'OF-MDF', 'OF → MDF', 'Improvement', 8.052, 0.2373, 2),
+    ('vegetation_change_2008_2018', 'SCRUB-VDF', 'SCRUB → VDF', 'Improvement', 0.0813, 0.0024, 3),
+    ('vegetation_change_2008_2018', 'SCRUB-OF', 'SCRUB → OF', 'Improvement', 1.952, 0.0575, 4),
+    ('vegetation_change_2008_2018', 'NF-VDF', 'NF → VDF', 'Improvement', 0.1627, 0.0048, 5),
+    ('vegetation_change_2008_2018', 'NF-MDF', 'NF → MDF', 'Improvement', 8.8654, 0.2612, 6),
+    ('vegetation_change_2008_2018', 'NF-SCRUB', 'NF → SCRUB', 'Improvement', 398.6, 11.7456, 7),
+    ('vegetation_change_2008_2018', 'NF-OF', 'NF → OF', 'Improvement', 316.6317, 9.3303, 8),
+    ('vegetation_change_2008_2018', 'VDF-MDF', 'VDF → MDF', 'Degradation', 7.1574, 0.2109, 9),
+    ('vegetation_change_2008_2018', 'VDF-OF', 'VDF → OF', 'Degradation', 445.2201, 13.1194, 10),
+    ('vegetation_change_2008_2018', 'VDF-SCRUB', 'VDF → SCRUB', 'Degradation', 8.784, 0.2588, 11),
+    ('vegetation_change_2008_2018', 'VDF-NF', 'VDF → NF', 'Degradation', 15.5347, 0.4578, 12),
+    ('vegetation_change_2008_2018', 'MDF-OF', 'MDF → OF', 'Degradation', 4.7987, 0.1414, 13),
+    ('vegetation_change_2008_2018', 'MDF-SCRUB', 'MDF → SCRUB', 'Degradation', 105.5269, 3.1096, 14),
+    ('vegetation_change_2008_2018', 'MDF-NF', 'MDF → NF', 'Degradation', 128.9541, 3.7999, 15),
+    ('vegetation_change_2008_2018', 'OF-SCRUB', 'OF → SCRUB', 'Degradation', 265.6355, 7.8275, 16),
+    ('vegetation_change_2008_2018', 'OF-NF', 'OF → NF', 'Degradation', 584.6259, 17.2273, 17),
+    ('vegetation_change_2008_2018', 'SCRUB-NF', 'SCRUB → NF', 'Degradation', 213.72, 6.2977, 18),
+    ('vegetation_change_2008_2018', 'VDF-VDF', 'VDF → VDF', 'Stable', 605.854, 17.8528, 19),
+    ('vegetation_change_2008_2018', 'MDF-MDF', 'MDF → MDF', 'Stable', 0.0813, 0.0024, 20),
+    ('vegetation_change_2008_2018', 'OF-OF', 'OF → OF', 'Stable', 224.6434, 6.6196, 21),
+    ('vegetation_change_2008_2018', 'SCRUB-SCRUB', 'SCRUB → SCRUB', 'Stable', 3.4973, 0.1031, 22),
+    ('vegetation_change_2018_2025', 'MDF-VDF', 'MDF → VDF', 'Improvement', 22.2854, 0.6567, 1),
+    ('vegetation_change_2018_2025', 'SCRUB-VDF', 'SCRUB → VDF', 'Improvement', 3.5787, 0.1055, 2),
+    ('vegetation_change_2018_2025', 'SCRUB-MDF', 'SCRUB → MDF', 'Improvement', 108.0924, 3.1852, 3),
+    ('vegetation_change_2018_2025', 'SCRUB-OF', 'SCRUB → OF', 'Improvement', 477.5909, 14.0733, 4),
+    ('vegetation_change_2018_2025', 'NF-MDF', 'NF → MDF', 'Improvement', 0.8133, 0.024, 5),
+    ('vegetation_change_2018_2025', 'NF-OF', 'NF → OF', 'Improvement', 2.94, 0.0866, 6),
+    ('vegetation_change_2018_2025', 'NF-SCRUB', 'NF → SCRUB', 'Improvement', 332.61, 9.8011, 7),
+    ('vegetation_change_2018_2025', 'VDF-MDF', 'VDF → MDF', 'Degradation', 18.7881, 0.5536, 8),
+    ('vegetation_change_2018_2025', 'MDF-OF', 'MDF → OF', 'Degradation', 35.9495, 1.0593, 9),
+    ('vegetation_change_2018_2025', 'MDF-SCRUB', 'MDF → SCRUB', 'Degradation', 3.0093, 0.0887, 10),
+    ('vegetation_change_2018_2025', 'MDF-NF', 'MDF → NF', 'Degradation', 1.22, 0.036, 11),
+    ('vegetation_change_2018_2025', 'OF-SCRUB', 'OF → SCRUB', 'Degradation', 303.1303, 8.9324, 12),
+    ('vegetation_change_2018_2025', 'OF-NF', 'OF → NF', 'Degradation', 2.2773, 0.0671, 13),
+    ('vegetation_change_2018_2025', 'SCRUB-NF', 'SCRUB → NF', 'Degradation', 22.0414, 0.6495, 14),
+    ('vegetation_change_2018_2025', 'VDF-VDF', 'VDF → VDF', 'Stable', 493.6136, 14.5454, 15),
+    ('vegetation_change_2018_2025', 'MDF-MDF', 'MDF → MDF', 'Stable', 479.5429, 14.1308, 16),
+    ('vegetation_change_2018_2025', 'OF-OF', 'OF → OF', 'Stable', 16.9174, 0.4985, 17),
+    ('vegetation_change_2018_2025', 'SCRUB-SCRUB', 'SCRUB → SCRUB', 'Stable', 936.3937, 27.593, 18),
+    ('vegetation_change_2018_2025', 'NF-NF', 'NF → NF', 'Stable', 132.8031, 3.9133, 19),
+    ('vegetation_change_2025_2026', 'MDF-VDF', 'MDF → VDF', 'Improvement', 163.5619, 4.8155, 1),
+    ('vegetation_change_2025_2026', 'OF-VDF', 'OF → VDF', 'Improvement', 15.0467, 0.443, 2),
+    ('vegetation_change_2025_2026', 'OF-MDF', 'OF → MDF', 'Improvement', 56.7709, 1.6714, 3),
+    ('vegetation_change_2025_2026', 'SCRUB-VDF', 'SCRUB → VDF', 'Improvement', 8.052, 0.2371, 4),
+    ('vegetation_change_2025_2026', 'SCRUB-MDF', 'SCRUB → MDF', 'Improvement', 90.0363, 2.6508, 5),
+    ('vegetation_change_2025_2026', 'SCRUB-OF', 'SCRUB → OF', 'Improvement', 83.1229, 2.4472, 6),
+    ('vegetation_change_2025_2026', 'VDF-MDF', 'VDF → MDF', 'Degradation', 122.4884, 3.6062, 7),
+    ('vegetation_change_2025_2026', 'VDF-OF', 'VDF → OF', 'Degradation', 6.588, 0.194, 8),
+    ('vegetation_change_2025_2026', 'VDF-SCRUB', 'VDF → SCRUB', 'Degradation', 20.1707, 0.5939, 9),
+    ('vegetation_change_2025_2026', 'MDF-OF', 'MDF → OF', 'Degradation', 34.3228, 1.0105, 10),
+    ('vegetation_change_2025_2026', 'MDF-SCRUB', 'MDF → SCRUB', 'Degradation', 192.11, 5.6559, 11),
+    ('vegetation_change_2025_2026', 'OF-SCRUB', 'OF → SCRUB', 'Degradation', 313.8, 9.2386, 12),
+    ('vegetation_change_2025_2026', 'OF-NF', 'OF → NF', 'Degradation', 2.928, 0.0862, 13),
+    ('vegetation_change_2025_2026', 'SCRUB-NF', 'SCRUB → NF', 'Degradation', 283.2409, 8.339, 14),
+    ('vegetation_change_2025_2026', 'NF-SCRUB', 'NF → SCRUB', 'Degradation', 24.3187, 0.716, 15),
+    ('vegetation_change_2025_2026', 'VDF-VDF', 'VDF → VDF', 'Stable', 359.6572, 10.5887, 16),
+    ('vegetation_change_2025_2026', 'MDF-MDF', 'MDF → MDF', 'Stable', 188.0433, 5.5362, 17),
+    ('vegetation_change_2025_2026', 'OF-OF', 'OF → OF', 'Stable', 61.8135, 1.8199, 18),
+    ('vegetation_change_2025_2026', 'SCRUB-SCRUB', 'SCRUB → SCRUB', 'Stable', 1229.5773, 36.2002, 19),
+    ('vegetation_change_2025_2026', 'NF-NF', 'NF → NF', 'Stable', 140.9511, 4.1498, 20),
+    ('treeDensity', '1', 'Very Dense Forest', NULL, 306.07, 9.019, 1),
+    ('treeDensity', '2', 'Moderately Dense Forest', NULL, 614.86, 18.1182, 2),
+    ('treeDensity', '3', 'Open Forest', NULL, 1276.95, 37.6282, 3),
+    ('treeDensity', '4', 'Scrub', NULL, 794.34, 23.407, 4),
+    ('treeDensity', '5', 'Non Forest', NULL, 401.38, 11.8276, 5),
+    ('forestCoverFSI', 'MODERATELY DENSE FOREST (Tree Canopy density 40% & above but < 70%)', 'Moderately Dense Forest', NULL, 645.12, 27.4548, 1),
+    ('forestCoverFSI', 'OPEN FOREST (Tree Canopy density 10% & above but < 40%)', 'Open Forest', NULL, 1637.3, 69.6798, 2),
+    ('forestCoverFSI', 'SCRUB (Tree Canopy density < 10%)', 'Scrub', NULL, 58.98, 2.5101, 3),
+    ('forestCoverFSI', 'WATER', 'Water', NULL, 8.35, 0.3554, 4),
+    ('forestTypeFSI', '3B/C2 Southern moist mixed deciduous forest', '3B/C2 Southern moist mixed deciduous forest', NULL, 1.0323, 0.0437, 1),
+    ('forestTypeFSI', '5/DS4 Dry Grassland', '5/DS4 Dry Grassland', NULL, 256.5418, 10.8579, 2),
+    ('forestTypeFSI', '5/E1 Anogeissus pendula Forest', '5/E1 Anogeissus pendula Forest', NULL, 501.2538, 21.2152, 3),
+    ('forestTypeFSI', '5/E 8c Salvadora-T amarix scrub', '5/E 8c Salvadora-Tamarix scrub', NULL, 8.8194, 0.3733, 4),
+    ('forestTypeFSI', 'Acacia senegal forest', 'Acacia senegal forest', NULL, 1576.9401, 66.7428, 5),
+    ('forestTypeFSI', '6/E4 Salvadora scrub', '6/E4 Salvadora scrub', NULL, 9.7805, 0.414, 6),
+    ('forestTypeFSI', 'Water', 'Water', NULL, 8.3442, 0.3532, 7)
+) AS v (overlay_key, class_value, label, class_group, area_ha, percentage, sort_order)
+JOIN static_overlays o ON o.key = v.overlay_key;

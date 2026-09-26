@@ -15,7 +15,8 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, key, label, group_id, asset_type, COALESCE(kind, ''), COALESCE(color, ''),
 			COALESCE(color_field, ''), categories, COALESCE(popup_fields, '{}'),
-			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status
+			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status, default_on,
+			EXISTS (SELECT 1 FROM overlay_class_stats s WHERE s.overlay_id = static_overlays.id)
 		FROM static_overlays
 		ORDER BY group_id, sort_order
 	`)
@@ -30,7 +31,8 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 		if err := rows.Scan(
 			&o.ID, &o.Key, &o.Label, &o.GroupID, &o.AssetType, &o.Kind, &o.Color,
 			&o.ColorField, &o.Categories, &o.PopupFields,
-			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status,
+			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status, &o.DefaultOn,
+			&o.HasStats,
 		); err != nil {
 			return nil, fmt.Errorf("repository: scan static overlay: %w", err)
 		}
@@ -61,7 +63,7 @@ func (r *Repository) GetStaticOverlayFilePath(ctx context.Context, key string) (
 // nesting; keeping it flat here means one query and no recursive CTE.
 func (r *Repository) GetLayerGroups(ctx context.Context) ([]models.LayerGroup, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, key, label, parent_id, sort_order
+		SELECT id, key, label, parent_id, sort_order, own_picker
 		FROM layer_groups
 		ORDER BY COALESCE(parent_id, 0), sort_order, id
 	`)
@@ -73,7 +75,7 @@ func (r *Repository) GetLayerGroups(ctx context.Context) ([]models.LayerGroup, e
 	groups := make([]models.LayerGroup, 0)
 	for rows.Next() {
 		var g models.LayerGroup
-		if err := rows.Scan(&g.ID, &g.Key, &g.Label, &g.ParentID, &g.SortOrder); err != nil {
+		if err := rows.Scan(&g.ID, &g.Key, &g.Label, &g.ParentID, &g.SortOrder, &g.OwnPicker); err != nil {
 			return nil, fmt.Errorf("repository: scan layer group: %w", err)
 		}
 		groups = append(groups, g)
@@ -103,4 +105,38 @@ func (r *Repository) GetStaticOverlay(ctx context.Context, key string) (models.S
 		return models.StaticOverlay{}, fmt.Errorf("repository: get static overlay: %w", err)
 	}
 	return o, nil
+}
+
+// GetOverlayClassStats returns the client's delivered class statistics for
+// the overlay with the given key, in delivered order: areas in square metres
+// and shares 0..1, converted here so the API speaks the same units as the
+// measured statistics. Empty (not an error) for an overlay with none, or for
+// an unknown key.
+func (r *Repository) GetOverlayClassStats(ctx context.Context, key string) ([]models.OverlayClassStat, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT s.class_value, s.label, COALESCE(s.class_group, ''),
+			s.area_ha * 10000, s.percentage / 100
+		FROM overlay_class_stats s
+		JOIN static_overlays o ON o.id = s.overlay_id
+		WHERE o.key = $1
+		ORDER BY s.sort_order, s.class_value
+	`, key)
+	if err != nil {
+		return nil, fmt.Errorf("repository: get overlay class stats: %w", err)
+	}
+	defer rows.Close()
+
+	stats := make([]models.OverlayClassStat, 0)
+	for rows.Next() {
+		var s models.OverlayClassStat
+		if err := rows.Scan(&s.Value, &s.Label, &s.Group, &s.AreaSqM, &s.Share); err != nil {
+			return nil, fmt.Errorf("repository: scan overlay class stat: %w", err)
+		}
+		stats = append(stats, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository: get overlay class stats: %w", err)
+	}
+
+	return stats, nil
 }

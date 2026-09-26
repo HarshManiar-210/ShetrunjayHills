@@ -114,6 +114,8 @@ export interface SectionItem {
    * class list instead of a single swatch. Absent for every other layer.
    */
   categories?: LegendClass[];
+  /** Delivered class statistics exist — see OverlayMeta.has_stats. */
+  hasStats?: boolean;
 }
 
 export interface RasterYear {
@@ -147,6 +149,8 @@ export interface SectionDef {
   children: SectionDef[];
   /** 0 for a top-level heading. Drives the sidebar's indentation. */
   depth: number;
+  /** Listed in a navbar dropdown of its own rather than under Sections. */
+  ownPicker: boolean;
 }
 
 /**
@@ -185,7 +189,6 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   "habitat-suitability": { accent: "fauna", icon: Layers },
   "wildlife-corridors": { accent: "fauna", icon: Route },
   "administrative-boundaries": { accent: "infra", icon: MapIcon },
-  reference: { accent: "infra", icon: Layers },
   toposheet: { accent: "imagery", icon: ScrollText },
 };
 
@@ -326,6 +329,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         years,
         children,
         depth,
+        ownPicker: Boolean(group.own_picker),
       };
     }
 
@@ -339,6 +343,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       years: [],
       children,
       depth,
+      ownPicker: Boolean(group.own_picker),
       items: rows.map((o) => ({
         key: o.key,
         label: o.label,
@@ -347,6 +352,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         pending: o.status === "pending",
         icon: ITEM_STYLE[o.key],
         categories: o.categories,
+        hasStats: o.has_stats,
       })),
     };
   }

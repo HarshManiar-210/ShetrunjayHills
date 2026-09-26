@@ -28,12 +28,14 @@ function PickerTrigger({
   label,
   count,
   tour,
+  disabled,
   className,
 }: {
   icon: LucideIcon;
   label: string;
   count: number;
   tour?: string;
+  disabled?: boolean;
   className?: string;
 }) {
   return (
@@ -43,6 +45,7 @@ function PickerTrigger({
       <Button
         variant="outline"
         data-tour={tour}
+        disabled={disabled}
         className={cn(
           "h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium",
           "shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)]",
@@ -54,7 +57,7 @@ function PickerTrigger({
         )}
       >
         <Icon className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
-        <span className="hidden sm:inline">{label}</span>
+        <span className="hidden max-w-40 truncate sm:inline">{label}</span>
         {count > 0 && (
           <span className="rounded-full bg-brand px-1.5 py-px text-[10px] font-semibold tabular-nums text-brand-foreground">
             {count}
@@ -66,18 +69,16 @@ function PickerTrigger({
   );
 }
 
-/** Popover chrome shared by both pickers: a titled header, a body, a footer. */
+/** Popover chrome shared by the pickers: a titled header and a body. */
 function PickerBody({
   title,
   onClear,
   clearable,
-  footer,
   children,
 }: {
   title: string;
   onClear: () => void;
   clearable: boolean;
-  footer: string;
   children: React.ReactNode;
 }) {
   return (
@@ -99,10 +100,6 @@ function PickerBody({
       <div className="max-h-[min(28rem,60vh)] overflow-y-auto p-1.5 scrollbar-thin">
         {children}
       </div>
-
-      <p className="border-t border-border px-3 py-2 text-[10px] leading-snug text-muted-foreground">
-        {footer}
-      </p>
     </PopoverContent>
   );
 }
@@ -119,12 +116,17 @@ export function SectionPicker({
   sections,
   active,
   onToggleSection,
+  loadError = false,
+  onRetry,
   className,
 }: {
   sections: SectionDef[];
   /** Section id → picked. */
   active: Record<string, boolean>;
   onToggleSection: (id: string, on: boolean) => void;
+  /** The section tree failed to load: shows an error and a retry. */
+  loadError?: boolean;
+  onRetry?: () => void;
   className?: string;
 }) {
   const count = sections.filter((s) => active[s.id]).length;
@@ -133,21 +135,30 @@ export function SectionPicker({
     <Popover>
       <PickerTrigger
         icon={FolderTree}
-        label="Sections"
+        label="Themes"
         count={count}
         tour="section-picker"
         className={className}
       />
       <PickerBody
-        title="Select sections"
+        title="Select themes"
         clearable={count > 0}
         onClear={() => {
           for (const section of sections) {
             if (active[section.id]) onToggleSection(section.id, false);
           }
         }}
-        footer="Pick a section to choose layers from it."
       >
+        {loadError && (
+          <div className="flex flex-col items-start gap-2 px-2.5 py-3">
+            <p className="text-xs leading-relaxed text-destructive">Could not load themes.</p>
+            {onRetry && (
+              <Button size="sm" variant="outline" onClick={onRetry}>
+                Retry
+              </Button>
+            )}
+          </div>
+        )}
         {sections.map((section) => (
           <label
             key={section.id}
@@ -165,6 +176,55 @@ export function SectionPicker({
               {sectionLayers(section).length}
             </span>
           </label>
+        ))}
+      </PickerBody>
+    </Popover>
+  );
+}
+
+/**
+ * A dropdown for one section that the seed gives a picker of its own
+ * (`own_picker`): its layers, listed straight away with no section step.
+ */
+export function SectionLayerPicker({
+  section,
+  selected,
+  onToggleLayer,
+  className,
+}: {
+  section: SectionDef;
+  /** Toggle key → selected. */
+  selected: Record<string, boolean>;
+  onToggleLayer: (key: string, picked: boolean) => void;
+  className?: string;
+}) {
+  const layers = sectionLayers(section);
+  const count = layers.filter((l) => selected[l.key]).length;
+
+  return (
+    <Popover>
+      <PickerTrigger
+        icon={section.icon}
+        label={section.label}
+        count={count}
+        className={className}
+      />
+      <PickerBody
+        title={section.label}
+        clearable={count > 0}
+        onClear={() => {
+          for (const layer of layers) {
+            if (selected[layer.key]) onToggleLayer(layer.key, false);
+          }
+        }}
+      >
+        {layers.map((layer) => (
+          <LayerOption
+            key={layer.key}
+            layer={layer}
+            checked={Boolean(selected[layer.key])}
+            onToggle={(next) => onToggleLayer(layer.key, next)}
+          />
         ))}
       </PickerBody>
     </Popover>
@@ -211,6 +271,8 @@ export function LayerPicker({
         label="Layers"
         count={count}
         tour="layer-picker"
+        // Nothing to list until a section is picked.
+        disabled={groups.length === 0}
         className={className}
       />
       <PickerBody
@@ -223,29 +285,19 @@ export function LayerPicker({
             }
           }
         }}
-        footer="Selected layers draw on the map and appear in its layers panel."
       >
-        {groups.length === 0 ? (
-          <p className="px-2.5 py-3 text-xs leading-relaxed text-muted-foreground">
-            No sections picked yet. Open{" "}
-            <span className="font-medium text-foreground">Sections</span> and tick one to choose
-            layers from it.
-          </p>
-        ) : (
-          groups.map(({ section, layers }, i) => (
+        {groups.map(({ section, layers }, i) => (
             <div key={section.id} className={cn(i > 0 && "mt-1 border-t border-border/60 pt-1")}>
               {layers.map((layer) => (
                 <LayerOption
                   key={layer.key}
                   layer={layer}
-                  section={section.label}
                   checked={Boolean(selected[layer.key])}
                   onToggle={(next) => onToggleLayer(layer.key, next)}
                 />
               ))}
             </div>
-          ))
-        )}
+          ))}
       </PickerBody>
     </Popover>
   );
@@ -253,13 +305,10 @@ export function LayerPicker({
 
 function LayerOption({
   layer,
-  section,
   checked,
   onToggle,
 }: {
   layer: SectionLayer;
-  /** The section this layer belongs to, named under it on the row. */
-  section: string;
   checked: boolean;
   onToggle: (next: boolean) => void;
 }) {
@@ -268,11 +317,8 @@ function LayerOption({
       <div className="flex items-center gap-2.5 px-2 py-1.5">
         <Checkbox checked={false} disabled aria-hidden tabIndex={-1} />
         <LayerDot color={layer.color} raster={layer.raster} faded />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] leading-tight text-muted-foreground/50">
-            {layer.label}
-          </span>
-          <span className="block truncate text-[10px] text-muted-foreground/40">{section}</span>
+        <span className="min-w-0 flex-1 text-[13px] leading-tight text-muted-foreground/50">
+          {layer.label}
         </span>
         <span className="shrink-0 text-[10px] font-medium text-brand/70">Coming soon</span>
       </div>
@@ -285,12 +331,9 @@ function LayerOption({
       {/* The colour it draws in, so the dropdown already reads as a key to
           the map. */}
       <LayerDot color={layer.color} raster={layer.raster} />
-      <span className="min-w-0 flex-1">
-        {/* Wrapped, not clipped: this is where a layer is chosen, so
-            its name has to be readable in full. */}
-        <span className="block text-[13px] leading-tight">{layer.label}</span>
-        <span className="block truncate text-[10px] text-muted-foreground">{section}</span>
-      </span>
+      {/* Wrapped, not clipped: this is where a layer is chosen, so its
+          name has to be readable in full. */}
+      <span className="min-w-0 flex-1 text-[13px] leading-tight">{layer.label}</span>
     </label>
   );
 }

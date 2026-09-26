@@ -3,7 +3,7 @@ import type { SwatchGeometryKind } from "@/components/LayerSwatch";
 import type { LayerFeature } from "@/lib/layers-api";
 
 /**
- * What the statistics panel and the PNG export both need to know about the
+ * What the statistics panel and the JPG export both need to know about the
  * vector layers on screen, and about the study area they sit in.
  *
  * Here rather than in StatsPanel because the export needs it too, and a

@@ -139,11 +139,7 @@ export function LegendContent({
   const categoricalOverlays = overlays.filter((o) => o.categories?.length);
 
   if (rows.length === 0 && overlays.length === 0 && rasterLayers.length === 0) {
-    return (
-      <p className={cn("text-xs text-muted-foreground", className)}>
-        No layers switched on yet — turn one on to see its legend.
-      </p>
-    );
+    return null;
   }
 
   return (
@@ -202,11 +198,7 @@ export function LegendContent({
                 <span className="text-muted-foreground"> · {raster.yearLabel}</span>
               )}
             </span>
-            {raster.isPhotographic ? (
-              <span className="text-xs text-muted-foreground/70 italic">
-                Photographic image — no class legend
-              </span>
-            ) : (
+            {!raster.isPhotographic &&
               legend && (
                 <div className="flex flex-col gap-1.5">
                   {/* The bar leads, as in the mockup: it is the scale, and the
@@ -235,12 +227,8 @@ export function LegendContent({
                       </div>
                     ))}
                   </div>
-                  {legend.note && (
-                    <span className="text-[10px] text-muted-foreground/70 italic">{legend.note}</span>
-                  )}
                 </div>
-              )
-            )}
+              )}
           </div>
         );
       })}

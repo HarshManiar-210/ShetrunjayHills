@@ -26,7 +26,8 @@ type overlayStatsGetter interface {
 //
 // Measuring means decoding a 20-megapixel PNG and walking every pixel — about
 // a second, and ~90 MB of decoded image. The result only changes when the file
-// does, so it is cached against the file's size and modification time, and a
+// or its extent does (the extent turns pixels into area), so it is cached
+// against the file's size and modification time plus the bounds, and a
 // single mutex serialises the work: that both protects the map and stops a
 // burst of requests from decoding several images at once.
 type statsCache struct {
@@ -37,6 +38,7 @@ type statsCache struct {
 type cachedStats struct {
 	modUnix int64
 	size    int64
+	bounds  rasterstats.Bounds
 	stats   *rasterstats.Stats
 }
 
@@ -53,7 +55,7 @@ func (c *statsCache) get(key, path string, b rasterstats.Bounds) (*rasterstats.S
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if hit, ok := c.entries[key]; ok && hit.modUnix == info.ModTime().Unix() && hit.size == info.Size() {
+	if hit, ok := c.entries[key]; ok && hit.modUnix == info.ModTime().Unix() && hit.size == info.Size() && hit.bounds == b {
 		return hit.stats, nil
 	}
 
@@ -68,7 +70,7 @@ func (c *statsCache) get(key, path string, b rasterstats.Bounds) (*rasterstats.S
 		return nil, err
 	}
 
-	c.entries[key] = cachedStats{modUnix: info.ModTime().Unix(), size: info.Size(), stats: stats}
+	c.entries[key] = cachedStats{modUnix: info.ModTime().Unix(), size: info.Size(), bounds: b, stats: stats}
 	return stats, nil
 }
 

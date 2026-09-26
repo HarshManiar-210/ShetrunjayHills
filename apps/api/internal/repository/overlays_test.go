@@ -52,3 +52,54 @@ func TestStaticOverlays(t *testing.T) {
 		t.Errorf("err = %v, want pgx.ErrNoRows", err)
 	}
 }
+
+// TestOverlayClassStats checks the delivered statistics come back in API
+// units, and that GetStaticOverlays flags which overlays have them.
+func TestOverlayClassStats(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("DATABASE_URL not set; skipping repository integration test")
+	}
+
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer pool.Close()
+
+	repo := New(pool)
+
+	stats, err := repo.GetOverlayClassStats(ctx, "forestCoverFSI")
+	if err != nil {
+		t.Fatalf("GetOverlayClassStats: %v", err)
+	}
+	if len(stats) == 0 {
+		t.Fatal("expected delivered statistics for forestCoverFSI, got none")
+	}
+	var share float64
+	for _, s := range stats {
+		share += s.Share
+	}
+	if share < 0.99 || share > 1.01 {
+		t.Errorf("shares sum to %v, want ~1", share)
+	}
+
+	none, err := repo.GetOverlayClassStats(ctx, "does_not_exist")
+	if err != nil || len(none) != 0 {
+		t.Errorf("unknown key: got %d rows, err %v; want none, nil", len(none), err)
+	}
+
+	overlays, err := repo.GetStaticOverlays(ctx)
+	if err != nil {
+		t.Fatalf("GetStaticOverlays: %v", err)
+	}
+	for _, o := range overlays {
+		if o.Key == "forestCoverFSI" && !o.HasStats {
+			t.Error("forestCoverFSI: HasStats = false, want true")
+		}
+		if o.Key == "roads" && o.HasStats {
+			t.Error("roads: HasStats = true, want false")
+		}
+	}
+}

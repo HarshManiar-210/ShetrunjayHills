@@ -19,10 +19,6 @@ export function AdminUsersContent() {
                 Users
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              Role, layer, and permission management is coming soon — this
-              screen will consume the admin write API once it ships.
-            </CardContent>
           </Card>
         ) : (
           <Card>

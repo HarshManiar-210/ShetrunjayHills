@@ -10,8 +10,10 @@ export function DashboardSkeleton() {
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 p-4">
           <div className="size-full rounded-2xl border border-border bg-muted" />
-          <div className="absolute top-3 left-3 hidden h-64 w-[var(--layers-panel-w)] rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 md:block" />
-          <div className="absolute top-3 right-3 hidden h-80 w-72 rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 xl:block" />
+          {/* The layers panel starts folded (nothing is picked yet), so
+              only its "Layers" button stands in here. */}
+          <div className="absolute top-7 left-7 hidden h-8 w-24 rounded-md bg-card shadow-e2 ring-1 ring-foreground/10 md:block" />
+          <div className="absolute top-7 right-7 hidden h-80 w-72 rounded-2xl bg-card/95 shadow-e3 ring-1 ring-foreground/10 xl:block" />
           <div className="absolute bottom-3 left-3 hidden h-16 w-48 rounded-xl bg-card/95 shadow-e2 ring-1 ring-foreground/10 md:block" />
           <div className="absolute bottom-3 left-[13.5rem] hidden h-52 w-10 rounded-xl bg-card/95 shadow-e2 ring-1 ring-foreground/10 md:block 2xl:left-[19.5rem]" />
         </div>

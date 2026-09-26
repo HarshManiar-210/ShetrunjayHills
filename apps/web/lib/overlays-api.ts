@@ -30,6 +30,8 @@ export interface OverlayMeta {
   categories?: LegendClass[];
   /** The properties a clicked feature's popup shows, in order. Absent shows them all. */
   popup_fields?: string[];
+  /** Selected and switched on when the dashboard opens. */
+  default_on?: boolean;
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
   min_lon?: number;
@@ -51,6 +53,12 @@ export interface OverlayMeta {
    * keys in the frontend.
    */
   tiled?: boolean;
+  /**
+   * The client delivered official class statistics for this overlay. A
+   * raster is measured when it has none, so this matters for a classed
+   * vector layer (the FSI layers), which only gets statistics when set.
+   */
+  has_stats?: boolean;
 }
 
 /**
@@ -64,6 +72,8 @@ export interface LayerGroup {
   label: string;
   parent_id?: number;
   sort_order: number;
+  /** A top-level group with a navbar dropdown of its own. */
+  own_picker?: boolean;
 }
 
 export async function fetchLayerGroups(): Promise<LayerGroup[]> {
