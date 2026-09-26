@@ -112,6 +112,26 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     ],
     note: "The 1980 image is off-palette vs the other years in the delivered data — its colours won't match these swatches exactly.",
   },
+  // Drone-derived 2026 density, in the same five classes as Forest Cover but
+  // its own palette. No colour doc came with it: these are the imagery's five
+  // dominant colours (the rest are anti-aliasing between them), assigned by
+  // matching each colour's pixel count against the class areas in the
+  // client's Tree Density Drone.xlsx. The three greens and the gold rank
+  // exactly as the four vegetation classes do; the neutral grey is left for Non
+  // Forest (it covers more pixels than Non Forest's area would suggest).
+  // Replace with the client's palette if one is delivered.
+  "tree-density": {
+    layerId: "tree-density",
+    ramp: "high-to-low",
+    rampLabels: ["Non forest", "Very dense forest"],
+    classes: [
+      { value: 1, label: "Very Dense Forest", color: "#006400" },
+      { value: 2, label: "Moderately Dense Forest", color: "#228b22" },
+      { value: 3, label: "Open Forest", color: "#90ee90" },
+      { value: 4, label: "Scrub", color: "#daa520" },
+      { value: 5, label: "Non Forest", color: "#c8c8c8" },
+    ],
+  },
   "green-cover": {
     layerId: "green-cover",
     ramp: "low-to-high",
@@ -486,7 +506,6 @@ const PROVISIONAL_IDS = [
   "carbon-stock",
   "dsm",
   "dtm",
-  "tree-density",
 ];
 
 export const LEGEND_CONFIG: Record<string, RasterLegend> = {
