@@ -4,6 +4,9 @@ import { useEffect, useState, type RefObject } from "react";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { cn } from "@/lib/utils";
 
+/** How long the pointer must stay still before its position is shown. */
+const DWELL_MS = 1000;
+
 /**
  * Pointer position, bottom-centre of the map.
  *
@@ -30,16 +33,27 @@ export function CoordinateReadout({
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    const onMove = (e: { lngLat: { lat: number; lng: number } }) =>
-      setPosition({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    // Only shown once the pointer has rested on one spot for DWELL_MS: moving
+    // hides it again, so it never flickers along behind a pointer in motion.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onMove = (e: { lngLat: { lat: number; lng: number } }) => {
+      const { lat, lng } = e.lngLat;
+      clearTimeout(timer);
+      setPosition(null);
+      timer = setTimeout(() => setPosition({ lat, lng }), DWELL_MS);
+    };
     // Touch devices have no hover, so the readout would otherwise stay empty
     // and then freeze on wherever was last tapped — clearing on leave keeps it
     // honest about only describing where the pointer actually is.
-    const onLeave = () => setPosition(null);
+    const onLeave = () => {
+      clearTimeout(timer);
+      setPosition(null);
+    };
 
     map.on("mousemove", onMove);
     map.on("mouseout", onLeave);
     return () => {
+      clearTimeout(timer);
       map.off("mousemove", onMove);
       map.off("mouseout", onLeave);
     };
