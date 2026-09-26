@@ -249,8 +249,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
-    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8),
-    ('reference',                   'Reference',                   NULL, 9);
+    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8);
 
 -- Boundaries are reference context laid over whatever else is on, not a
 -- subject of their own, so they get a dropdown of their own in the navbar.
@@ -276,7 +275,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('aspect',      'Aspect',                      grp('drone-data'), 5),
     ('chm',         'CHM (Canopy Height Model)',   grp('drone-data'), 6),
 
-    ('toposheet',   'Toposheet',                   grp('reference'), 2),
+    ('toposheet',   'Toposheet',                   grp('administrative-boundaries'), 12),
 
     ('flood-depth',                 'Flood Depth (m)',             grp('hydrogeology'), 1),
     ('existing-water-conservation', 'Existing Water Conservation', grp('hydrogeology'), 2),
@@ -440,7 +439,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('causeway',      'Causeway',      grp('existing-water-conservation'), 'vector', 'fill', '#B5651D', 'vector-data/causeway-existing-water-conservation.geojson',      4, 71.728402, 21.450967, 71.820940, 21.505128),
     ('checkDam',      'Checkdam',     grp('existing-water-conservation'), 'vector', 'fill', '#2E86AB', 'vector-data/check-dam-existing-water-conservation.geojson',     3, 71.737601, 21.456108, 71.821241, 21.509884),
-    ('fireline',      'Fireline',      grp('reference'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      3, 71.729119, 21.453405, 71.820934, 21.510580),
+    ('fireline',      'Fireline',      grp('administrative-boundaries'), 'vector', 'line', '#D64550', 'vector-data/fireline.geojson',      11,71.729119, 21.453405, 71.820934, 21.510580),
     ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
     ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
