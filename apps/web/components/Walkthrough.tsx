@@ -24,18 +24,18 @@ const STEPS: Step[] = [
   },
   {
     target: "section-picker",
-    title: "Start with a section",
-    body: "Every layer lives in a section — Forest Layers, Landuse, Drone Data and so on. Tick the ones you are working in; the number beside each says how many layers it holds. Nothing is drawn yet by picking a section.",
+    title: "Start with a theme",
+    body: "Every layer lives in a theme — Forest Layers, Landuse, Drone Data and so on. Tick the ones you are working in; the number beside each says how many layers it holds. Nothing is drawn yet by picking a theme.",
   },
   {
     target: "layer-picker",
     title: "Then pick the layers",
-    body: "This lists the layers inside the sections you picked, each one naming the section it came from. Tick a layer and it draws on the map straight away. A layer marked “Coming soon” has no data delivered yet.",
+    body: "This lists the layers inside the themes you picked, each one naming the theme it came from. Tick a layer and it draws on the map straight away. A layer marked “Coming soon” has no data delivered yet.",
   },
   {
     target: "sections",
     title: "Your layers panel",
-    body: "The layers you chose are listed here, grouped by section, and drawing — as many at once as you like, with vector layers always above raster imagery. Untick one to hide it without losing your place, the × beside it takes it back out altogether, and the panel folds away when you want the map clear.",
+    body: "The layers you chose are listed here, grouped by theme, and drawing — as many at once as you like, with vector layers always above raster imagery. Untick one to hide it without losing your place, the × beside it takes it back out altogether, and the panel folds away when you want the map clear.",
   },
   {
     target: "section-theme",

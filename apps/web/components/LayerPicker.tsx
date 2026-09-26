@@ -135,13 +135,13 @@ export function SectionPicker({
     <Popover>
       <PickerTrigger
         icon={FolderTree}
-        label="Sections"
+        label="Themes"
         count={count}
         tour="section-picker"
         className={className}
       />
       <PickerBody
-        title="Select sections"
+        title="Select themes"
         clearable={count > 0}
         onClear={() => {
           for (const section of sections) {
@@ -151,7 +151,7 @@ export function SectionPicker({
       >
         {loadError && (
           <div className="flex flex-col items-start gap-2 px-2.5 py-3">
-            <p className="text-xs leading-relaxed text-destructive">Could not load sections.</p>
+            <p className="text-xs leading-relaxed text-destructive">Could not load themes.</p>
             {onRetry && (
               <Button size="sm" variant="outline" onClick={onRetry}>
                 Retry
