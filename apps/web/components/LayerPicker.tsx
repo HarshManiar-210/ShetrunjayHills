@@ -292,7 +292,6 @@ export function LayerPicker({
                 <LayerOption
                   key={layer.key}
                   layer={layer}
-                  section={section.label}
                   checked={Boolean(selected[layer.key])}
                   onToggle={(next) => onToggleLayer(layer.key, next)}
                 />
@@ -306,13 +305,10 @@ export function LayerPicker({
 
 function LayerOption({
   layer,
-  section,
   checked,
   onToggle,
 }: {
   layer: SectionLayer;
-  /** The section this layer belongs to, named under it on the row. */
-  section?: string;
   checked: boolean;
   onToggle: (next: boolean) => void;
 }) {
@@ -321,13 +317,8 @@ function LayerOption({
       <div className="flex items-center gap-2.5 px-2 py-1.5">
         <Checkbox checked={false} disabled aria-hidden tabIndex={-1} />
         <LayerDot color={layer.color} raster={layer.raster} faded />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] leading-tight text-muted-foreground/50">
-            {layer.label}
-          </span>
-          {section && (
-            <span className="block truncate text-[10px] text-muted-foreground/40">{section}</span>
-          )}
+        <span className="min-w-0 flex-1 text-[13px] leading-tight text-muted-foreground/50">
+          {layer.label}
         </span>
         <span className="shrink-0 text-[10px] font-medium text-brand/70">Coming soon</span>
       </div>
@@ -340,14 +331,9 @@ function LayerOption({
       {/* The colour it draws in, so the dropdown already reads as a key to
           the map. */}
       <LayerDot color={layer.color} raster={layer.raster} />
-      <span className="min-w-0 flex-1">
-        {/* Wrapped, not clipped: this is where a layer is chosen, so
-            its name has to be readable in full. */}
-        <span className="block text-[13px] leading-tight">{layer.label}</span>
-        {section && (
-          <span className="block truncate text-[10px] text-muted-foreground">{section}</span>
-        )}
-      </span>
+      {/* Wrapped, not clipped: this is where a layer is chosen, so its
+          name has to be readable in full. */}
+      <span className="min-w-0 flex-1 text-[13px] leading-tight">{layer.label}</span>
     </label>
   );
 }
