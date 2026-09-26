@@ -8,7 +8,8 @@ mask *is* the study-area outline -- which gives a way to measure where it
 belongs: rasterise StudyArea.geojson in a candidate grid and fit the extent
 that best matches the mask (intersection-over-union).
 
-Doing that showed two kinds of misplacement:
+Doing that showed two kinds of misplacement (a third product is placed from
+its own delivered extent):
 
 1. Toposheet, FCC, Forest Cover, Green Cover, Vegetation Change and LULC are
    north-up in UTM zone 42N (EPSG:32642), not Web Mercator -- the grid
@@ -29,15 +30,17 @@ Doing that showed two kinds of misplacement:
    fitted to that extent's UTM corners, which gives the UTM box of the whole
    canvas (square 7.04 m pixels, corners within ~1 px).
 
-   Fragmentation only covers forest patches, not the whole study area, so its
-   mask can't be fitted to the outline. Its opaque area is the same year's
-   Green Cover green class, so it is fitted to that instead.
-
 2. Growing Stock, Habitat Suitability and Wildlife Corridors are on an
    EPSG:4326 grid (equal degrees per pixel, as prepare-drone-rasters.py found
    for the drone products) -- they fit best as a plain lat/lng box, but not
    the one seeded. Only their bounds change; a 4326 grid over ~0.06 deg is
    drawn within a pixel of linear in Web Mercator, so the PNGs stay as they are.
+
+3. Fragmentation came with its extent in EPSG:4326 per year
+   (FRAGMENTATION_EXTENTS), so it is placed there as delivered rather than
+   fitted: its forest patches don't match any outline or Green Cover class
+   closely enough to fit to. Only shrunk to MAX_WIDTH (nearest neighbour, so
+   class colours stay exact).
 
 Everything is re-derived from apps/raster-data/originals, so the script can be
 re-run. The fits are only as good as the outline the rasters were clipped
@@ -82,7 +85,7 @@ PRODUCTS = [
     ("green-cover/*.png", "utm", "nearest"),
     ("vegetation-change/*.png", "utm", "nearest"),
     ("lulc/*.png", "utm", "nearest"),
-    ("fragmentation/*.png", "utm", "nearest"),
+    ("fragmentation/*.png", "extent", "nearest"),
     ("growingstock.png", "4326", None),
     ("habitat.png", "4326", None),
     ("wildlifecorridor.png", "4326", None),
@@ -91,8 +94,19 @@ PRODUCTS = [
 # The delivered Toposheet's sheet extent: W, S, E, N in EPSG:4326.
 TOPOSHEET_EXTENT = (71.499945, 21.249988, 72.000122, 21.750008)
 
-# Fragmentation is fitted to this class of the same year's Green Cover.
-GREEN_COVER_GREEN = (10, 141, 35)
+# Fragmentation's delivered extents: W, S, E, N in EPSG:4326, per year.
+FRAGMENTATION_EXTENTS = {
+    "1980": (71.727577, 21.452491, 71.822678, 21.511575),
+    "1989": (71.727566, 21.452156, 71.822770, 21.511847),
+    "1998": (71.727287, 21.451914, 71.823059, 21.512117),
+    "2008": (71.727566, 21.452156, 71.822770, 21.511847),
+    "2018": (71.727566, 21.452156, 71.822770, 21.511847),
+    "2025": (71.727566, 21.452156, 71.822770, 21.511847),
+    "2026": (71.727566, 21.452156, 71.822770, 21.511847),
+}
+
+# Widest image served; wider ones exceed the GPU texture size on some devices.
+MAX_WIDTH = 8192
 
 # A pixel this transparent is outside the footprint (matches rasterstats).
 MIN_OPAQUE_ALPHA = 0x20
@@ -293,7 +307,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--write", action="store_true", help="rewrite the PNGs and init.sql")
     ap.add_argument("--sql", action="store_true", help="print UPDATEs for a seeded DB")
-    ap.add_argument("only", nargs="?", help="process just the products matching this glob")
+    ap.add_argument("only", nargs="*",
+                    help="process just the products matching these globs")
     args = ap.parse_args()
 
     mask, box, utm_start = outline_reference(utm_forward)
@@ -302,11 +317,10 @@ def main():
     deg_ref = (mask, box)
 
     bounds = {}
-    utm_boxes = {}  # served path -> (UTM box, image), for Fragmentation's reference
     for pattern, grid, method in PRODUCTS:
-        if args.only and args.only != pattern:
+        if args.only and pattern not in args.only:
             continue
-        base = ORIGINALS if grid == "utm" else RASTER_DIR
+        base = RASTER_DIR if grid == "4326" else ORIGINALS
         paths = sorted(glob.glob(os.path.join(base, pattern)))
         if not paths:
             raise SystemExit(f"no files for {pattern} under {base}")
@@ -314,6 +328,17 @@ def main():
             rel = os.path.relpath(path, base).replace(os.sep, "/")
             src = np.array(Image.open(path).convert("RGBA"))
             opaque = opaque_mask(src)
+
+            if grid == "extent":
+                bounds[rel] = FRAGMENTATION_EXTENTS[os.path.splitext(os.path.basename(rel))[0]]
+                img = Image.fromarray(src)
+                if img.width > MAX_WIDTH:
+                    img = img.resize((MAX_WIDTH, round(img.height * MAX_WIDTH / img.width)),
+                                     Image.NEAREST)
+                print(f"{rel:36s} delivered extent -> {img.width}x{img.height}")
+                if args.write:
+                    img.save(os.path.join(RASTER_DIR, rel), optimize=True)
+                continue
 
             if grid == "4326":
                 box, score = fit(opaque, deg_ref, deg_start, 0.0004)
@@ -324,15 +349,9 @@ def main():
             if rel == "toposheet.png":
                 box, err = fit_corners(opaque, TOPOSHEET_EXTENT)
                 fitted = f"fitted to sheet extent, corners within {err:.1f} px"
-            elif rel.startswith("fragmentation/"):
-                gc_box, gc = utm_boxes["green-cover/" + os.path.basename(rel)]
-                ref = (np.all(gc[:, :, :3] == GREEN_COVER_GREEN, -1) & opaque_mask(gc), gc_box)
-                box, score = fit(opaque, ref, gc_box, 40)
-                fitted = f"IoU {score:.4f} vs green cover"
             else:
                 box, score = fit(opaque, utm_ref, utm_start, 40)
                 fitted = f"IoU {score:.4f} vs outline"
-            utm_boxes[rel] = (box, src)
             px = ((box[2] - box[0]) / src.shape[1], (box[3] - box[1]) / src.shape[0])
             img, b = warp_to_mercator(src, box, method)
             bounds[rel] = b
