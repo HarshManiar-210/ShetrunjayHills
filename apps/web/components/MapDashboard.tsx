@@ -808,9 +808,6 @@ export function MapDashboard() {
               {/* Null for everyone but admins, who get the users link here. */}
               <Sidebar variant="combined" user={auth.user} />
               {layersPanel(SHOW_PANEL_COLLAPSE ? () => setPanelOpen(false) : undefined)}
-              <p className="shrink-0 border-t border-border/60 px-3 py-2 text-center text-[10px] tracking-wide text-muted-foreground">
-                © Shatrunjay Hills {new Date().getFullYear()}
-              </p>
             </div>
           ) : (
             <Button
