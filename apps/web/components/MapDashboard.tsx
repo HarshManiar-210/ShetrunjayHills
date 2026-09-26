@@ -44,11 +44,11 @@ import { vectorOverlayDefs } from "@/lib/static-overlays";
 import {
   buildSections,
   flattenSections,
-  groupToggleKey,
   isGroupToggleKey,
   isRasterToggleKey,
   layerIdOf,
   optionOwners,
+  ownerToggleKey,
   rasterToggleKey,
   sectionLayers,
   DEFAULT_RASTER_OPACITY,
@@ -314,11 +314,11 @@ export function MapDashboard() {
 
   // An options group switches on with every option that has data, so picking
   // it draws something straight away; the side panel narrows it from there.
+  // A raster theme likewise brings the vector rows seeded beside its imagery.
   const keysFor = useCallback(
     (key: string) => {
-      if (!isGroupToggleKey(key)) return [key];
-      const group = allSections.find((s) => groupToggleKey(s.id) === key);
-      return [key, ...(group?.items ?? []).filter((i) => !i.pending).map((i) => i.key)];
+      const owner = allSections.find((s) => ownerToggleKey(s) === key);
+      return [key, ...(owner?.items ?? []).filter((i) => !i.pending).map((i) => i.key)];
     },
     [allSections],
   );
