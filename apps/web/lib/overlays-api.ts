@@ -32,6 +32,8 @@ export interface OverlayMeta {
   popup_fields?: string[];
   /** Selected and switched on when the dashboard opens. */
   default_on?: boolean;
+  /** A 'line' row drawn dotted rather than solid (Fireline). */
+  dotted?: boolean;
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
   min_lon?: number;

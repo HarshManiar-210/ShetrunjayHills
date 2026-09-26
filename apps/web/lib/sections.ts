@@ -235,14 +235,14 @@ export function slugify(label: string): string {
 
 export function iconForGeometry(kind: SwatchGeometryKind): LucideIcon {
   if (kind === "point") return MapPin;
-  if (kind === "line") return Route;
+  if (kind === "line" || kind === "dotted-line") return Route;
   if (kind === "raster") return Image;
   return kind === "polygon" ? Square : SquareDashed;
 }
 
 /** static_overlays.kind -> the legend's shape vocabulary. */
-export function swatchKindOf(kind: OverlayMeta["kind"]): SwatchGeometryKind {
-  if (kind === "line") return "line";
+export function swatchKindOf(kind: OverlayMeta["kind"], dotted = false): SwatchGeometryKind {
+  if (kind === "line") return dotted ? "dotted-line" : "line";
   if (kind === "point") return "point";
   if (kind === "outline") return "polygon-outline";
   return "polygon";
@@ -352,7 +352,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         key: o.key,
         label: o.label,
         color: o.color ?? DEFAULT_OVERLAY_COLOR,
-        geometryKind: swatchKindOf(o.kind),
+        geometryKind: swatchKindOf(o.kind, o.dotted),
         pending: o.status === "pending",
         icon: ITEM_STYLE[o.key],
         categories: o.categories,
