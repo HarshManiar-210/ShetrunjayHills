@@ -350,7 +350,9 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
           scale.ticks,
         );
       }
-      for (const cls of legend?.classes ?? []) swatchRow(c, cls.color, "raster", cls.label);
+      if (!legend?.rampOnly) {
+        for (const cls of legend?.classes ?? []) swatchRow(c, cls.color, "raster", cls.label);
+      }
       c.y += 6;
     });
   }
