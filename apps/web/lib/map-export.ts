@@ -1,6 +1,6 @@
 import { basemapById, type BasemapId } from "@/lib/basemaps";
 import { legendFor, rampScale } from "@/lib/legend-config";
-import { fetchRasterStats, nameClasses, type NamedClassStat } from "@/lib/raster-stats-api";
+import { classStatsFor, fetchOverlayStats, type NamedClassStat } from "@/lib/raster-stats-api";
 import { STUDY_AREA_HA, countByLayer } from "@/lib/vector-stats";
 import type { StatsRasterLayer } from "@/components/StatsPanel";
 import type { LegendOverlay, LegendRasterLayer } from "@/components/LegendCard";
@@ -279,7 +279,7 @@ function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchG
   ctx.restore();
 }
 
-/** A raster theme's measured classes, or why there are none. */
+/** A theme's class statistics (delivered or measured), or why there are none. */
 interface MeasuredRaster {
   layer: StatsRasterLayer;
   areaSqM: number | null;
@@ -291,12 +291,11 @@ async function measure(rasterStats: StatsRasterLayer[]): Promise<MeasuredRaster[
   return Promise.all(
     rasterStats.map(async (layer) => {
       try {
-        const stats = await fetchRasterStats(layer.imageKey);
-        if (stats.photographic) return { layer, areaSqM: stats.area_sq_m, classes: [] };
+        const stats = await fetchOverlayStats(layer.imageKey);
         return {
           layer,
           areaSqM: stats.area_sq_m,
-          classes: nameClasses(layer.id, stats.classes ?? []),
+          classes: classStatsFor(stats, layer.id, layer.imageKey, layer.categories),
         };
       } catch {
         return { layer, areaSqM: null, classes: [], message: "Could not measure this layer." };

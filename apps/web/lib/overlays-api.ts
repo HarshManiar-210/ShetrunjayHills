@@ -53,6 +53,12 @@ export interface OverlayMeta {
    * keys in the frontend.
    */
   tiled?: boolean;
+  /**
+   * The client delivered official class statistics for this overlay. A
+   * raster is measured when it has none, so this matters for a classed
+   * vector layer (the FSI layers), which only gets statistics when set.
+   */
+  has_stats?: boolean;
 }
 
 /**

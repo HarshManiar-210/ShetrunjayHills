@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { BarChart3, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,17 +9,19 @@ import { LayerSwatch } from "@/components/LayerSwatch";
 import { ClassDonut } from "@/components/ClassDonut";
 import { countByLayer, STUDY_AREA_HA } from "@/lib/vector-stats";
 import {
-  fetchRasterStats,
-  nameClasses,
+  classStatsFor,
+  fetchOverlayStats,
   type NamedClassStat,
-  type RasterStats,
+  type OverlayStats,
 } from "@/lib/raster-stats-api";
 import type { LayerFeature } from "@/lib/layers-api";
+import type { LegendClass } from "@/lib/legend-config";
 
 /**
- * A raster theme currently on the map, and the specific image it is showing.
- * `imageKey` is the static_overlays key for the selected year, which is what
- * the statistics endpoint measures.
+ * A raster theme currently on the map, and the specific image it is showing —
+ * or a classed vector overlay the client delivered statistics for (the FSI
+ * layers). `imageKey` is the static_overlays key for the selected year, which
+ * is what the statistics endpoint answers for.
  */
 export interface StatsRasterLayer {
   id: string;
@@ -27,6 +29,8 @@ export interface StatsRasterLayer {
   imageKey: string;
   year: number | null;
   years: number[];
+  /** A vector overlay's own class list, standing in for a raster legend. */
+  categories?: LegendClass[];
 }
 
 /**
@@ -68,26 +72,34 @@ function StackedBar({ classes }: { classes: NamedClassStat[] }) {
 function ClassTable({ classes }: { classes: NamedClassStat[] }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-      {classes.map((cls) => (
-        <div key={cls.key} className="flex items-center gap-1.5 text-xs">
-          <LayerSwatch color={cls.color} geometryKind="raster" />
-          <span className="min-w-0 flex-1 truncate" title={cls.label}>
-            {cls.label}
-          </span>
-          <span className="shrink-0 tabular-nums text-muted-foreground">
-            {COUNT.format(toHectares(cls.areaSqM))} ha
-          </span>
-          <span className="w-11 shrink-0 text-right tabular-nums">
-            {PERCENT.format(cls.share * 100)}%
-          </span>
-        </div>
+      {classes.map((cls, i) => (
+        <Fragment key={cls.key}>
+          {/* Vegetation Change's Improvement / Degradation / Stable runs. */}
+          {cls.group && cls.group !== classes[i - 1]?.group && (
+            <span className="pt-1 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+              {cls.group}
+            </span>
+          )}
+          <div className="flex items-center gap-1.5 text-xs">
+            <LayerSwatch color={cls.color} geometryKind="raster" />
+            <span className="min-w-0 flex-1 truncate" title={cls.fullLabel ?? cls.label}>
+              {cls.label}
+            </span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {COUNT.format(toHectares(cls.areaSqM))} ha
+            </span>
+            <span className="w-11 shrink-0 text-right tabular-nums">
+              {PERCENT.format(cls.share * 100)}%
+            </span>
+          </div>
+        </Fragment>
       ))}
     </div>
   );
 }
 
 function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
-  const [stats, setStats] = useState<RasterStats | null>(null);
+  const [stats, setStats] = useState<OverlayStats | null>(null);
   const [failed, setFailed] = useState(false);
 
   // One fetch per image. Changing year remounts this block (StatsPanel keys
@@ -95,7 +107,7 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
   // callbacks set state, and the guard drops a response that lost the race.
   useEffect(() => {
     let cancelled = false;
-    fetchRasterStats(layer.imageKey)
+    fetchOverlayStats(layer.imageKey)
       .then((result) => {
         if (!cancelled) setStats(result);
       })
@@ -107,10 +119,9 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
     };
   }, [layer.imageKey]);
 
-  const classes =
-    stats && !stats.photographic
-      ? nameClasses(layer.id, stats.classes ?? [], layer.imageKey)
-      : [];
+  const classes = stats
+    ? classStatsFor(stats, layer.id, layer.imageKey, layer.categories)
+    : [];
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -126,7 +137,7 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
       {!stats && !failed && (
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <Loader2 className="size-3 animate-spin" strokeWidth={2} />
-          Measuring…
+          Loading…
         </span>
       )}
 
@@ -144,6 +155,9 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
               {COUNT.format(toHectares(stats!.area_sq_m))} ha
             </span>
           </div>
+          <span className="-mt-1 text-[10px] text-muted-foreground/70">
+            {stats!.source === "delivered" ? "Official figures" : "Measured from imagery"}
+          </span>
 
           {/* Ring above the table, not beside it. The panel is 18rem wide and
               the ring takes 104px of that; side by side, every class name
@@ -166,8 +180,9 @@ function RasterStatsBlock({ layer }: { layer: StatsRasterLayer }) {
 }
 
 /**
- * The Statistics tab: class areas per raster theme, measured from the imagery
- * itself by the API, plus feature counts for the vector layers on screen.
+ * The Statistics tab: class areas per raster theme — the client's official
+ * figures where they were delivered, otherwise measured from the imagery
+ * itself by the API — plus feature counts for the vector layers on screen.
  *
  * These replace the synthetic filler this panel used to show. The numbers are
  * now real enough to check: Forest Cover's measured footprint comes to

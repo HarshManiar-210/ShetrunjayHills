@@ -114,6 +114,8 @@ export interface SectionItem {
    * class list instead of a single swatch. Absent for every other layer.
    */
   categories?: LegendClass[];
+  /** Delivered class statistics exist — see OverlayMeta.has_stats. */
+  hasStats?: boolean;
 }
 
 export interface RasterYear {
@@ -350,6 +352,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         pending: o.status === "pending",
         icon: ITEM_STYLE[o.key],
         categories: o.categories,
+        hasStats: o.has_stats,
       })),
     };
   }

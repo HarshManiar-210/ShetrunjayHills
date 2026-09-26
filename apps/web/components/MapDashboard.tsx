@@ -585,8 +585,8 @@ export function MapDashboard() {
   );
 
   const statsRasterLayers: StatsRasterLayer[] = useMemo(
-    () =>
-      activeRasters.map(({ section, image }) => ({
+    () => [
+      ...activeRasters.map(({ section, image }) => ({
         id: section.id,
         name: section.label,
         // The overlay row for the year on screen — what the statistics
@@ -595,7 +595,22 @@ export function MapDashboard() {
         year: image.year,
         years: section.years.map((y) => y.year),
       })),
-    [activeRasters],
+      // Switched-on vector overlays the client delivered class figures for
+      // (the FSI layers). Which ones is the overlay's has_stats flag, not a
+      // key list.
+      ...allSections
+        .flatMap((section) => section.items)
+        .filter((item) => item.hasStats && overlays[item.key])
+        .map((item) => ({
+          id: item.key,
+          name: item.label,
+          imageKey: item.key,
+          year: null,
+          years: [],
+          categories: item.categories,
+        })),
+    ],
+    [activeRasters, allSections, overlays],
   );
 
   // Static overlays carry a colour but no geometry in React state, so the
