@@ -592,6 +592,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033),
     ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7285633, 21.4520919, 71.8217935, 21.5118928);
 
+-- Wildlife Corridors' corridor lines (7, with Length), in the same group as
+-- the corridor raster so the theme's one switch draws both.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('wildlifeCorridorLines', 'Wildlife Corridor', grp('wildlife-corridors'), 'vector', 'line', '#f60b10', 'vector-data/WildlifeCorridor.geojson', 2, 71.752679, 21.461982, 71.820672, 21.507573);
+
 -- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
 -- 5/10 m) picked the same way Forest/Green Cover pick a year -- all sharing
 -- the same delivered extent ("Flood All Layers"). Each level's four colour
