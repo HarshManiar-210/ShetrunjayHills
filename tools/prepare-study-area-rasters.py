@@ -8,7 +8,8 @@ mask *is* the study-area outline -- which gives a way to measure where it
 belongs: rasterise StudyArea.geojson in a candidate grid and fit the extent
 that best matches the mask (intersection-over-union).
 
-Doing that showed two kinds of misplacement:
+Doing that showed two kinds of misplacement (a third product is placed from
+its own delivered extent):
 
 1. Toposheet, FCC, Forest Cover, Green Cover, Vegetation Change and LULC are
    north-up in UTM zone 42N (EPSG:32642), not Web Mercator -- the grid
@@ -18,20 +19,29 @@ Doing that showed two kinds of misplacement:
 
        Web Mercator box  0.959     UTM 42N box  0.986 (square 1.18 m pixels)
 
-   These are resampled onto a Web Mercator grid, keeping the delivered width.
+   These are resampled onto a Web Mercator grid, keeping the delivered width
+   up to MAX_WIDTH.
    Classified rasters use nearest neighbour, so every pixel keeps an exact
    class colour (rasterstats counts colours exactly); photographic ones
    (Toposheet, FCC) use bilinear with premultiplied alpha.
 
-   Fragmentation only covers forest patches, not the whole study area, so its
-   mask can't be fitted to the outline. Its opaque area is the same year's
-   Green Cover green class, so it is fitted to that instead.
+   The Toposheet is not clipped to the study area, so it can't be fitted to
+   the outline either. It came with its sheet extent in EPSG:4326
+   (TOPOSHEET_EXTENT); the sheet's four corners are found in the image and
+   fitted to that extent's UTM corners, which gives the UTM box of the whole
+   canvas (square 7.04 m pixels, corners within ~1 px).
 
 2. Growing Stock, Habitat Suitability and Wildlife Corridors are on an
    EPSG:4326 grid (equal degrees per pixel, as prepare-drone-rasters.py found
    for the drone products) -- they fit best as a plain lat/lng box, but not
    the one seeded. Only their bounds change; a 4326 grid over ~0.06 deg is
    drawn within a pixel of linear in Web Mercator, so the PNGs stay as they are.
+
+3. Fragmentation came with its extent in EPSG:4326 per year
+   (FRAGMENTATION_EXTENTS), so it is placed there as delivered rather than
+   fitted: its forest patches don't match any outline or Green Cover class
+   closely enough to fit to. Only shrunk to MAX_WIDTH (nearest neighbour, so
+   class colours stay exact).
 
 Everything is re-derived from apps/raster-data/originals, so the script can be
 re-run. The fits are only as good as the outline the rasters were clipped
@@ -76,14 +86,28 @@ PRODUCTS = [
     ("green-cover/*.png", "utm", "nearest"),
     ("vegetation-change/*.png", "utm", "nearest"),
     ("lulc/*.png", "utm", "nearest"),
-    ("fragmentation/*.png", "utm", "nearest"),
+    ("fragmentation/*.png", "extent", "nearest"),
     ("growingstock.png", "4326", None),
     ("habitat.png", "4326", None),
     ("wildlifecorridor.png", "4326", None),
 ]
 
-# Fragmentation is fitted to this class of the same year's Green Cover.
-GREEN_COVER_GREEN = (10, 141, 35)
+# The delivered Toposheet's sheet extent: W, S, E, N in EPSG:4326.
+TOPOSHEET_EXTENT = (71.499945, 21.249988, 72.000122, 21.750008)
+
+# Fragmentation's delivered extents: W, S, E, N in EPSG:4326, per year.
+FRAGMENTATION_EXTENTS = {
+    "1980": (71.727577, 21.452491, 71.822678, 21.511575),
+    "1989": (71.727566, 21.452156, 71.822770, 21.511847),
+    "1998": (71.727287, 21.451914, 71.823059, 21.512117),
+    "2008": (71.727566, 21.452156, 71.822770, 21.511847),
+    "2018": (71.727566, 21.452156, 71.822770, 21.511847),
+    "2025": (71.727566, 21.452156, 71.822770, 21.511847),
+    "2026": (71.727566, 21.452156, 71.822770, 21.511847),
+}
+
+# Widest image served; wider ones exceed the GPU texture size on some devices.
+MAX_WIDTH = 8192
 
 # A pixel this transparent is outside the footprint (matches rasterstats).
 MIN_OPAQUE_ALPHA = 0x20
@@ -212,6 +236,25 @@ def fit(opaque, ref, start, step):
     return list(res.x), -res.fun
 
 
+def fit_corners(opaque, extent):
+    """UTM box of a canvas whose opaque quad is `extent`'s lat/lng corners.
+
+    The quad's extreme pixels are matched to the corners' UTM positions by
+    least squares (x/y scale and offset, no rotation: the grid is UTM
+    north-up). Returns the box and the worst corner residual in pixels.
+    """
+    w, s, e, n = extent
+    rows, cols = np.nonzero(opaque)
+    found = [(cols[i], rows[i]) for i in (np.argmax(-rows - cols), np.argmax(-rows + cols),
+                                         np.argmax(rows - cols), np.argmax(rows + cols))]
+    utm = [utm_forward(*c) for c in ((w, n), (e, n), (w, s), (e, s))]
+    (ax, cx), *_ = np.linalg.lstsq([[x, 1] for x, _ in utm], [c for c, _ in found], rcond=None)
+    (ay, cy), *_ = np.linalg.lstsq([[y, 1] for _, y in utm], [r for _, r in found], rcond=None)
+    worst = max(abs(ax * x + cx - c) + abs(ay * y + cy - r) for (x, y), (c, r) in zip(utm, found))
+    h, wd = opaque.shape
+    return [(0 - cx) / ax, (h - cy) / ay, (wd - cx) / ax, (0 - cy) / ay], worst
+
+
 # --- resampling --------------------------------------------------------------
 
 
@@ -223,7 +266,7 @@ def warp_to_mercator(src, box, method):
     west, east = min(c[0] for c in corners), max(c[0] for c in corners)
     south, north = min(c[1] for c in corners), max(c[1] for c in corners)
 
-    out_w = sw
+    out_w = min(sw, MAX_WIDTH)
     out_h = round(out_w * (merc_y(north) - merc_y(south)) / (east - west))
     lon = west + (np.arange(out_w) + 0.5) / out_w * (east - west)
     my_n, my_s = merc_y(north), merc_y(south)
@@ -265,6 +308,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--write", action="store_true", help="rewrite the PNGs and init.sql")
     ap.add_argument("--sql", action="store_true", help="print UPDATEs for a seeded DB")
+    ap.add_argument("only", nargs="*",
+                    help="process just the products matching these globs")
     args = ap.parse_args()
 
     mask, box, utm_start = outline_reference(utm_forward)
@@ -273,9 +318,10 @@ def main():
     deg_ref = (mask, box)
 
     bounds = {}
-    utm_boxes = {}  # served path -> (UTM box, image), for Fragmentation's reference
     for pattern, grid, method in PRODUCTS:
-        base = ORIGINALS if grid == "utm" else RASTER_DIR
+        if args.only and pattern not in args.only:
+            continue
+        base = RASTER_DIR if grid == "4326" else ORIGINALS
         paths = sorted(glob.glob(os.path.join(base, pattern)))
         if not paths:
             raise SystemExit(f"no files for {pattern} under {base}")
@@ -284,25 +330,33 @@ def main():
             src = np.array(Image.open(path).convert("RGBA"))
             opaque = opaque_mask(src)
 
+            if grid == "extent":
+                bounds[rel] = FRAGMENTATION_EXTENTS[os.path.splitext(os.path.basename(rel))[0]]
+                img = Image.fromarray(src)
+                if img.width > MAX_WIDTH:
+                    img = img.resize((MAX_WIDTH, round(img.height * MAX_WIDTH / img.width)),
+                                     Image.NEAREST)
+                print(f"{rel:36s} delivered extent -> {img.width}x{img.height}")
+                if args.write:
+                    img.save(os.path.join(RASTER_DIR, rel), optimize=True)
+                continue
+
             if grid == "4326":
                 box, score = fit(opaque, deg_ref, deg_start, 0.0004)
                 bounds[rel] = tuple(box)
                 print(f"{rel:36s} 4326  IoU {score:.4f}")
                 continue
 
-            if rel.startswith("fragmentation/"):
-                gc_box, gc = utm_boxes["green-cover/" + os.path.basename(rel)]
-                ref = (np.all(gc[:, :, :3] == GREEN_COVER_GREEN, -1) & opaque_mask(gc), gc_box)
-                box, score = fit(opaque, ref, gc_box, 40)
-                against = "green cover"
+            if rel == "toposheet.png":
+                box, err = fit_corners(opaque, TOPOSHEET_EXTENT)
+                fitted = f"fitted to sheet extent, corners within {err:.1f} px"
             else:
                 box, score = fit(opaque, utm_ref, utm_start, 40)
-                against = "outline"
-            utm_boxes[rel] = (box, src)
+                fitted = f"IoU {score:.4f} vs outline"
             px = ((box[2] - box[0]) / src.shape[1], (box[3] - box[1]) / src.shape[0])
             img, b = warp_to_mercator(src, box, method)
             bounds[rel] = b
-            print(f"{rel:36s} UTM   IoU {score:.4f} vs {against}, "
+            print(f"{rel:36s} UTM   {fitted}, "
                   f"pixel {px[0]:.3f} x {px[1]:.3f} m -> {img.shape[1]}x{img.shape[0]}")
             if args.write:
                 out = os.path.join(RASTER_DIR, rel)

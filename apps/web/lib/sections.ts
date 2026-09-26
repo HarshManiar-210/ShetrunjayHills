@@ -151,6 +151,8 @@ export interface SectionDef {
   depth: number;
   /** Listed in a navbar dropdown of its own rather than under Sections. */
   ownPicker: boolean;
+  /** Drawn beneath every other raster — see layer_groups.draw_below. */
+  drawBelow: boolean;
 }
 
 /**
@@ -233,14 +235,14 @@ export function slugify(label: string): string {
 
 export function iconForGeometry(kind: SwatchGeometryKind): LucideIcon {
   if (kind === "point") return MapPin;
-  if (kind === "line") return Route;
+  if (kind === "line" || kind === "dotted-line") return Route;
   if (kind === "raster") return Image;
   return kind === "polygon" ? Square : SquareDashed;
 }
 
 /** static_overlays.kind -> the legend's shape vocabulary. */
-export function swatchKindOf(kind: OverlayMeta["kind"]): SwatchGeometryKind {
-  if (kind === "line") return "line";
+export function swatchKindOf(kind: OverlayMeta["kind"], dotted = false): SwatchGeometryKind {
+  if (kind === "line") return dotted ? "dotted-line" : "line";
   if (kind === "point") return "point";
   if (kind === "outline") return "polygon-outline";
   return "polygon";
@@ -296,6 +298,19 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
     overlaysByGroup.set(overlay.group_id, rows);
   }
 
+  function toItem(o: OverlayMeta): SectionItem {
+    return {
+      key: o.key,
+      label: o.label,
+      color: o.color ?? DEFAULT_OVERLAY_COLOR,
+      geometryKind: swatchKindOf(o.kind, o.dotted),
+      pending: o.status === "pending",
+      icon: ITEM_STYLE[o.key],
+      categories: o.categories,
+      hasStats: o.has_stats,
+    };
+  }
+
   function build(group: LayerGroup, depth: number): SectionDef {
     const style = GROUP_STYLE[group.key] ?? DEFAULT_STYLE;
     const rows = overlaysByGroup.get(group.id) ?? [];
@@ -325,11 +340,14 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         id: group.key,
         ...style,
         mode: "layer",
-        items: [],
+        // Vector rows seeded beside the imagery (Wildlife Corridors' lines)
+        // draw with the theme's own switch, like an options group's rows.
+        items: rows.filter((o) => o.asset_type === "vector").map(toItem),
         years,
         children,
         depth,
         ownPicker: Boolean(group.own_picker),
+        drawBelow: Boolean(group.draw_below),
       };
     }
 
@@ -344,16 +362,8 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       children,
       depth,
       ownPicker: Boolean(group.own_picker),
-      items: rows.map((o) => ({
-        key: o.key,
-        label: o.label,
-        color: o.color ?? DEFAULT_OVERLAY_COLOR,
-        geometryKind: swatchKindOf(o.kind),
-        pending: o.status === "pending",
-        icon: ITEM_STYLE[o.key],
-        categories: o.categories,
-        hasStats: o.has_stats,
-      })),
+      drawBelow: Boolean(group.draw_below),
+      items: rows.map(toItem),
     };
   }
 
@@ -435,12 +445,23 @@ export function sectionLayers(section: SectionDef): SectionLayer[] {
   return [...own, ...section.children.flatMap(sectionLayers)];
 }
 
-/** Option overlay key → the toggle key of the options group it belongs to. */
+/** The one switch that turns on a section's rows with it, if it has one. */
+export function ownerToggleKey(section: SectionDef): string | null {
+  if (section.mode === "options") return groupToggleKey(section.id);
+  if (section.mode === "layer") return rasterToggleKey(section.id);
+  return null;
+}
+
+/**
+ * Overlay key → the switch it draws under: an options group's, or a raster
+ * theme's for vector rows seeded beside its imagery.
+ */
 export function optionOwners(allSections: SectionDef[]): Record<string, string> {
   const owners: Record<string, string> = {};
   for (const section of allSections) {
-    if (section.mode !== "options") continue;
-    for (const item of section.items) owners[item.key] = groupToggleKey(section.id);
+    const owner = ownerToggleKey(section);
+    if (!owner) continue;
+    for (const item of section.items) owners[item.key] = owner;
   }
   return owners;
 }

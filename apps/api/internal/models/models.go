@@ -57,6 +57,8 @@ type StaticOverlay struct {
 	PopupFields []string `json:"popup_fields,omitempty"`
 	// DefaultOn marks a layer the dashboard switches on when it opens.
 	DefaultOn bool `json:"default_on,omitempty"`
+	// Dotted draws a 'line' row dotted rather than solid (Fireline).
+	Dotted bool `json:"dotted,omitempty"`
 	// SizeBytes is the asset's size on disk, filled in by the Overlays
 	// handler rather than stored in the DB — statting the file cannot drift
 	// out of step with it the way a seeded column would. Lets the frontend
@@ -104,4 +106,6 @@ type LayerGroup struct {
 	SortOrder int    `json:"sort_order"`
 	// OwnPicker gives a top-level group a navbar dropdown of its own.
 	OwnPicker bool `json:"own_picker"`
+	// DrawBelow puts a raster group beneath every other raster on the map.
+	DrawBelow bool `json:"draw_below"`
 }

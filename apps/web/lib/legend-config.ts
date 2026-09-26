@@ -62,6 +62,12 @@ export interface RasterLegend {
    * ticks evenly over unequal classes would misreport where the breaks are.
    */
   rampTicks?: string[];
+  /**
+   * Draw the bar alone, with no class list under it. For a continuous
+   * surface whose colour doc names only the two ends (Wildlife Corridors'
+   * low → high cost), where middle rows would have nothing to say.
+   */
+  rampOnly?: boolean;
 }
 
 // Visibly provisional — a plain 5-step grey ramp, distinct from any real
@@ -105,12 +111,11 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     rampLabels: ["Non forest", "Very dense forest"],
     classes: [
       { value: 1, label: "Very Dense Forest", color: "#06660c" },
-      { value: 2, label: "Moderately Dense Forest", color: "#05ba19" },
-      { value: 3, label: "Open Forest", color: "#00ef67" },
-      { value: 4, label: "Scrub", color: "#ffeb00" },
-      { value: 5, label: "Non Forest", color: "#7f645b" },
+      { value: 2, label: "Moderately Dense Forest", color: "#00ff00" },
+      { value: 3, label: "Open Forest", color: "#ffff00" },
+      { value: 4, label: "Scrub", color: "#ff0000" },
+      { value: 5, label: "Non Forest", color: "#ffffff" },
     ],
-    note: "The 1980 image is off-palette vs the other years in the delivered data — its colours won't match these swatches exactly.",
   },
   // Drone-derived 2026 density, in the same five classes as Forest Cover but
   // its own palette. No colour doc came with it: these are the imagery's five
@@ -144,22 +149,23 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   "historical-land-use": {
     layerId: "historical-land-use",
     classes: [
-      { value: 1, label: "Barren", color: "#816c65" },
+      { value: 1, label: "Barren", color: "#dd8db4" },
       { value: 2, label: "Builtup", color: "#ff0025" },
-      { value: 3, label: "Dense Vegetation", color: "#00570b" },
-      { value: 4, label: "Scrub / Sparse Vegetation", color: "#96ef4d" },
-      { value: 5, label: "Waterbody", color: "#1200ef" },
+      { value: 3, label: "Dense Vegetation", color: "#09ac00" },
+      { value: 4, label: "Scrub / Sparse Vegetation", color: "#7cbc7e" },
+      { value: 5, label: "Waterbody", color: "#3976c9" },
     ],
   },
-  // Drone-sourced 2026 LULC — same palette as the satellite series above.
+  // Drone-sourced 2026 LULC — its own palette, from the client's legend
+  // colour doc (the image was recoloured to match).
   "current-land-use": {
     layerId: "current-land-use",
     classes: [
-      { value: 1, label: "Barren", color: "#816c65" },
+      { value: 1, label: "Barren", color: "#dd9aba" },
       { value: 2, label: "Builtup", color: "#ff0025" },
-      { value: 3, label: "Dense Vegetation", color: "#00570b" },
-      { value: 4, label: "Scrub / Sparse Vegetation", color: "#96ef4d" },
-      { value: 5, label: "Waterbody", color: "#1200ef" },
+      { value: 3, label: "Dense Vegetation", color: "#089600" },
+      { value: 4, label: "Scrub / Sparse Vegetation", color: "#3fbc43" },
+      { value: 5, label: "Waterbodies", color: "#000eff" },
     ],
   },
   "forest-fragmentation": {
@@ -413,29 +419,77 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   chm: {
     layerId: "chm",
     ramp: "low-to-high",
-    rampLabels: ["Low canopy", "High canopy"],
+    rampLabels: ["0 m", "30.64 m"],
     classes: [
-      { value: 1, label: "Low canopy height", color: "#28bceb" },
-      { value: 2, label: "Medium-low canopy height", color: "#a4fc3c" },
-      { value: 3, label: "Medium-high canopy height", color: "#fb7e21" },
-      { value: 4, label: "High canopy height", color: "#7a0403" },
+      { value: 1, label: "0 – 7.66 m", color: "#28bceb" },
+      { value: 2, label: "7.66 – 15.32 m", color: "#a4fc3c" },
+      { value: 3, label: "15.32 – 22.98 m", color: "#fb7e21" },
+      { value: 4, label: "22.98 – 30.64 m", color: "#7a0403" },
     ],
-    note: "Gradient stops as given; exact height breakpoints (metres) weren't supplied.",
+  },
+  // DSM/DTM: the colour doc names a cpt-city gradient (DEM_screen,
+  // wiki-knutux) and gives its stops with their elevation ranges.
+  dsm: {
+    layerId: "dsm",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "611 m"],
+    classes: [
+      { value: 1, label: "0 – 76 m", color: "#008435" },
+      { value: 2, label: "76 – 153 m", color: "#33cc00" },
+      { value: 3, label: "153 – 305 m", color: "#f4f071" },
+      { value: 4, label: "305 – 382 m", color: "#f4bd45" },
+      { value: 5, label: "382 – 458 m", color: "#99642b" },
+      { value: 6, label: "458 – 611 m", color: "#ffffff" },
+    ],
+  },
+  dtm: {
+    layerId: "dtm",
+    ramp: "low-to-high",
+    rampLabels: ["0 m", "604 m"],
+    classes: [
+      { value: 1, label: "0 – 121 m", color: "#4aad5a" },
+      { value: 2, label: "121 – 242 m", color: "#b5d663" },
+      { value: 3, label: "242 – 363 m", color: "#ffe710" },
+      { value: 4, label: "363 – 484 m", color: "#ff9c08" },
+      { value: 5, label: "484 – 604 m", color: "#ff7b10" },
+    ],
+  },
+  "growing-stock": {
+    layerId: "growing-stock",
+    ramp: "low-to-high",
+    rampLabels: ["0.03 m³/ha", "> 5.0 m³/ha"],
+    classes: [
+      { value: 1, label: "0.03 – 1.5 m³/ha", color: "#30123b" },
+      { value: 2, label: "1.5 – 2.5 m³/ha", color: "#28bceb" },
+      { value: 3, label: "2.5 – 3.5 m³/ha", color: "#a4fc3c" },
+      { value: 4, label: "3.5 – 5.0 m³/ha", color: "#fb7e21" },
+      { value: 5, label: "> 5.0 m³/ha", color: "#7a0403" },
+    ],
+  },
+  "wildlife-corridors": {
+    layerId: "wildlife-corridors",
+    ramp: "low-to-high",
+    rampOnly: true,
+    rampLabels: ["Low cost", "High cost"],
+    classes: [
+      { value: 1, label: "Low cost", color: "#a6611a" },
+      { value: 2, label: "", color: "#dfc27d" },
+      { value: 3, label: "", color: "#f5f5f5" },
+      { value: 4, label: "", color: "#80cdc1" },
+      { value: 5, label: "High cost", color: "#018571" },
+    ],
   },
   slope: {
     layerId: "slope",
     ramp: "low-to-high",
-    // The range is the one number the delivered data does pin down, so the
-    // ends of the bar carry it even though the breaks between are unknown.
-    rampLabels: ["Flat · 0°", "Steep · 88°"],
+    rampLabels: ["0°", "88.13°"],
     classes: [
-      { value: 1, label: "Flattest", color: "#2c7bb6" },
-      { value: 2, label: "Gentle", color: "#abd9e9" },
-      { value: 3, label: "Moderate", color: "#ffffbf" },
-      { value: 4, label: "Steep", color: "#fdae61" },
-      { value: 5, label: "Steepest", color: "#d7191c" },
+      { value: 1, label: "Flat (0° – 8.24°)", color: "#2c7bb6" },
+      { value: 2, label: "Gentle (8.24° – 15.82°)", color: "#abd9e9" },
+      { value: 3, label: "Moderate (15.82° – 25.56°)", color: "#ffffbf" },
+      { value: 4, label: "Steep (25.56° – 60.25°)", color: "#fdae61" },
+      { value: 5, label: "Very Steep (60.25° – 88.13°)", color: "#d7191c" },
     ],
-    note: "Range 0.001°–88.13° across the study area; exact intermediate breakpoints weren't supplied.",
   },
   aspect: {
     layerId: "aspect",
@@ -493,19 +547,14 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
 };
 
-// Still-pending themes (no raster delivered) plus DSM/DTM, whose gradients
-// were only given as named external palette references ("cpt-city
-// DEM_screen", "cpt-city wiki-knutux") rather than literal hex stops.
+// Still-pending themes: no palette delivered yet.
 const PROVISIONAL_IDS = [
   "ecological-degradation",
   "tof",
-  "growing-stock",
   "tree-height",
   "habitat-suitability",
   "agb",
   "carbon-stock",
-  "dsm",
-  "dtm",
 ];
 
 export const LEGEND_CONFIG: Record<string, RasterLegend> = {

@@ -44,11 +44,11 @@ import { vectorOverlayDefs } from "@/lib/static-overlays";
 import {
   buildSections,
   flattenSections,
-  groupToggleKey,
   isGroupToggleKey,
   isRasterToggleKey,
   layerIdOf,
   optionOwners,
+  ownerToggleKey,
   rasterToggleKey,
   sectionLayers,
   DEFAULT_RASTER_OPACITY,
@@ -314,11 +314,11 @@ export function MapDashboard() {
 
   // An options group switches on with every option that has data, so picking
   // it draws something straight away; the side panel narrows it from there.
+  // A raster theme likewise brings the vector rows seeded beside its imagery.
   const keysFor = useCallback(
     (key: string) => {
-      if (!isGroupToggleKey(key)) return [key];
-      const group = allSections.find((s) => groupToggleKey(s.id) === key);
-      return [key, ...(group?.items ?? []).filter((i) => !i.pending).map((i) => i.key)];
+      const owner = allSections.find((s) => ownerToggleKey(s) === key);
+      return [key, ...(owner?.items ?? []).filter((i) => !i.pending).map((i) => i.key)];
     },
     [allSections],
   );
@@ -480,11 +480,17 @@ export function MapDashboard() {
     [layers, visibility],
   );
 
-  /** Every raster theme currently switched on, with the year each is showing. */
+  /**
+   * Every raster theme currently switched on, with the year each is showing.
+   * The map stacks rasters in this order, last on top, so a draw_below theme
+   * (the Toposheet) sorts first; the sort is stable, keeping the rest in tree
+   * order.
+   */
   const activeRasters = useMemo(
     () =>
       allSections
         .filter((section) => section.mode === "layer" && visible[rasterToggleKey(section.id)])
+        .toSorted((a, b) => Number(b.drawBelow) - Number(a.drawBelow))
         .flatMap((section) => {
           // Falls back to the newest year, which is what the sidebar's own
           // year control shows when nothing has been picked yet.
