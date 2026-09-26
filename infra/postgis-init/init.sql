@@ -501,17 +501,25 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- now agree to within ~40 m north and ~200 m east, and each box matches its
 -- image's aspect exactly, so nothing is distorted.
 --
+-- That aspect is taken in EPSG:4326, the grid all the client's data is
+-- delivered in: each pixel spans equal degrees of longitude and latitude
+-- (measured on the delivered footprints, 1.004 in degrees vs 1.079 in Web
+-- Mercator). An earlier derivation matched the aspect in Web Mercator
+-- instead, which cut ~0.0045 deg (~500 m) off each south edge and squeezed
+-- the imagery ~7% north-south. The south edges below now sit within ~20-40 m
+-- of the delivered footprints.
+--
 -- These are still derived from the delivered numbers, which are the only
 -- georeferencing this imagery has — no GeoTIFF or world file was supplied.
 -- Ask the client for one to place these properly, and before building any
 -- tile pyramid, which would bake the current placement in.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4547790, 71.8240547, 21.5129591),
-    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
-    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4551430, 71.8234530, 21.5120913),
-    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4551430, 71.8234229, 21.5120913),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4558151, 71.8229114, 21.5120633);
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
+    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
+    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4514270, 71.8229114, 21.5118751);
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
@@ -552,7 +560,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- clipped to the study area; bounds fitted to its outline by
 -- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
+    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033),
     ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7285633, 21.4520919, 71.8217935, 21.5118928);

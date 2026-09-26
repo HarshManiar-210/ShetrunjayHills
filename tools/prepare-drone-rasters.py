@@ -31,11 +31,19 @@ bounds to paste into init.sql, derived as follows:
     footprint bounds outwards across its own padding. Those six estimates are
     averaged into one canvas, which is what makes the six products mutually
     consistent again.
-  * The canvas is then forced to the pixel grid's own aspect ratio in Web
-    Mercator -- the projection MapLibre warps an image source into -- so the
-    imagery cannot be distorted. The top edge is the anchor, because it is
+  * The canvas is then forced to the pixel grid's own aspect ratio in
+    EPSG:4326 -- the grid the client's data is delivered in: a pixel spans
+    the same number of degrees east-west as north-south. (Measured on the
+    padded originals, Orthomosaic and DSM come out at a 1.004 lat/lon
+    degree ratio per pixel, against 1.079 in Web Mercator.) An earlier
+    version forced the aspect in Web Mercator instead, which squeezed the
+    drone imagery ~7% north-south. The top edge is the anchor, because it is
     the edge the six delivered extents already agree on most closely
     (Orthomosaic and DSM to within ~2 m).
+  * MapLibre places an image source linearly in Web Mercator, not in
+    degrees, so a 4326 grid is drawn very slightly non-linearly -- over the
+    ~0.06 deg these rasters span that is well under one pixel, so the PNGs
+    are served on their delivered 4326 grid rather than reprojected.
   * Each product's own bounds are then read back off that shared canvas.
 
 Residual error
@@ -95,15 +103,6 @@ PRODUCTS: dict[str, tuple[str, str, tuple[float, float, float, float]]] = {
     "aspect": ("Aspect.png", "Aspect.png", (71.727678, 21.452812, 71.823913, 21.512044)),
     "chm":   ("CHM.png",   "CHM.png",   (71.727066, 21.452069, 71.823365, 21.512053)),
 }
-
-
-def merc_y(lat_deg: float) -> float:
-    """Web Mercator northing, in the same radian-ish units as radians(lon)."""
-    return math.log(math.tan(math.pi / 4 + math.radians(lat_deg) / 2))
-
-
-def inv_merc_y(y: float) -> float:
-    return math.degrees(2 * math.atan(math.exp(y)) - math.pi / 2)
 
 
 def content_box(path: str) -> tuple[tuple[int, int, int, int], tuple[int, int]]:
@@ -203,10 +202,10 @@ def main() -> int:
         lon_mins.append(w_lon - left * lon_per_px)
         lon_maxs.append(w_lon + (cw - left) * lon_per_px)
 
-        # Latitude is extrapolated in Mercator, not in degrees: over 66' of
-        # latitude the two differ by enough to matter at this precision.
-        y_per_px = (merc_y(n_lat) - merc_y(s_lat)) / (bottom - top)
-        lat_tops.append(merc_y(n_lat) + top * y_per_px)
+        # Extrapolated in degrees: the pixel grid is EPSG:4326, so every row
+        # spans the same latitude.
+        lat_per_px = (n_lat - s_lat) / (bottom - top)
+        lat_tops.append(n_lat + top * lat_per_px)
 
         print(f"{key:12s} canvas {cw}x{ch}  content {right-left}x{bottom-top} "
               f"(L{left} R{cw-right} T{top} B{ch-bottom})")
@@ -217,17 +216,17 @@ def main() -> int:
 
     lon_min = sum(lon_mins) / len(lon_mins)
     lon_max = sum(lon_maxs) / len(lon_maxs)
-    y_top = sum(lat_tops) / len(lat_tops)
+    lat_top = sum(lat_tops) / len(lat_tops)
 
     # --- 2. force the canvas to the pixel grid's own aspect ----------------
-    dx = math.radians(lon_max - lon_min)
-    dy = dx / (canvas_w / canvas_h)
-    y_bottom = y_top - dy
+    # Square pixels in degrees (EPSG:4326), not on the ground.
+    dlat = (lon_max - lon_min) / (canvas_w / canvas_h)
+    lat_bottom = lat_top - dlat
 
     spread_lon = (max(lon_maxs) - min(lon_maxs)) * 111_320 * math.cos(math.radians(21.48))
-    spread_lat = (max(lat_tops) - min(lat_tops)) * 6_378_137
+    spread_lat = (max(lat_tops) - min(lat_tops)) * 110_574
     print(f"\nshared canvas  lon {lon_min:.7f}..{lon_max:.7f}  "
-          f"lat {inv_merc_y(y_bottom):.7f}..{inv_merc_y(y_top):.7f}")
+          f"lat {lat_bottom:.7f}..{lat_top:.7f}")
     print(f"agreement between the six: east edge +/-{spread_lon:.0f} m, "
           f"north edge +/-{spread_lat:.0f} m")
 
@@ -237,8 +236,8 @@ def main() -> int:
         left, top, right, bottom = box
         w = lon_min + (lon_max - lon_min) * left / canvas_w
         e = lon_min + (lon_max - lon_min) * right / canvas_w
-        n = inv_merc_y(y_top - dy * top / canvas_h)
-        s = inv_merc_y(y_top - dy * bottom / canvas_h)
+        n = lat_top - dlat * top / canvas_h
+        s = lat_top - dlat * bottom / canvas_h
         print(f"   {key:12s} {w:.7f}, {s:.7f}, {e:.7f}, {n:.7f}")
 
     if not args.write:

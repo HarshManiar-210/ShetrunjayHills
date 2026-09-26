@@ -91,9 +91,10 @@ func asRGBA(src image.Image) *image.RGBA {
 // Compute decodes an image and measures each colour's coverage.
 //
 // Area per pixel is taken as the bounding box's ground area divided by the
-// pixel count. The image is placed in Web Mercator, where ground area per
-// pixel varies with latitude — but across the ~0.06° these rasters span that
-// variation is under 0.1%, far below the precision of the placement itself.
+// pixel count. The images are EPSG:4326 grids — equal degrees per pixel — so
+// ground area per pixel shrinks with the cosine of latitude; but across the
+// ~0.06° these rasters span that variation is under 0.1%, far below the
+// precision of the placement itself.
 func Compute(r io.Reader, b Bounds) (*Stats, error) {
 	src, _, err := image.Decode(r)
 	if err != nil {
