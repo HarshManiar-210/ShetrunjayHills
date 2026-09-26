@@ -339,6 +339,16 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     8, 71.758100, 21.466484, 71.821988, 21.512142),
     ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       4, 71.697740, 21.427782, 71.855416, 21.552918);
 
+-- Watershed size classes. WatershedClass was added to the delivered GeoJSON
+-- from each polygon's measured geodesic area (99 Mini, 10 Micro); the
+-- delivered `Area` attribute doesn't match the geometry, so it isn't used.
+UPDATE static_overlays SET color_field = 'WatershedClass',
+    categories = '[
+        {"value": "Mini",  "label": "Mini Watershed (1 - 100 Ha)",     "color": "#2F9E9E"},
+        {"value": "Micro", "label": "Micro Watershed (100 - 1000 Ha)", "color": "#1F4E79"}
+    ]'::jsonb
+WHERE key = 'watershed';
+
 -- Tree Inventory: per-tree survey attributes. Tree Height is the client's
 -- full 856,700-point survey, every point of it — but served as PMTiles
 -- rather than as the 166 MB GeoJSON it was delivered as. Handed over whole it
