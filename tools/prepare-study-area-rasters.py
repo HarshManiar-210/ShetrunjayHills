@@ -19,7 +19,8 @@ its own delivered extent):
 
        Web Mercator box  0.959     UTM 42N box  0.986 (square 1.18 m pixels)
 
-   These are resampled onto a Web Mercator grid, keeping the delivered width.
+   These are resampled onto a Web Mercator grid, keeping the delivered width
+   up to MAX_WIDTH.
    Classified rasters use nearest neighbour, so every pixel keeps an exact
    class colour (rasterstats counts colours exactly); photographic ones
    (Toposheet, FCC) use bilinear with premultiplied alpha.
@@ -265,7 +266,7 @@ def warp_to_mercator(src, box, method):
     west, east = min(c[0] for c in corners), max(c[0] for c in corners)
     south, north = min(c[1] for c in corners), max(c[1] for c in corners)
 
-    out_w = sw
+    out_w = min(sw, MAX_WIDTH)
     out_h = round(out_w * (merc_y(north) - merc_y(south)) / (east - west))
     lon = west + (np.arange(out_w) + 0.5) / out_w * (east - west)
     my_n, my_s = merc_y(north), merc_y(south)
