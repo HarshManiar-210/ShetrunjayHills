@@ -83,7 +83,7 @@ func main() {
 	r.Get("/api/layer-groups", handlers.LayerGroups(repo))
 	r.Get("/api/overlays", handlers.Overlays(repo, dataRoot))
 	r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
-	r.Get("/api/overlays/{key}/stats", handlers.RasterStats(repo, dataRoot))
+	r.Get("/api/overlays/{key}/stats", handlers.OverlayStats(repo, dataRoot))
 
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.Auth([]byte(jwtSecret), publicRoleID))

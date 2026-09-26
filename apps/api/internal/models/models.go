@@ -71,6 +71,26 @@ type StaticOverlay struct {
 	// fact about the delivered file, and this keeps "which layers are tiled"
 	// out of the frontend as a hardcoded key list (CLAUDE.md's invariant).
 	Tiled bool `json:"tiled,omitempty"`
+	// HasStats reports that the client delivered official class statistics
+	// for this overlay (overlay_class_stats rows). A raster is measured when
+	// it has none, so this matters mostly for a classed vector layer, which
+	// the Statistics panel can only describe when it is set.
+	HasStats bool `json:"has_stats,omitempty"`
+}
+
+// OverlayClassStat is one class's delivered area and share for one overlay.
+type OverlayClassStat struct {
+	// Value is the class's value in the theme's legend (or a vector layer's
+	// categories) — what the frontend matches to find its colour and name.
+	Value string `json:"value"`
+	// Label is the delivered class name, for a class no legend entry matches.
+	Label string `json:"label"`
+	// Group heads a run of classes (Vegetation Change's Improvement,
+	// Degradation, Stable); empty elsewhere.
+	Group   string  `json:"group,omitempty"`
+	AreaSqM float64 `json:"area_sq_m"`
+	// Share of the overlay's classified area, 0..1.
+	Share float64 `json:"share"`
 }
 
 // LayerGroup is a node in the sidebar's tree. ParentID is nil for a
