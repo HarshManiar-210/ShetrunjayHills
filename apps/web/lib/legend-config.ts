@@ -114,22 +114,21 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   },
   // Drone-derived 2026 density, in the same five classes as Forest Cover but
   // its own palette. No colour doc came with it: these are the imagery's five
-  // dominant colours (the rest are anti-aliasing between them), assigned by
-  // matching each colour's pixel count against the class areas in the
-  // client's Tree Density Drone.xlsx. The three greens and the gold rank
-  // exactly as the four vegetation classes do; the neutral grey is left for Non
-  // Forest (it covers more pixels than Non Forest's area would suggest).
+  // colours (the rest are its edge anti-aliasing), assigned by matching each
+  // colour's pixel count against the class areas in the client's Tree Density
+  // Drone.xlsx — all five rank exactly as the classes do. Non Forest's light
+  // grey covers fewer pixels than its area would suggest.
   // Replace with the client's palette if one is delivered.
   "tree-density": {
     layerId: "tree-density",
     ramp: "high-to-low",
     rampLabels: ["Non forest", "Very dense forest"],
     classes: [
-      { value: 1, label: "Very Dense Forest", color: "#006400" },
+      { value: 1, label: "Very Dense Forest", color: "#06660c" },
       { value: 2, label: "Moderately Dense Forest", color: "#228b22" },
-      { value: 3, label: "Open Forest", color: "#90ee90" },
-      { value: 4, label: "Scrub", color: "#daa520" },
-      { value: 5, label: "Non Forest", color: "#c8c8c8" },
+      { value: 3, label: "Open Forest", color: "#ffff00" },
+      { value: 4, label: "Scrub", color: "#ff0000" },
+      { value: 5, label: "Non Forest", color: "#f1f1f1" },
     ],
   },
   "green-cover": {
