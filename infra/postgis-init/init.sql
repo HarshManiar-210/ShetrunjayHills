@@ -374,25 +374,32 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, colo
         {"value": "Water", "label": "Water", "color": "#00206d"}
     ]', 'vector-data/forest-type-FSI.geojson', 8, 71.728918, 21.451784, 71.821736, 21.511611);
 
+-- Placement of Forest Cover, Green Cover, Vegetation Change, LULC,
+-- Fragmentation, FCC and the Toposheet: all delivered north-up in UTM zone
+-- 42N rather than Web Mercator, ~1 deg rotated against the map, with no
+-- georeferencing. tools/prepare-study-area-rasters.py fits each one to the
+-- study-area outline (Fragmentation to its year's Green Cover), resamples
+-- it onto a Web Mercator grid and writes these bounds; the delivered PNGs
+-- are kept under raster-data/originals.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.7286101, 21.4518315, 71.8217471, 21.5128586),
+    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.7281532, 21.4513116, 71.8223030, 21.5130240),
+    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.7283231, 21.4512694, 71.8224318, 21.5130876),
+    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.7281749, 21.4513122, 71.8222409, 21.5128611),
+    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.7283457, 21.4512710, 71.8222194, 21.5130469),
+    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.7281567, 21.4513038, 71.8222886, 21.5129559),
+    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.7281667, 21.4513177, 71.8222078, 21.5128887);
 
 -- Green Cover: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Non-Forest/Forest two-class palette).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('green_cover_1980', '1980', grp('green-cover'), 'raster', 'raster-data/green-cover/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('green_cover_1989', '1989', grp('green-cover'), 'raster', 'raster-data/green-cover/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_1998', '1998', grp('green-cover'), 'raster', 'raster-data/green-cover/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_2008', '2008', grp('green-cover'), 'raster', 'raster-data/green-cover/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_2018', '2018', grp('green-cover'), 'raster', 'raster-data/green-cover/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('green_cover_2025', '2025', grp('green-cover'), 'raster', 'raster-data/green-cover/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('green_cover_2026', '2026', grp('green-cover'), 'raster', 'raster-data/green-cover/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('green_cover_1980', '1980', grp('green-cover'), 'raster', 'raster-data/green-cover/1980.png', 1980, 71.7280245, 21.4515512, 71.8222228, 21.5131147),
+    ('green_cover_1989', '1989', grp('green-cover'), 'raster', 'raster-data/green-cover/1989.png', 1989, 71.7281993, 21.4509904, 71.8225423, 21.5132563),
+    ('green_cover_1998', '1998', grp('green-cover'), 'raster', 'raster-data/green-cover/1998.png', 1998, 71.7281498, 21.4510152, 71.8224950, 21.5129437),
+    ('green_cover_2008', '2008', grp('green-cover'), 'raster', 'raster-data/green-cover/2008.png', 2008, 71.7282026, 21.4512816, 71.8224067, 21.5133099),
+    ('green_cover_2018', '2018', grp('green-cover'), 'raster', 'raster-data/green-cover/2018.png', 2018, 71.7283183, 21.4511984, 71.8226556, 21.5132668),
+    ('green_cover_2025', '2025', grp('green-cover'), 'raster', 'raster-data/green-cover/2025.png', 2025, 71.7282007, 21.4511068, 71.8225222, 21.5132757),
+    ('green_cover_2026', '2026', grp('green-cover'), 'raster', 'raster-data/green-cover/2026.png', 2026, 71.7283074, 21.4509080, 71.8223818, 21.5132622);
 
 -- Vegetation Change: same per-year-raster shape as Forest Cover, but each
 -- image is a from→to transition (see legend-config.ts's 25-class VDF/MDF/
@@ -401,34 +408,34 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- end year, which sections.ts falls back to for ordering/selection since the
 -- label itself isn't a bare number here.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('vegetation_change_1980_1989', '1980 → 1989', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.727577, 21.452491, 71.822678, 21.511575),
-    ('vegetation_change_1989_1998', '1989 → 1998', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_1998_2008', '1998 → 2008', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2008_2018', '2008 → 2018', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2018_2025', '2018 → 2025', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('vegetation_change_2025_2026', '2025 → 2026', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('vegetation_change_1980_1989', '1980 → 1989', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1989-over-1980.png', 1989, 71.7284859, 21.4517838, 71.8218672, 21.5126671),
+    ('vegetation_change_1989_1998', '1989 → 1998', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/1998-over-1989.png', 1998, 71.7283106, 21.4512150, 71.8223453, 21.5129152),
+    ('vegetation_change_1998_2008', '1998 → 2008', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2008-over-1998.png', 2008, 71.7283242, 21.4511114, 71.8222454, 21.5129490),
+    ('vegetation_change_2008_2018', '2008 → 2018', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2018-over-2008.png', 2018, 71.7284728, 21.4513835, 71.8221158, 21.5128975),
+    ('vegetation_change_2018_2025', '2018 → 2025', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2025-over-2018.png', 2025, 71.7283716, 21.4512628, 71.8223480, 21.5129644),
+    ('vegetation_change_2025_2026', '2025 → 2026', grp('vegetation-change'), 'raster', 'raster-data/vegetation-change/2026-over-2025.png', 2026, 71.7283717, 21.4512608, 71.8221552, 21.5130384);
 
 -- LULC: same per-year-raster shape as Forest Cover (see legend-config.ts's
 -- Barren/Builtup/Dense Vegetation/Scrub/Waterbody classes).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.728275, 21.452979, 71.822287, 21.511565),
-    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.7283997, 21.4516401, 71.8220819, 21.5128512),
+    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.7281485, 21.4513079, 71.8223060, 21.5130655),
+    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.7283244, 21.4513881, 71.8223362, 21.5129603),
+    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.7281451, 21.4512307, 71.8223022, 21.5129476),
+    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7281270, 21.4511610, 71.8223518, 21.5129177),
+    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7281446, 21.4513003, 71.8223723, 21.5130954),
+    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7281467, 21.4513031, 71.8224187, 21.5130212);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.727020, 21.452038, 71.823220, 21.512114),
-    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.727566, 21.452156, 71.822770, 21.511847),
-    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.728275, 21.452979, 71.822286, 21.511473),
-    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.727566, 21.452156, 71.822770, 21.511847);
+    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.7281994, 21.4514962, 71.8220053, 21.5129734),
+    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.7280945, 21.4510551, 71.8226199, 21.5130365),
+    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.7284686, 21.4513930, 71.8225164, 21.5131724),
+    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.7292832, 21.4511107, 71.8225409, 21.5129556),
+    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.7283721, 21.4510642, 71.8223312, 21.5131965),
+    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.7281198, 21.4512334, 71.8224232, 21.5128263),
+    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.7281140, 21.4511883, 71.8224237, 21.5132639);
 
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
 -- flat vector-section pattern as Forest Boundary/Cadastral Map. File names
@@ -490,13 +497,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- 1980 doesn't (literal Red→R, NIR→G and B) — as delivered, not a
 -- transcription error. 1980's G and B both "Band 6: Near Infrared" likewise.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fcc_1980', '1980', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1980.png', 1980, 71.728140, 21.451769, 71.821924, 21.512136),
-    ('fcc_1989', '1989', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1989.png', 1989, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_1998', '1998', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1998.png', 1998, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2008', '2008', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2008.png', 2008, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2018', '2018', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2018.png', 2018, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2025', '2025', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
-    ('fcc_2026', '2026', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
+    ('fcc_1980', '1980', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1980.png', 1980, 71.7281596, 21.4512176, 71.8221907, 21.5131104),
+    ('fcc_1989', '1989', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1989.png', 1989, 71.7282559, 21.4511450, 71.8223452, 21.5131101),
+    ('fcc_1998', '1998', grp('satellite-imagery'), 'raster', 'raster-data/FCC/1998.png', 1998, 71.7281512, 21.4511578, 71.8223883, 21.5132250),
+    ('fcc_2008', '2008', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2008.png', 2008, 71.7282427, 21.4512579, 71.8223151, 21.5132120),
+    ('fcc_2018', '2018', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2018.png', 2018, 71.7281299, 21.4512684, 71.8226527, 21.5133135),
+    ('fcc_2025', '2025', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2025.png', 2025, 71.7281768, 21.4511377, 71.8223431, 21.5132342),
+    ('fcc_2026', '2026', grp('satellite-imagery'), 'raster', 'raster-data/FCC/2026.png', 2026, 71.7283712, 21.4512347, 71.8223161, 21.5132302);
 
 -- Dyke/Geology/Geomorphology/Greenwash/Lineament: five newly delivered
 -- geology-themed vector layers, each its own one-layer section (same flat
@@ -509,16 +516,17 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#3CB371', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#E63946', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
--- Tree Density and Growing Stock: both drone-derived, tight-cropped to the
--- flight footprint, so both take the Orthomosaic's bounds (pixel aspect 1.564
--- and 1.555 respectively vs 1.566 in Web Mercator).
+-- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
+-- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 for that box
+-- in EPSG:4326 degrees).
+-- Growing Stock, Habitat Suitability, Wildlife Corridors: EPSG:4326 grids
+-- clipped to the study area; bounds fitted to its outline by
+-- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7265374, 21.4548350, 71.8243556, 21.5129591),
-    -- Habitat Suitability: extent supplied with the raster.
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390),
-    -- Wildlife Corridors: same extent as Habitat Suitability.
-    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7287438236, 21.4516896641, 71.8221861880, 21.5128519390);
+    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033),
+    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7285633, 21.4520919, 71.8217935, 21.5118928);
 
 -- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
 -- 5/10 m) picked the same way Forest/Green Cover pick a year -- all sharing
@@ -534,11 +542,9 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
--- Ortho/DSM/etc above. Delivered north-up in UTM 42N, not Web Mercator, so
--- the served PNG is reprojected by tools/prepare-toposheet.py, which prints
--- these bounds.
+-- Ortho/DSM/etc above. Placed like Forest Cover (see there).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.7281171, 21.4514673, 71.8226211, 21.5133079);
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.7281306, 21.4514600, 71.8226062, 21.5133095);
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers from the client's structure with no data delivered yet.
