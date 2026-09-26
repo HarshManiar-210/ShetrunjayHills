@@ -37,9 +37,12 @@ export function ClassDonut({
   classes,
   /** Announced to screen readers and shown in the ring when nothing is hovered. */
   caption,
+  /** Rendered size. The drawing scales with it, text included. */
+  className = "size-[104px]",
 }: {
   classes: NamedClassStat[];
   caption: string;
+  className?: string;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   // The hovered class, else the largest: classes can arrive in legend order
@@ -65,7 +68,7 @@ export function ClassDonut({
     <div className="flex items-center gap-3">
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="size-[104px] shrink-0"
+        className={`${className} shrink-0`}
         role="img"
         aria-label={`${caption}. ${summary}`}
       >

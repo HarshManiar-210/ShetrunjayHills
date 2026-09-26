@@ -657,7 +657,9 @@ export default function Map({
   /**
    * Whether the legend and statistics column has grown down far enough to
    * reach the bottom-right corner. When it has, the tool stack steps left of
-   * it and the bottom-centre band gives up the width to match.
+   * it and the bottom-centre band gives up the width to match. Both read
+   * the column's width from `--info-col-w`, set by the dashboard, because
+   * the column widens while two years are being compared.
    */
   infoReachesCorner?: boolean;
   /**
@@ -1067,7 +1069,7 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
-        className={infoReachesCorner ? "xl:right-[19.5rem]" : undefined}
+        className={infoReachesCorner ? "xl:right-[calc(var(--info-col-w,18rem)+1.5rem)]" : undefined}
         measureMode={measureMode}
         onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
@@ -1104,7 +1106,9 @@ export default function Map({
       <div
         className={cn(
           "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-12 md:left-[13.5rem]",
-          infoReachesCorner ? "md:right-14 xl:right-[23rem]" : "md:right-14",
+          infoReachesCorner
+            ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+5rem)]"
+            : "md:right-14",
         )}
       >
         {/* The measure panel joins the stack rather than sitting beside the

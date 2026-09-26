@@ -792,6 +792,10 @@ export function MapDashboard() {
           <div
             ref={mapAreaRef}
             className="relative size-full overflow-hidden rounded-2xl border border-border shadow-e3"
+            // The info column's width, in one place: the column itself and
+            // the map's corner controls and year bar, which step aside for it,
+            // all read it.
+            style={{ "--info-col-w": comparingStats ? "24rem" : "18rem" } as React.CSSProperties}
           >
             <Map
               onReady={(map) => {
@@ -874,10 +878,7 @@ export function MapDashboard() {
                   the stack steps aside for it rather than the column stopping
                   short. It still stops clear of the year bar's own row. */}
               {infoPanel(
-                cn(
-                  "pointer-events-auto hidden max-h-[calc(100%-4.5rem)] shrink-0 transition-[width] xl:flex",
-                  comparingStats ? "w-96" : "w-72",
-                ),
+                "pointer-events-auto hidden max-h-[calc(100%-4.5rem)] w-(--info-col-w) shrink-0 xl:flex",
                 infoRef,
               )}
             </div>

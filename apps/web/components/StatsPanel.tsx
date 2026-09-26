@@ -347,6 +347,7 @@ function CompareStatsBlock({
   const failed = sides.some((side) => side.failed);
   const rows = compareClasses(before.classes, after.classes);
   const ring = Math.max(before.classes.length, after.classes.length) <= MAX_DONUT_CLASSES;
+  const sameSource = before.stats?.source === after.stats?.source;
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -357,27 +358,40 @@ function CompareStatsBlock({
 
       {!loading && !failed && rows.length > 0 && (
         <>
+          {/* Kept short: two full-size rings stacked the whole column and
+              pushed the table — the actual numbers — out of view. */}
           <div className="grid grid-cols-2 gap-3">
             {sides.map((side) => (
               <div key={side.imageKey} className="flex min-w-0 flex-col items-center gap-1">
-                <span className="text-[11px] font-medium tabular-nums">{side.label}</span>
+                <span className="text-[11px] tabular-nums">
+                  <span className="font-medium">{side.label}</span>
+                  <span className="text-muted-foreground">
+                    {" · "}
+                    {COUNT.format(toHectares(side.stats!.area_sq_m))} ha
+                  </span>
+                </span>
                 {ring ? (
                   <ClassDonut
                     classes={side.classes}
                     caption={`${layer.name} ${side.label} class shares`}
+                    className="size-20"
                   />
                 ) : (
                   <StackedBar classes={side.classes} />
                 )}
-                <span className="text-[11px] tabular-nums">
-                  {COUNT.format(toHectares(side.stats!.area_sq_m))} ha
-                </span>
-                <span className="-mt-1 text-[10px] text-muted-foreground/70">
-                  {sourceLabel(side.stats!)}
-                </span>
+                {!sameSource && (
+                  <span className="text-[10px] text-muted-foreground/70">
+                    {sourceLabel(side.stats!)}
+                  </span>
+                )}
               </div>
             ))}
           </div>
+          {sameSource && (
+            <span className="-mt-0.5 text-center text-[10px] text-muted-foreground/70">
+              {sourceLabel(before.stats!)}
+            </span>
+          )}
           <CompareTable rows={rows} before={before.label} after={after.label} />
         </>
       )}
