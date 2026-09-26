@@ -579,9 +579,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
--- Ortho/DSM/etc above. Placed like Forest Cover (see there).
+-- Ortho/DSM/etc above. A UTM 42N image like Forest Cover (see there), but
+-- not clipped to the study area: it covers the sheet extent delivered with
+-- it (71.499945, 21.249988 : 72.000122, 21.750008 in EPSG:4326), which
+-- tools/prepare-study-area-rasters.py fits it to instead. These bounds are
+-- the whole canvas, including its transparent margin.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.7281306, 21.4514600, 71.8226062, 21.5133095);
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.4870089, 21.2403840, 72.0156875, 21.7609689);
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers from the client's structure with no data delivered yet.
