@@ -412,13 +412,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, colo
         {"value": "Water", "label": "Water", "color": "#00206d"}
     ]', 'vector-data/forest-type-FSI.geojson', 8, 71.728918, 21.451784, 71.821736, 21.511611);
 
--- Placement of Forest Cover, Green Cover, Vegetation Change, LULC,
--- Fragmentation, FCC and the Toposheet: all delivered north-up in UTM zone
--- 42N rather than Web Mercator, ~1 deg rotated against the map, with no
--- georeferencing. tools/prepare-study-area-rasters.py fits each one to the
--- study-area outline (Fragmentation to its year's Green Cover), resamples
--- it onto a Web Mercator grid and writes these bounds; the delivered PNGs
--- are kept under raster-data/originals.
+-- Placement of Forest Cover, Green Cover, Vegetation Change, LULC, FCC and
+-- the Toposheet: all delivered north-up in UTM zone 42N rather than Web
+-- Mercator, ~1 deg rotated against the map, with no georeferencing.
+-- tools/prepare-study-area-rasters.py fits each one to the study-area
+-- outline, resamples it onto a Web Mercator grid and writes these bounds;
+-- the delivered PNGs are kept under raster-data/originals. Fragmentation
+-- came with a per-year EPSG:4326 extent, so it is placed there as delivered.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.7286101, 21.4518315, 71.8217471, 21.5128586),
     ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.7281532, 21.4513116, 71.8223030, 21.5130240),
@@ -467,13 +467,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.7281994, 21.4514962, 71.8220053, 21.5129734),
-    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.7280945, 21.4510551, 71.8226199, 21.5130365),
-    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.7284686, 21.4513930, 71.8225164, 21.5131724),
-    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.7292832, 21.4511107, 71.8225409, 21.5129556),
-    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.7283721, 21.4510642, 71.8223312, 21.5131965),
-    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.7281198, 21.4512334, 71.8224232, 21.5128263),
-    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.7281140, 21.4511883, 71.8224237, 21.5132639);
+    ('fragmentation_1980', '1980', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1980.png', 1980, 71.7275770, 21.4524910, 71.8226780, 21.5115750),
+    ('fragmentation_1989', '1989', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1989.png', 1989, 71.7275660, 21.4521560, 71.8227700, 21.5118470),
+    ('fragmentation_1998', '1998', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/1998.png', 1998, 71.7272870, 21.4519140, 71.8230590, 21.5121170),
+    ('fragmentation_2008', '2008', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2008.png', 2008, 71.7275660, 21.4521560, 71.8227700, 21.5118470),
+    ('fragmentation_2018', '2018', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2018.png', 2018, 71.7275660, 21.4521560, 71.8227700, 21.5118470),
+    ('fragmentation_2025', '2025', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2025.png', 2025, 71.7275660, 21.4521560, 71.8227700, 21.5118470),
+    ('fragmentation_2026', '2026', grp('forest-fragmentation'), 'raster', 'raster-data/fragmentation/2026.png', 2026, 71.7275660, 21.4521560, 71.8227700, 21.5118470);
 
 -- SMC (Soil Moisture Conservation): watershed conservation structures, same
 -- flat vector-section pattern as Forest Boundary/Cadastral Map. File names
