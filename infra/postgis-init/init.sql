@@ -534,9 +534,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
--- Ortho/DSM/etc above.
+-- Ortho/DSM/etc above. Delivered north-up in UTM 42N, not Web Mercator, so
+-- the served PNG is reprojected by tools/prepare-toposheet.py, which prints
+-- these bounds.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.728494, 21.451980, 71.821804, 21.511973);
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.7281171, 21.4514673, 71.8226211, 21.5133079);
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers from the client's structure with no data delivered yet.
