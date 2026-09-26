@@ -111,12 +111,11 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     rampLabels: ["Non forest", "Very dense forest"],
     classes: [
       { value: 1, label: "Very Dense Forest", color: "#06660c" },
-      { value: 2, label: "Moderately Dense Forest", color: "#05ba19" },
-      { value: 3, label: "Open Forest", color: "#00ef67" },
-      { value: 4, label: "Scrub", color: "#ffeb00" },
-      { value: 5, label: "Non Forest", color: "#7f645b" },
+      { value: 2, label: "Moderately Dense Forest", color: "#00ff00" },
+      { value: 3, label: "Open Forest", color: "#ffff00" },
+      { value: 4, label: "Scrub", color: "#ff0000" },
+      { value: 5, label: "Non Forest", color: "#ffffff" },
     ],
-    note: "The 1980 image is off-palette vs the other years in the delivered data — its colours won't match these swatches exactly.",
   },
   // Drone-derived 2026 density, in the same five classes as Forest Cover but
   // its own palette. No colour doc came with it: these are the imagery's five
@@ -150,11 +149,11 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   "historical-land-use": {
     layerId: "historical-land-use",
     classes: [
-      { value: 1, label: "Barren", color: "#816c65" },
+      { value: 1, label: "Barren", color: "#dd8db4" },
       { value: 2, label: "Builtup", color: "#ff0025" },
-      { value: 3, label: "Dense Vegetation", color: "#00570b" },
-      { value: 4, label: "Scrub / Sparse Vegetation", color: "#96ef4d" },
-      { value: 5, label: "Waterbody", color: "#1200ef" },
+      { value: 3, label: "Dense Vegetation", color: "#09ac00" },
+      { value: 4, label: "Scrub / Sparse Vegetation", color: "#7cbc7e" },
+      { value: 5, label: "Waterbody", color: "#3976c9" },
     ],
   },
   // Drone-sourced 2026 LULC — its own palette, from the client's legend

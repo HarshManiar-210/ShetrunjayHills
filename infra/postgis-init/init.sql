@@ -420,13 +420,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, colo
 -- the delivered PNGs are kept under raster-data/originals. Fragmentation
 -- came with a per-year EPSG:4326 extent, so it is placed there as delivered.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.7286101, 21.4518315, 71.8217471, 21.5128586),
-    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.7281532, 21.4513116, 71.8223030, 21.5130240),
-    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.7283231, 21.4512694, 71.8224318, 21.5130876),
-    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.7281749, 21.4513122, 71.8222409, 21.5128611),
-    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.7283457, 21.4512710, 71.8222194, 21.5130469),
-    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.7281567, 21.4513038, 71.8222886, 21.5129559),
-    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.7281667, 21.4513177, 71.8222078, 21.5128887);
+    ('forest_cover_1980', '1980', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1980.png', 1980, 71.7286467, 21.4515393, 71.8219906, 21.5129191),
+    ('forest_cover_1989', '1989', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1989.png', 1989, 71.7280341, 21.4511189, 71.8225410, 21.5131123),
+    ('forest_cover_1998', '1998', grp('forest-cover'), 'raster', 'raster-data/forest-cover/1998.png', 1998, 71.7280378, 21.4510414, 71.8225355, 21.5131010),
+    ('forest_cover_2008', '2008', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2008.png', 2008, 71.7280437, 21.4511625, 71.8225168, 21.5130726),
+    ('forest_cover_2018', '2018', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2018.png', 2018, 71.7280397, 21.4512490, 71.8225252, 21.5131694),
+    ('forest_cover_2025', '2025', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2025.png', 2025, 71.7280402, 21.4510100, 71.8225436, 21.5131225),
+    ('forest_cover_2026', '2026', grp('forest-cover'), 'raster', 'raster-data/forest-cover/2026.png', 2026, 71.7280448, 21.4513334, 71.8225226, 21.5130950);
 
 -- Green Cover: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Non-Forest/Forest two-class palette).
@@ -456,13 +456,13 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- LULC: same per-year-raster shape as Forest Cover (see legend-config.ts's
 -- Barren/Builtup/Dense Vegetation/Scrub/Waterbody classes).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.7283997, 21.4516401, 71.8220819, 21.5128512),
-    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.7281485, 21.4513079, 71.8223060, 21.5130655),
-    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.7283244, 21.4513881, 71.8223362, 21.5129603),
-    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.7281451, 21.4512307, 71.8223022, 21.5129476),
-    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7281270, 21.4511610, 71.8223518, 21.5129177),
-    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7281446, 21.4513003, 71.8223723, 21.5130954),
-    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7281467, 21.4513031, 71.8224187, 21.5130212);
+    ('lulc_1980', '1980', grp('historical-land-use'), 'raster', 'raster-data/lulc/1980.png', 1980, 71.7282797, 21.4514148, 71.8223489, 21.5132224),
+    ('lulc_1989', '1989', grp('historical-land-use'), 'raster', 'raster-data/lulc/1989.png', 1989, 71.7280354, 21.4511433, 71.8225295, 21.5130464),
+    ('lulc_1998', '1998', grp('historical-land-use'), 'raster', 'raster-data/lulc/1998.png', 1998, 71.7280348, 21.4510837, 71.8225266, 21.5130027),
+    ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.7280348, 21.4510837, 71.8225266, 21.5130027),
+    ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7280361, 21.4512032, 71.8225123, 21.5130427),
+    ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7280248, 21.4513280, 71.8225252, 21.5129805),
+    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7280402, 21.4513279, 71.8225400, 21.5130106);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
