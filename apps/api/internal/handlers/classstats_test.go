@@ -79,3 +79,20 @@ func TestOverlayStatsFallsBackToMeasuring(t *testing.T) {
 		})
 	}
 }
+
+func TestOverlayStatsTiledRasterIsPhotographic(t *testing.T) {
+	// No file on disk: a tile archive must answer without being decoded.
+	lon, lat := 71.7, 21.4
+	rec := serveOverlayStats(fakeClassStatsGetter{overlay: models.StaticOverlay{
+		AssetType: "raster", FilePath: "raster-data/DSM.pmtiles",
+		MinLon: &lon, MinLat: &lat, MaxLon: &lon, MaxLat: &lat,
+	}})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var got struct{ Photographic bool }
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil || !got.Photographic {
+		t.Fatalf("got %+v (err %v), want photographic", got, err)
+	}
+}
