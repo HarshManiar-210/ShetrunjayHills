@@ -551,6 +551,7 @@ export function MapDashboard() {
           id: section.id,
           url: overlayDataUrl(image.key),
           bounds: image.bounds,
+          tiled: image.tiled,
           opacity,
           label: image.label === section.label ? section.label : `${section.label} · ${image.label}`,
         };
@@ -568,6 +569,7 @@ export function MapDashboard() {
             id: `${section.id}:compare`,
             url: overlayDataUrl(other.key),
             bounds: other.bounds,
+            tiled: other.tiled,
             opacity: opacity * blend,
             label: `${section.label} · ${other.label}`,
           },

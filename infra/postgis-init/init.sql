@@ -538,15 +538,20 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 --
 -- These are still derived from the delivered numbers, which are the only
 -- georeferencing this imagery has — no GeoTIFF or world file was supplied.
--- Ask the client for one to place these properly, and before building any
--- tile pyramid, which would bake the current placement in.
+-- Ask the client for one to place these properly.
+--
+-- Served as lossless-WebP PMTiles archives built from the client's ~24,000 px
+-- PNGs (tools/prepare-raster-tiles.sh, passing these bounds). The tiles bake
+-- the placement in: change a row's bounds here and rebuild its archive.
+-- CHM is re-delivered on DSM's exact footprint (its outline matches DSM's to
+-- 99.96%), so it now carries DSM's bounds.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/orthomosaic.webp', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
-    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.png',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
-    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.png',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
-    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.png', 1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
-    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.png', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',   1, 71.7283427, 21.4514270, 71.8229114, 21.5118751);
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
+    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
+    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.pmtiles', 1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.pmtiles', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.pmtiles',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380);
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic

@@ -177,16 +177,13 @@ export function basemapById(id: BasemapId): BasemapDef {
  * someone zoom to a blurry z22 and wonder what is broken, so the camera stops
  * where the imagery does.
  *
- * Taken as the shallowest ceiling across the providers, so the limit holds
- * whichever basemap is showing rather than lurching when someone switches.
- * The cost is one level on OSM, which does publish a real z19 here.
- *
- * 18 gives up no real detail: at this latitude it is about 0.56 m per pixel,
- * and the sharpest overlay served — the drone orthomosaic, 4096 px across
- * roughly 8.9 km — is about 2.2 m per pixel, so it is already upscaled well
- * before this point.
+ * One level past the shallowest provider (Esri, z18), because the drone
+ * rasters are sharper than any basemap: ~0.41 m per pixel, against z18's
+ * ~0.56 m here. Their tiles run to z19 (~0.28 m, see
+ * tools/prepare-raster-tiles.sh), so stopping at 18 would hide a quarter of
+ * the delivered detail. For that last level Esri shows its z18 upscaled.
  */
-export const MAX_MAP_ZOOM = Math.min(...SOURCES.map((s) => s.maxZoom));
+export const MAX_MAP_ZOOM = 19;
 
 /** Every basemap layer id, so the visibility pass can hide the ones that are off. */
 export const BASEMAP_LAYER_IDS: string[] = LAYERS.map((l) => l.id);

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/go-chi/chi/v5"
@@ -111,6 +112,16 @@ func RasterStats(repo overlayStatsGetter, dataRoot string) http.HandlerFunc {
 		// cleaning it against a leading separator stops a "../.." row climbing
 		// out of dataRoot.
 		full := filepath.Join(root, filepath.Clean(string(filepath.Separator)+overlay.FilePath))
+
+		// A tile archive is not one decodable image. Only the full-resolution
+		// drone products are tiled, and those are continuous imagery that
+		// measured as photographic anyway, so say so without decoding.
+		// ponytail: add histogram-from-tiles if a classified raster is ever tiled.
+		if strings.EqualFold(filepath.Ext(full), pmtilesExt) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(rasterstats.Stats{Photographic: true})
+			return
+		}
 
 		stats, err := cache.get(key, full, rasterstats.Bounds{
 			MinLon: *overlay.MinLon,

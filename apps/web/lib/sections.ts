@@ -125,6 +125,8 @@ export interface RasterYear {
   label: string;
   key: string;
   bounds: [[number, number], [number, number]];
+  /** Served as a PMTiles raster archive rather than one image — see OverlayMeta.tiled. */
+  tiled: boolean;
 }
 
 export interface SectionDef {
@@ -330,6 +332,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
             [o.min_lon!, o.min_lat!],
             [o.max_lon!, o.max_lat!],
           ] as [[number, number], [number, number]],
+          tiled: o.tiled ?? false,
         }))
         .filter((y) => !Number.isNaN(y.year))
         .sort((a, b) => a.year - b.year);

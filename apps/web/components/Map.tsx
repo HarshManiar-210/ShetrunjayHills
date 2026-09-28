@@ -92,6 +92,12 @@ export interface RasterOverlay {
   id: string;
   url: string;
   bounds: LngLatBoundsLike;
+  /**
+   * `url` is a PMTiles raster archive: drawn from a tile source that fetches
+   * only the tiles on screen, not as one image. For rasters too large to
+   * upload as a single GPU texture (the full-resolution drone products).
+   */
+  tiled?: boolean;
   opacity: number;
   /** What the loading indicator calls it while the image downloads. */
   label?: string;
@@ -931,7 +937,15 @@ export default function Map({
     for (const raster of rasterOverlays) {
       const sourceId = rasterSourceId(raster.id);
       const layerId = rasterLayerId(raster.id);
-      const existing = map.getSource<ImageSource>(sourceId);
+      let existing = map.getSource<ImageSource>(sourceId);
+
+      // A tile source has no updateImage, so a year change on one (or a
+      // switch between tiled and whole-image years) swaps the source outright.
+      if (existing && live[raster.id] !== raster.url && (raster.tiled || existing.type !== "image")) {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        map.removeSource(sourceId);
+        existing = undefined;
+      }
 
       if (existing) {
         if (live[raster.id] !== raster.url) {
@@ -942,11 +956,12 @@ export default function Map({
           map.setPaintProperty(layerId, "raster-opacity", raster.opacity);
         }
       } else {
-        map.addSource(sourceId, {
-          type: "image",
-          url: raster.url,
-          coordinates: imageCoordinates(raster.bounds),
-        });
+        map.addSource(
+          sourceId,
+          raster.tiled
+            ? { type: "raster", url: `pmtiles://${raster.url}`, tileSize: 256 }
+            : { type: "image", url: raster.url, coordinates: imageCoordinates(raster.bounds) },
+        );
         markLoading(sourceId, raster.label ?? "layer");
         // beforeId, so imagery can never cover the vector geometry —
         // see firstVectorLayerId.
