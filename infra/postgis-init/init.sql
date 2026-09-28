@@ -87,7 +87,7 @@ $$ LANGUAGE sql STABLE;
 -- overlay on the map — the source imagery has no embedded geo tags of its
 -- own. NULL for vector rows, which carry their own geometry instead.
 -- status lets a row announce a layer whose data hasn't been delivered yet
--- (e.g. Tree Species, alongside Tree Height in the same section) without a
+-- (a layer in the client's structure whose file is still due) without a
 -- frontend code change: 'pending' rows carry no kind/color/file_path and the
 -- sidebar renders them as a disabled placeholder rather than a working
 -- switch. Flip to 'available' and fill in kind/color/file_path once the data
@@ -324,11 +324,13 @@ UPDATE layer_groups SET draw_below = true WHERE key = 'toposheet';
 
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
--- layer, which would swallow Tree Height (and the still-pending rows) next
--- to it.
+-- layer, which would swallow the vector rows next to it.
+-- Tree Statistics is a nested group of two vector rows, so it is one layer
+-- whose switch turns on both (see lib/sections.ts, mode "options").
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
-    ('tree-density',  'Tree Density',   grp('drone-analysis'), 1),
-    ('growing-stock', 'Growing Stock',  grp('drone-analysis'), 2);
+    ('tree-density',    'Tree Density',    grp('drone-analysis'), 1),
+    ('growing-stock',   'Growing Stock',   grp('drone-analysis'), 2),
+    ('tree-statistics', 'Tree Statistics', grp('drone-analysis'), 3);
 
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
@@ -348,26 +350,30 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     8, 71.758100, 21.466484, 71.821988, 21.512142),
     ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       4, 71.697740, 21.427782, 71.855416, 21.552918);
 
--- Tree Inventory: per-tree survey attributes. Tree Height is the client's
--- full 856,700-point survey, every point of it — but served as PMTiles
--- rather than as the 166 MB GeoJSON it was delivered as. Handed over whole it
--- became 856,700 objects in MapLibre's worker and killed the tab; tiled, the
--- browser holds only what is on screen. The .geojson stays in the repo as the
--- source the archive is rebuilt from (tools/prepare-vector-tiles.sh).
---
--- Nothing here says "this layer is tiled": the API stamps that from the file
--- extension, so switching a layer to tiles is this one path edit.
---
--- Tree Species: 822,994 trees from Tree_Statistics.parquet (UTM 42N), built
--- the same way as TOF (ogr2ogr to EPSG:4326 keeping Predicted_SN, Max_Height,
--- Carbon_kg, then tools/prepare-vector-tiles.sh). Coloured by the ten most
--- common species (91% of trees); the other 24 and the unnamed fall through to
--- `color`, which the "Other species" legend row names.
-INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeHeight',  'Tree Height',  grp('drone-analysis'), 'vector', 'point', '#3E7C3A', 'vector-data/tree-height.pmtiles', 1, 'available', 71.727980, 21.451834, 71.822887, 21.512493),
-    ('treeSpecies', 'Tree Species', grp('drone-analysis'), 'vector', 'point', '#bab0ac', 'vector-data/tree-species.pmtiles', 2, 'available', 71.728574, 21.451984, 71.821788, 21.511942);
+-- Tree Statistics: one layer (nested group, see above) of two rows drawn
+-- together — the 822,994 surveyed trees, and the 189-cell grid their totals
+-- are summarised over. Both delivered as parquet (not committed; the served
+-- files are rebuilt from them):
+--   ogr2ogr -f GeoJSON tree-statistics.geojson tree-statistics.parquet \
+--     -t_srs EPSG:4326 -lco COORDINATE_PRECISION=7 \
+--     -select Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum
+--   tools/prepare-vector-tiles.sh treeStatistics tree-statistics.geojson
+--   ogr2ogr -f GeoJSON apps/vector-data/tree-grid.geojson grid.parquet \
+--     -t_srs EPSG:4326 -dim XY -lco COORDINATE_PRECISION=7 \
+--     -select GridNum,Zone,Total_Tree_Count,Total_Tree_Species,Total_Carbon_kg,Total_Carbon_Tonnes,Carbon_Density_t_ha,Area_SqM
+-- The trees are tiled (a whole-file GeoJSON of that many points kills the
+-- tab); the API stamps that from the .pmtiles extension. The grid is an
+-- outline so the trees show through it, and sorts first so the trees draw on
+-- top — a click on a tree opens the tree, anywhere else in a cell the cell.
+-- Trees are coloured by the ten most common species (91% of trees); the
+-- other 24 and the unnamed fall through to `color`, the "Other species" row.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('treeGrid',       'Grid',  grp('tree-statistics'), 'vector', 'outline', '#FFFFFF', 'vector-data/tree-grid.geojson',        1, 71.728476, 21.451971, 71.821823, 21.512008,
+        '{GridNum,Zone,Total_Tree_Count,Total_Tree_Species,Total_Carbon_Tonnes,Carbon_Density_t_ha}'),
+    ('treeStatistics', 'Trees', grp('tree-statistics'), 'vector', 'point',   '#bab0ac', 'vector-data/tree-statistics.pmtiles', 2, 71.728574, 21.451984, 71.821788, 21.511942,
+        '{Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum}');
 
-UPDATE static_overlays SET color_field = 'Predicted_SN', popup_fields = '{Predicted_SN,Max_Height,Carbon_kg}',
+UPDATE static_overlays SET color_field = 'Predicted_SN',
     categories = '[
         {"value": "Butea monosperma", "label": "Butea monosperma", "color": "#f28e2b"},
         {"value": "Senegalia senegal", "label": "Senegalia senegal", "color": "#4e79a7"},
@@ -381,7 +387,7 @@ UPDATE static_overlays SET color_field = 'Predicted_SN', popup_fields = '{Predic
         {"value": "Mangifera indica", "label": "Mangifera indica", "color": "#17becf"},
         {"value": "Other", "label": "Other species", "color": "#bab0ac"}
     ]'::jsonb
-WHERE key = 'treeSpecies';
+WHERE key = 'treeStatistics';
 
 -- Forest Survey of India (FSI) 2023 notification: official density-class and
 -- species-type polygons, delivered as vector data rather than as imagery.
@@ -619,22 +625,8 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.4870089, 21.2403840, 72.0156875, 21.7609689);
 
--- ---------------------------------------------------------------------------
--- Seed: layers from the client's structure with no data delivered yet.
---
--- Seeded 'pending' exactly like Tree Species and Matipala above: no kind,
--- colour, file or extent, and the sidebar renders them as a disabled
--- placeholder. Each goes live by updating its row; nothing else changes.
--- ---------------------------------------------------------------------------
-
-INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, status) VALUES
-    -- Drone Analysis. Tree Height and Tree Species are seeded above, Tree
-    -- Density and Growing Stock are their own raster groups below; these are
-    -- the rest of the brief's list for that group.
-    ('carbonStock',         'Carbon Stock Estimates',      grp('drone-analysis'), 'vector', NULL, NULL, '', 5, 'pending');
-
 -- TOF (Trees Outside Forests): 212,969 tree polygons, delivered as
--- TreeOutsideForest.parquet (UTM 42N) and served as PMTiles like Tree Height.
+-- TreeOutsideForest.parquet (UTM 42N) and served as PMTiles like Tree Statistics.
 -- Built with:
 --   ogr2ogr -f GeoJSON tof.geojson TreeOutsideForest.parquet -t_srs EPSG:4326 \
 --     -select TOF_Class,Max_Height -lco COORDINATE_PRECISION=7
