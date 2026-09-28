@@ -69,6 +69,11 @@ const INITIAL_ZOOM = 11;
 const LINE_WIDTH = 1;
 const LINE_CASING_WIDTH = 2;
 const OUTLINE_WIDTH = 0.75;
+// A dotted line (static_overlays.dotted) is drawn as round-capped zero-length
+// dashes, one dot per DOTTED_GAP line-widths. At LINE_WIDTH the dots would
+// merge into a faint solid line, so it draws wider.
+const DOTTED_WIDTH = 2.5;
+const DOTTED_GAP = 2;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -439,7 +444,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -461,7 +466,22 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
     // per-layer lookup — see tools/prepare-vector-tiles.sh.
     const from = tiled ? { "source-layer": key } : {};
 
-    if (kind === "line") {
+    if (kind === "line" && dotted) {
+      // No casing or flow: a solid casing would show between the dots, and
+      // the flow's moving gaps would scramble them.
+      map.addLayer({
+        id: `${sourceId}-line`,
+        type: "line",
+        source: sourceId,
+        ...from,
+        layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": fillColor,
+          "line-width": DOTTED_WIDTH,
+          "line-dasharray": [0, DOTTED_GAP],
+        },
+      });
+    } else if (kind === "line") {
       map.addLayer({
         id: `${sourceId}-casing`,
         type: "line",

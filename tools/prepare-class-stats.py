@@ -84,6 +84,17 @@ FRAGMENTATION = {
 }
 
 DENSITY_CODES = {"VDF", "MDF", "OF", "SCRUB", "NF"}
+# Densest first. A transition's group follows from its two codes: towards a
+# denser class is Improvement, towards a sparser one Degradation. Derived
+# rather than read from the sheet, whose headings misfile some rows (e.g.
+# NF-SCRUB under Degradation in 1980-1989).
+DENSITY_RANK = {"VDF": 0, "MDF": 1, "OF": 2, "SCRUB": 3, "NF": 4}
+GROUP_ORDER = ("Improvement", "Degradation", "Stable")
+
+
+def transition_group(frm: str, to: str) -> str:
+    d = DENSITY_RANK[to] - DENSITY_RANK[frm]
+    return "Improvement" if d < 0 else "Degradation" if d > 0 else "Stable"
 # One typo in the delivery ("VD-SCRUB", 2018 over 2008).
 CODE_FIXES = {"VD": "VDF"}
 
@@ -179,20 +190,20 @@ def vegetation_change(path: Path) -> list[Row]:
         if not m:
             sys.exit(f"{path.name}: unexpected sheet {sheet!r}")
         key = f"vegetation_change_{m[2]}_{m[1]}"
-        group = None
-        order = 0
+        sheet_rows = []
         for r in rows_of(path, sheet)[1:]:
-            if r[0] is not None:
-                # "Degardation" in one sheet.
-                group = {"degardation": "Degradation"}.get(str(r[0]).strip().lower(), str(r[0]).strip())
             if r[1] is None or r[2] is None:
                 continue
             codes = [CODE_FIXES.get(c, c) for c in re.split(r"\s*-\s*", str(r[1]).strip().upper())]
             if len(codes) != 2 or not set(codes) <= DENSITY_CODES:
                 sys.exit(f"{path.name}/{sheet}: unrecognised transition {r[1]!r}")
             value = "-".join(codes)
-            order += 1
-            out.append((key, value, value.replace("-", " → "), group, r[2], r[3], order))
+            sheet_rows.append((value, transition_group(*codes), r[2], r[3]))
+        # The panel heads each run of one group, so a group's rows must be
+        # contiguous; the sort is stable, keeping the delivered order within one.
+        sheet_rows.sort(key=lambda row: GROUP_ORDER.index(row[1]))
+        for order, (value, group, area, pct) in enumerate(sheet_rows, 1):
+            out.append((key, value, value.replace("-", " → "), group, area, pct, order))
     return out
 
 

@@ -24,6 +24,8 @@ export interface OverlayDef {
   categories?: LegendClass[];
   /** See OverlayMeta.popup_fields. */
   popupFields?: string[];
+  /** See OverlayMeta.dotted. */
+  dotted?: boolean;
   /**
    * SW/NE corners of the layer's own geometry, from its `static_overlays`
    * row. The map frames a layer from this the moment its switch is flipped,
@@ -57,6 +59,7 @@ export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
       colorField: o.color_field,
       categories: o.categories,
       popupFields: o.popup_fields,
+      dotted: o.dotted,
       tiled: o.tiled ?? false,
       bounds:
         o.min_lon != null && o.min_lat != null && o.max_lon != null && o.max_lat != null

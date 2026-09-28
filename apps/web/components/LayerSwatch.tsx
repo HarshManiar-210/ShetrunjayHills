@@ -10,7 +10,13 @@
  * a solid edge over them, a hollow polygon is the edge alone, a line has the
  * width it draws at, and a point is a disc.
  */
-export type SwatchGeometryKind = "point" | "line" | "polygon" | "polygon-outline" | "raster";
+export type SwatchGeometryKind =
+  | "point"
+  | "line"
+  | "dotted-line"
+  | "polygon"
+  | "polygon-outline"
+  | "raster";
 
 /**
  * How strongly a filled polygon's wash reads in its swatch.
@@ -43,6 +49,16 @@ export function LayerSwatch({
       <span
         className="h-0.5 w-4 shrink-0 rounded-full"
         style={{ backgroundColor: color }}
+        aria-hidden
+      />
+    );
+  }
+
+  if (geometryKind === "dotted-line") {
+    return (
+      <span
+        className="w-4 shrink-0 border-t-2 border-dotted"
+        style={{ borderColor: color }}
         aria-hidden
       />
     );

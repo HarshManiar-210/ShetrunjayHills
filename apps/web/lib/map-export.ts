@@ -241,7 +241,7 @@ function gradientBar(
 
 /**
  * The legend's shape vocabulary, drawn rather than styled — the canvas
- * counterpart of LayerSwatch, and deliberately the same five shapes, so a
+ * counterpart of LayerSwatch, and deliberately the same shapes, so a
  * sheet reads the same as the screen it came from.
  */
 function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchGeometryKind) {
@@ -253,8 +253,10 @@ function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchG
     ctx.beginPath();
     ctx.arc(x + SWATCH / 2, y + SWATCH / 2, SWATCH / 2 - 0.5, 0, Math.PI * 2);
     ctx.fill();
-  } else if (kind === "line") {
+  } else if (kind === "line" || kind === "dotted-line") {
     ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.setLineDash(kind === "dotted-line" ? [0, 5] : []);
     ctx.beginPath();
     ctx.moveTo(x, y + SWATCH / 2);
     ctx.lineTo(x + SWATCH, y + SWATCH / 2);
@@ -348,7 +350,9 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
           scale.ticks,
         );
       }
-      for (const cls of legend?.classes ?? []) swatchRow(c, cls.color, "raster", cls.label);
+      if (!legend?.rampOnly) {
+        for (const cls of legend?.classes ?? []) swatchRow(c, cls.color, "raster", cls.label);
+      }
       c.y += 6;
     });
   }

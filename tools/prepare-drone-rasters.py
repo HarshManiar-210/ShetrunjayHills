@@ -95,7 +95,7 @@ WHITE = 250
 # The seeded bounds are the *input* to the correction, read from init.sql as
 # delivered; the corrected values this script prints replace them.
 PRODUCTS: dict[str, tuple[str, str, tuple[float, float, float, float]]] = {
-    "orthomosaic": ("orthomosaic.png", "orthomosaic.png",
+    "orthomosaic": ("orthomosaic.png", "orthomosaic.webp",
                     (71.7260650456997695, 21.4501880729730381, 71.8235358472878715, 21.5126892571809378)),
     "dsm":   ("DSM.png",   "DSM.png",   (71.7271798880087346, 21.4508330628973276, 71.8229888063212201, 21.5126892567312282)),
     "dtm":   ("DTM.png",   "DTM.png",   (71.727678, 21.452812, 71.823913, 21.512044)),
@@ -258,7 +258,8 @@ def main() -> int:
         im = drop_white(im)
 
         transparent = im.getchannel("A").histogram()[0] / (im.width * im.height)
-        im.save(dst, optimize=True)
+        # PNG ignores the WebP args and vice versa; WebP here is lossless.
+        im.save(dst, optimize=True, lossless=True, quality=100, method=6)
         print(f"{key:12s} from {source_size[0]}x{source_size[1]} "
               f"-> {im.width}x{im.height}, {transparent:.1%} transparent")
 

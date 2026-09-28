@@ -209,24 +209,26 @@ export function LegendContent({
 
                   {/* Long class lists go two-up with their compact labels, so
                       the legend still fits without scrolling. */}
-                  <div
-                    className={cn(
-                      "gap-x-2 gap-y-1",
-                      isLong(legend) ? "grid grid-cols-2" : "flex flex-col",
-                    )}
-                  >
-                    {legend.classes.map((cls) => (
-                      <div key={cls.value} className="flex items-center gap-1.5 text-xs">
-                        {/* A raster class is a solid block, per the brief —
-                            the same shape LayerSwatch gives a filled polygon,
-                            and deliberately not the dot a point layer gets. */}
-                        <LayerSwatch color={cls.color} geometryKind="raster" />
-                        <span className="truncate" title={cls.label}>
-                          {isLong(legend) ? (cls.shortLabel ?? cls.label) : cls.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {!legend.rampOnly && (
+                    <div
+                      className={cn(
+                        "gap-x-2 gap-y-1",
+                        isLong(legend) ? "grid grid-cols-2" : "flex flex-col",
+                      )}
+                    >
+                      {legend.classes.map((cls) => (
+                        <div key={cls.value} className="flex items-center gap-1.5 text-xs">
+                          {/* A raster class is a solid block, per the brief —
+                              the same shape LayerSwatch gives a filled polygon,
+                              and deliberately not the dot a point layer gets. */}
+                          <LayerSwatch color={cls.color} geometryKind="raster" />
+                          <span className="truncate" title={cls.label}>
+                            {isLong(legend) ? (cls.shortLabel ?? cls.label) : cls.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
           </div>
