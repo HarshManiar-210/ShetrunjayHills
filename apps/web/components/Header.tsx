@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Mountain, ChevronDown, LogIn, LogOut, CircleQuestionMark } from "lucide-react";
+import { Menu, ChevronDown, LogIn, LogOut, CircleQuestionMark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 // import { ThemeToggle } from "@/components/theme-toggle"; // disabled for now
 import {
@@ -89,9 +89,12 @@ export function Header({
           <Menu />
         </Button>
 
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-nav-soft to-nav-line/40 shadow-e1 ring-1 ring-nav-line">
-          <Mountain className="size-5 text-nav-accent" strokeWidth={2.25} />
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a 144 px static logo; next/image adds nothing here */}
+        <img
+          src="/logo.png"
+          alt=""
+          className="size-9 shrink-0 rounded-xl object-cover shadow-e1 ring-1 ring-nav-line"
+        />
         {/* Dropped below sm so the search bar has room on a phone; the mobile
             navigation sheet carries the wordmark in full. */}
         <div className="hidden min-w-0 sm:block">

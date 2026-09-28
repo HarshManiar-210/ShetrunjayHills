@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Mountain } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { LoginForm } from "@/components/LoginForm";
 
@@ -13,7 +12,8 @@ export default function LoginPage() {
       <div className="flex w-full flex-col justify-center px-6 py-12 sm:px-12 md:w-1/2 lg:px-20">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2">
-            <Mountain className="size-6 text-primary" strokeWidth={1.75} />
+            {/* eslint-disable-next-line @next/next/no-img-element -- see Header */}
+            <img src="/logo.png" alt="" className="size-9 rounded-xl object-cover" />
             <div>
               <p className="text-base font-semibold leading-tight">
                 Shatrunjay Hills
