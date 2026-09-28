@@ -22,6 +22,8 @@ import (
 	"io"
 	"math"
 	"sort"
+
+	_ "golang.org/x/image/webp" // lossless WebP rasters (the orthomosaic)
 )
 
 // IUGG mean Earth radius, in metres.
