@@ -587,8 +587,8 @@ UPDATE static_overlays SET color_field = 'lithologic',
 WHERE key = 'geology';
 
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
--- takes the Orthomosaic's bounds (pixel aspect 1.564 vs 1.566 for that box
--- in EPSG:4326 degrees).
+-- takes the Orthomosaic's bounds. Its pixels are square in metres (aspect
+-- 1.466, vs 1.465 for that box on the ground), not in degrees.
 -- Growing Stock, Habitat Suitability, Wildlife Corridors: EPSG:4326 grids
 -- clipped to the study area; bounds fitted to its outline by
 -- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
