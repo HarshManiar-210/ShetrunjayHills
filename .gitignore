@@ -162,3 +162,15 @@ go.work.sum
 infra/postgis-data/
 
 *.DS_Store
+
+# ---- Drone rasters ----
+# Full-resolution delivery (~24,000 px PNGs) and the lossless tile archives
+# built from them (tools/prepare-raster-tiles.sh). Too big for Git LFS's
+# allowance, so they are copied to the server with scp instead of committed.
+apps/raster-data/Orthomosaic.png
+apps/raster-data/DSM.png
+apps/raster-data/DTM.png
+apps/raster-data/Slope.png
+apps/raster-data/Aspect.png
+apps/raster-data/CHM.png
+apps/raster-data/*.pmtiles
