@@ -350,6 +350,16 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     8, 71.758100, 21.466484, 71.821988, 21.512142),
     ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       4, 71.697740, 21.427782, 71.855416, 21.552918);
 
+-- Watershed size classes. WatershedClass was added to the delivered GeoJSON
+-- from each polygon's measured geodesic area (99 Mini, 10 Micro); the
+-- delivered `Area` attribute doesn't match the geometry, so it isn't used.
+UPDATE static_overlays SET color_field = 'WatershedClass',
+    categories = '[
+        {"value": "Mini",  "label": "Mini Watershed (1 - 100 Ha)",     "color": "#2F9E9E"},
+        {"value": "Micro", "label": "Micro Watershed (100 - 1000 Ha)", "color": "#1F4E79"}
+    ]'::jsonb
+WHERE key = 'watershed';
+
 -- Tree Statistics: one layer (nested group, see above) of two rows drawn
 -- together — the 822,994 surveyed trees, and the 189-cell grid their totals
 -- are summarised over. Both delivered as parquet (not committed; the served
