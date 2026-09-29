@@ -821,6 +821,26 @@ export default function Map({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Home: the loaded layers' extent, or the initial view when nothing is on.
+  // Shared by the "Reset view" control and clearing a searched coordinate.
+  const resetView = useCallback(() => {
+    const map = mapRef.current;
+    const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
+    if (map && bounds) map.fitBounds(bounds, { padding: 40 });
+    else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
+  }, []);
+
+  // A searched pin being cleared sends the map home, not left where it was.
+  const hadPinRef = useRef(false);
+  useEffect(() => {
+    if (!mapLoaded) return;
+    if (pin) hadPinRef.current = true;
+    else if (hadPinRef.current) {
+      hadPinRef.current = false;
+      resetView();
+    }
+  }, [pin, mapLoaded, resetView]);
+
   // A searched coordinate: fly there and mark it. Zooms in only as far as
   // SEARCH_PIN_ZOOM, and never back out if the view is already closer. The
   // marker's popup repeats the coordinate, so it can be read off the map.
@@ -1108,12 +1128,7 @@ export default function Map({
         measureMode={measureMode}
         onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
-        fitBounds={() => {
-          const map = mapRef.current;
-          const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
-          if (map && bounds) map.fitBounds(bounds, { padding: 40 });
-          else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
-        }}
+        fitBounds={resetView}
       />
 
       {/* Bottom-centre: the year bar anchored to the map's bottom edge when a

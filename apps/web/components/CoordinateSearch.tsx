@@ -11,15 +11,21 @@ import { formatLatLng, parseLatLng, type LatLng } from "@/lib/coords";
  * there and pins it (see lib/coords.ts for what parses). Layers are found
  * through the navbar pickers, not here.
  *
+ * The searched coordinate stays in the field afterwards; the clear button
+ * removes it and the pin, and sends the map home (via onClear).
+ *
  * The one suggestion is absolutely positioned, so it overhangs the map
  * instead of growing the header.
  */
 export function CoordinateSearch({
   onGoTo,
+  onClear,
   className,
 }: {
   /** A coordinate pair was entered: centre the map there. */
   onGoTo: (point: LatLng) => void;
+  /** The field was cleared: drop the pin and return the map home. */
+  onClear: () => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -29,21 +35,24 @@ export function CoordinateSearch({
   const point = parseLatLng(query);
   const showSuggestion = open && point !== null;
 
-  function reset() {
+  function clear() {
     setQuery("");
     setOpen(false);
+    onClear();
   }
 
   function goTo(target: LatLng) {
     onGoTo(target);
-    reset();
+    // The query stays in the field, so what was searched remains visible.
+    setOpen(false);
     inputRef.current?.blur();
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      reset();
+      setOpen(false);
+      inputRef.current?.blur();
     } else if (event.key === "Enter" && point) {
       event.preventDefault();
       goTo(point);
@@ -84,10 +93,7 @@ export function CoordinateSearch({
             size="icon-xs"
             className="shrink-0"
             aria-label="Clear search"
-            onClick={() => {
-              reset();
-              inputRef.current?.focus();
-            }}
+            onClick={clear}
           >
             <X />
           </Button>

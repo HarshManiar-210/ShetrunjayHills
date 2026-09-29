@@ -789,6 +789,7 @@ export function MapDashboard() {
               setPin({ ...point });
               setMobileSheet(null);
             }}
+            onClear={() => setPin(null)}
           />
         }
       />
