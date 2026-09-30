@@ -32,6 +32,7 @@ import { MapControls } from "@/components/MapControls";
 import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
 import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
+import type { MapStackEntry } from "@/lib/layer-order";
 import type { LegendClass } from "@/lib/legend-config";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,8 @@ const INITIAL_ZOOM = 11;
 // animates over: narrower leaves a sliver of layer colour down each side of
 // every gap, wider paints over the neighbouring geometry. As constants the
 // pairing is structural, so thinning a line cannot silently break its dashes.
+// These are defaults: a row's static_overlays.line_width replaces them, and
+// its flow layer is built from the same resolved width.
 const LINE_WIDTH = 1;
 const LINE_CASING_WIDTH = 2;
 const OUTLINE_WIDTH = 0.75;
@@ -74,6 +77,10 @@ const OUTLINE_WIDTH = 0.75;
 // merge into a faint solid line, so it draws wider.
 const DOTTED_WIDTH = 2.5;
 const DOTTED_GAP = 2;
+
+// The lowest of the shared permissioned layers (see addLayers). The panel's
+// ordered layers are stacked beneath it.
+const STACK_CEILING = "polygons-fill";
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -418,7 +425,7 @@ function addLayers(
  * gaps in that line rather than a second line of its own.
  */
 function flowLayerIds(defs: OverlayDef[]): string[] {
-  return defs.map(({ key }) => `overlay-${key}-flow`);
+  return defs.filter((d) => !d.solid).map(({ key }) => `overlay-${key}-flow`);
 }
 
 // Static overlays (Base Layers + Watershed Analysis sections): added once,
@@ -450,7 +457,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url, dotted } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted, lineWidth, solid } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -488,13 +495,14 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         },
       });
     } else if (kind === "line") {
+      const width = lineWidth ?? LINE_WIDTH;
       map.addLayer({
         id: `${sourceId}-casing`,
         type: "line",
         source: sourceId,
         ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
+        paint: { "line-color": CASING, "line-width": width + LINE_CASING_WIDTH - LINE_WIDTH },
       });
       map.addLayer({
         id: `${sourceId}-line`,
@@ -502,22 +510,24 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": fillColor, "line-width": LINE_WIDTH },
+        paint: { "line-color": fillColor, "line-width": width },
       });
-      map.addLayer({
-        id: `${sourceId}-flow`,
-        type: "line",
-        source: sourceId,
-        ...from,
-        // Butt caps, not round: a round cap on every dash bleeds the dashes
-        // into each other and the flow stops reading as movement.
-        layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
-        paint: {
-          "line-color": CASING,
-          "line-width": LINE_WIDTH,
-          "line-dasharray": DASH_SEQUENCE[0],
-        },
-      });
+      if (!solid) {
+        map.addLayer({
+          id: `${sourceId}-flow`,
+          type: "line",
+          source: sourceId,
+          ...from,
+          // Butt caps, not round: a round cap on every dash bleeds the dashes
+          // into each other and the flow stops reading as movement.
+          layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+          paint: {
+            "line-color": CASING,
+            "line-width": width,
+            "line-dasharray": DASH_SEQUENCE[0],
+          },
+        });
+      }
     } else if (kind === "point") {
       // No casing/flow here — the dash animation is a line-only effect, and
       // startDashAnimation already no-ops on a layer id that doesn't exist.
@@ -552,21 +562,25 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         type: "line",
         source: sourceId,
         ...from,
-        layout: { visibility: "none" },
-        paint: { "line-color": fillColor, "line-width": OUTLINE_WIDTH },
+        // Round joins, so a thick boundary does not spike at every vertex.
+        layout: { visibility: "none", "line-join": "round" },
+        paint: { "line-color": fillColor, "line-width": lineWidth ?? OUTLINE_WIDTH },
       });
-      map.addLayer({
-        id: `${sourceId}-flow`,
-        type: "line",
-        source: sourceId,
-        ...from,
-        layout: { visibility: "none" },
-        paint: {
-          "line-color": CASING,
-          "line-width": OUTLINE_WIDTH,
-          "line-dasharray": DASH_SEQUENCE[0],
-        },
-      });
+      // A `solid` row has no flow layer at all: its colour runs unbroken.
+      if (!solid) {
+        map.addLayer({
+          id: `${sourceId}-flow`,
+          type: "line",
+          source: sourceId,
+          ...from,
+          layout: { visibility: "none" },
+          paint: {
+            "line-color": CASING,
+            "line-width": lineWidth ?? OUTLINE_WIDTH,
+            "line-dasharray": DASH_SEQUENCE[0],
+          },
+        });
+      }
     }
   }
 }
@@ -584,6 +598,38 @@ function flyToIfCloser(map: MapLibreMap, bounds: LngLatBoundsLike | undefined) {
   const camera = map.cameraForBounds(bounds, fitOptions);
   if (camera?.zoom != null && camera.zoom > map.getZoom()) {
     map.fitBounds(bounds, fitOptions);
+  }
+}
+
+/**
+ * Restacks the overlays and rasters to the layers panel's order.
+ *
+ * Every entry is moved beneath the shared permissioned layers
+ * (STACK_CEILING), top entry first, each one directly under the last. So the
+ * ordered layers keep to the band between the basemap and those, and
+ * anything added above them later — the measure tool, the location circle —
+ * is never buried by a reorder. A layer not on the map yet is skipped; the
+ * effect that calls this runs again once it has been added.
+ */
+function applyStack(map: MapLibreMap, stack: MapStackEntry[], defs: OverlayDef[]) {
+  if (!map.getLayer(STACK_CEILING)) return;
+  const kindOf = new globalThis.Map(defs.map((d) => [d.key, d.kind]));
+  let before = STACK_CEILING;
+  for (const entry of stack) {
+    // Bottom to top within the entry, walked backwards so each move lands
+    // directly beneath the one placed before it.
+    const ids = [
+      ...entry.rasters.map(rasterLayerId),
+      ...entry.overlays.flatMap((key) => {
+        const kind = kindOf.get(key);
+        return kind ? overlayLayerIds(kind, `overlay-${key}`) : [];
+      }),
+    ];
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if (!map.getLayer(ids[i])) continue;
+      map.moveLayer(ids[i], before);
+      before = ids[i];
+    }
   }
 }
 
@@ -662,6 +708,7 @@ export default function Map({
   bottomCenter,
   infoReachesCorner = false,
   pin = null,
+  stack,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -682,10 +729,11 @@ export default function Map({
   bottomCenter?: React.ReactNode;
   /**
    * Whether the legend and statistics column has grown down far enough to
-   * reach the bottom-right corner. When it has, the tool stack steps left of
-   * it and the bottom-centre band gives up the width to match. Both read
-   * the column's width from `--info-col-w`, set by the dashboard, because
-   * the column widens while two years are being compared.
+   * reach the bottom-right corner. When it has, the tool stack turns into a
+   * row in the corner beneath it, and the bottom-centre band gives up the
+   * column's width so the year bar never runs underneath either. The band
+   * reads that width from `--info-col-w`, set by the dashboard, because the
+   * column widens while two years are being compared.
    */
   infoReachesCorner?: boolean;
   /**
@@ -693,6 +741,11 @@ export default function Map({
    * marker; a new object for the same point flies there again.
    */
   pin?: LatLng | null;
+  /**
+   * Draw order, top first, from the layers panel (see lib/layer-order.ts).
+   * Absent keeps the order layers were added in, rasters under vectors.
+   */
+  stack?: MapStackEntry[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -701,6 +754,9 @@ export default function Map({
   // the overlayDefs captured at mount time otherwise — the metadata fetch
   // that populates this typically resolves after that.
   const overlayDefsRef = useRef(overlayDefs);
+  // Whether a panel order is driving the stack. Read by the raster reconcile,
+  // which must leave stacking alone when one is.
+  const hasStackRef = useRef(stack !== undefined);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
   const attributionRef = useRef<CompactAttribution | null>(null);
@@ -787,9 +843,8 @@ export default function Map({
       style: mapStyle(basemapRef.current),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
-      // Stops the camera where the basemaps stop having imagery, so nobody
-      // can zoom into Esri's "Map data not yet available" tile. See
-      // MAX_MAP_ZOOM for why this gives up no real detail.
+      // Stops the camera where the basemaps and drone tiles stop having data.
+      // See MAX_MAP_ZOOM for why this gives up no real detail.
       maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
       // Needed to read the canvas back for the JPG export. WebGL discards the
@@ -820,6 +875,26 @@ export default function Map({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Home: the loaded layers' extent, or the initial view when nothing is on.
+  // Shared by the "Reset view" control and clearing a searched coordinate.
+  const resetView = useCallback(() => {
+    const map = mapRef.current;
+    const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
+    if (map && bounds) map.fitBounds(bounds, { padding: 40 });
+    else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
+  }, []);
+
+  // A searched pin being cleared sends the map home, not left where it was.
+  const hadPinRef = useRef(false);
+  useEffect(() => {
+    if (!mapLoaded) return;
+    if (pin) hadPinRef.current = true;
+    else if (hadPinRef.current) {
+      hadPinRef.current = false;
+      resetView();
+    }
+  }, [pin, mapLoaded, resetView]);
 
   // A searched coordinate: fly there and mark it. Zooms in only as far as
   // SEARCH_PIN_ZOOM, and never back out if the view is already closer. The
@@ -906,7 +981,7 @@ export default function Map({
         map.setLayoutProperty(layerId, "visibility", shown.has(layerId) ? "visible" : "none");
       }
     }
-    // Esri and OpenStreetMap require different credits, and only the visible
+    // Google and OpenStreetMap require different credits, and only the visible
     // one may be shown.
     attributionRef.current?.setHTML(basemapById(basemap).attribution);
   }, [basemap, mapLoaded]);
@@ -984,6 +1059,11 @@ export default function Map({
     // matters for compare mode: the compared year has to sit above the base
     // year for the blend to read correctly. Moving each layer in turn to just
     // below the first vector layer leaves the last entry on top.
+    //
+    // Only without a panel order: with one, the restack effect owns stacking,
+    // and this — which also runs on every opacity change — would drag
+    // imagery the user had raised back under the vectors.
+    if (hasStackRef.current) return;
     const floor = firstVectorLayerId(map);
     for (const raster of rasterOverlays) {
       const layerId = rasterLayerId(raster.id);
@@ -1000,6 +1080,17 @@ export default function Map({
     if (!map || !mapLoaded) return;
     addOverlaySources(map, overlayDefs);
   }, [overlayDefs, mapLoaded]);
+
+  // Restack after the raster reconcile and the overlay-source effect above
+  // have added whatever is new — hence keyed on which rasters exist, not on
+  // the raster objects, so dragging an opacity slider does not restack.
+  const rasterIds = rasterOverlays.map((r) => r.id).join("|");
+  useEffect(() => {
+    const map = mapRef.current;
+    hasStackRef.current = stack !== undefined;
+    if (!map || !mapLoaded || !stack) return;
+    applyStack(map, stack, overlayDefs);
+  }, [stack, rasterIds, overlayDefs, mapLoaded]);
 
   // static overlays: each file is handed to MapLibre once, as a URL rather
   // than as parsed GeoJSON. That hands the fetch, the JSON parse and the
@@ -1104,16 +1195,11 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
-        className={infoReachesCorner ? "xl:right-[calc(var(--info-col-w,18rem)+1.5rem)]" : undefined}
+        horizontal={infoReachesCorner}
         measureMode={measureMode}
         onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
-        fitBounds={() => {
-          const map = mapRef.current;
-          const bounds = dataRef.current.features.map(boundsOfFeature).find(Boolean);
-          if (map && bounds) map.fitBounds(bounds, { padding: 40 });
-          else map?.flyTo({ center: INITIAL_CENTER, zoom: INITIAL_ZOOM });
-        }}
+        fitBounds={resetView}
       />
 
       {/* Bottom-centre: the year bar anchored to the map's bottom edge when a
@@ -1129,8 +1215,9 @@ export default function Map({
 
           Centred in the band the corner controls leave free: the basemap
           switcher on the left, the tool stack on the right. When the legend
-          and statistics column reaches the corner the stack steps left of it,
-          and the band's right edge follows so the bar never runs underneath.
+          and statistics column reaches the corner the stack becomes a row
+          beneath it, and the band's right edge moves to the column's left
+          edge so the bar runs under neither.
           Click-through, so the empty space beside the bar does not eat map
           drags.
 
@@ -1143,7 +1230,7 @@ export default function Map({
         className={cn(
           "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-3 md:left-[13.5rem]",
           infoReachesCorner
-            ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+5rem)]"
+            ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+1.5rem)]"
             : "md:right-14",
         )}
       >

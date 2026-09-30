@@ -13,15 +13,8 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element -- see Header */}
-            <img src="/logo.png" alt="" className="size-9 rounded-xl object-cover" />
-            <div>
-              <p className="text-base font-semibold leading-tight">
-                Shatrunjay Hills
-              </p>
-              <p className="text-xs text-muted-foreground leading-tight">
-                Web GIS Dashboard
-              </p>
-            </div>
+            <img src="/logo.png" alt="" className="size-11 rounded-xl object-cover" />
+            <p className="text-lg font-semibold leading-tight">Shatrunjay Hills</p>
           </div>
           <Card>
             <CardContent>

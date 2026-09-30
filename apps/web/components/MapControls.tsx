@@ -32,10 +32,12 @@ const SETTLE_MS = 12_000;
 /**
  * The map's tool stack.
  *
- * Bottom-right by default, and stepped left of the statistics card when that
- * card and the legend above it grow tall enough to reach down here. Which
- * they do is measured rather than assumed — see MapDashboard — because it
- * depends on how many layers are switched on, not on a breakpoint.
+ * A vertical stack in the bottom-right corner by default. When the legend
+ * and statistics column grows tall enough to reach down here it lays out as
+ * a horizontal row instead, still in the corner, in the strip the column
+ * leaves free below itself. Whether it reaches is measured rather than
+ * assumed — see MapDashboard — because it depends on how many layers are
+ * switched on, not on a breakpoint.
  *
  * Measure Distance, Measure Area and Show Location are all from the brief.
  * Show Location had previously been removed on the grounds that it points a
@@ -48,12 +50,15 @@ export function MapControls({
   fitBounds,
   measureMode,
   onMeasureModeChange,
+  horizontal = false,
   className,
 }: {
   mapRef: RefObject<MapLibreMap | null>;
   fitBounds: () => void;
   measureMode: MeasureMode;
   onMeasureModeChange: (mode: MeasureMode) => void;
+  /** A single row rather than a column — see above for when. */
+  horizontal?: boolean;
   /** Where it sits. The default is the bottom-right corner. */
   className?: string;
 }) {
@@ -174,23 +179,31 @@ export function MapControls({
     <div
       data-tour="map-controls"
       className={cn(
-        "absolute right-3 bottom-3 z-10 flex flex-col gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm",
+        "absolute right-3 bottom-3 z-10 flex gap-1 rounded-xl bg-card/95 p-1 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm",
+        horizontal ? "flex-row" : "flex-col",
         className,
       )}
     >
-      <ToolButton label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
+      <ToolButton horizontal={horizontal} label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
         <Plus />
       </ToolButton>
-      <ToolButton label="Zoom out" onClick={() => mapRef.current?.zoomOut()}>
+      <ToolButton horizontal={horizontal} label="Zoom out" onClick={() => mapRef.current?.zoomOut()}>
         <Minus />
       </ToolButton>
-      <ToolButton label="Reset view" onClick={fitBounds}>
+      <ToolButton horizontal={horizontal} label="Reset view" onClick={fitBounds}>
         <House />
       </ToolButton>
 
-      <span className="mx-1 my-0.5 border-t border-border/70" aria-hidden />
+      <span
+        className={cn(
+          "border-border/70",
+          horizontal ? "mx-0.5 my-1 border-l" : "mx-1 my-0.5 border-t",
+        )}
+        aria-hidden
+      />
 
       <ToolButton
+        horizontal={horizontal}
         label="Measure distance"
         pressed={measureMode === "distance"}
         onClick={() => toggleMeasure("distance")}
@@ -198,6 +211,7 @@ export function MapControls({
         <Ruler />
       </ToolButton>
       <ToolButton
+        horizontal={horizontal}
         label="Measure area"
         pressed={measureMode === "area"}
         onClick={() => toggleMeasure("area")}
@@ -205,6 +219,7 @@ export function MapControls({
         <Shapes />
       </ToolButton>
       <ToolButton
+        horizontal={horizontal}
         label={locateLabel}
         onClick={showLocation}
         disabled={locating}
@@ -258,6 +273,7 @@ function drawAccuracy(map: MapLibreMap, center: [number, number], radiusMetres: 
 }
 
 function ToolButton({
+  horizontal,
   label,
   pressed,
   disabled,
@@ -265,6 +281,7 @@ function ToolButton({
   className,
   children,
 }: {
+  horizontal: boolean;
   label: string;
   pressed?: boolean;
   disabled?: boolean;
@@ -290,8 +307,9 @@ function ToolButton({
           {children}
         </Button>
       </TooltipTrigger>
-      {/* Opens away from the edge the stack sits on. */}
-      <TooltipContent side="left">{label}</TooltipContent>
+      {/* Opens away from the edge the stack sits on: off the right edge as a
+          column, up off the bottom edge as a row. */}
+      <TooltipContent side={horizontal ? "top" : "left"}>{label}</TooltipContent>
     </Tooltip>
   );
 }

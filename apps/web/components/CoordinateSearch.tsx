@@ -4,49 +4,68 @@ import { useRef, useState } from "react";
 import { MapPin, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatLatLng, parseLatLng, type LatLng } from "@/lib/coords";
+import { formatLatLng, latLngError, parseLatLng, type LatLng } from "@/lib/coords";
 
 /**
  * Coordinate search for the header bar: type "lat, long" and the map flies
  * there and pins it (see lib/coords.ts for what parses). Layers are found
  * through the navbar pickers, not here.
  *
+ * Invalid input is flagged once the user commits to it (Enter or leaving the
+ * field), then re-checked on every keystroke until it is fixed — so a half-
+ * typed "21." is not scolded mid-word.
+ *
+ * The searched coordinate stays in the field afterwards; the clear button
+ * removes it and the pin, and sends the map home (via onClear).
+ *
  * The one suggestion is absolutely positioned, so it overhangs the map
  * instead of growing the header.
  */
 export function CoordinateSearch({
   onGoTo,
+  onClear,
   className,
 }: {
   /** A coordinate pair was entered: centre the map there. */
   onGoTo: (point: LatLng) => void;
+  /** The field was cleared: drop the pin and return the map home. */
+  onClear: () => void;
   className?: string;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  // The user has tried to use what they typed: from here on, say what's wrong.
+  const [touched, setTouched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const point = parseLatLng(query);
   const showSuggestion = open && point !== null;
+  const error = touched ? latLngError(query) : null;
 
-  function reset() {
+  function clear() {
     setQuery("");
     setOpen(false);
+    setTouched(false);
+    onClear();
   }
 
   function goTo(target: LatLng) {
     onGoTo(target);
-    reset();
+    // The query stays in the field, so what was searched remains visible.
+    setOpen(false);
+    setTouched(false);
     inputRef.current?.blur();
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      reset();
-    } else if (event.key === "Enter" && point) {
+      setOpen(false);
+      inputRef.current?.blur();
+    } else if (event.key === "Enter") {
       event.preventDefault();
-      goTo(point);
+      if (point) goTo(point);
+      else setTouched(true);
     }
   }
 
@@ -54,7 +73,13 @@ export function CoordinateSearch({
     <div className={cn("relative", className)} data-tour="search">
       {/* A grey inset well against the flat band — a field that looks like a
           field, without borrowing the brand accent to say so. */}
-      <div className="group/search flex h-10 items-center gap-2.5 rounded-full border border-nav-line bg-nav-soft px-3.5 shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)] transition-[color,box-shadow,background-color,border-color] hover:border-nav-accent/45 focus-within:border-nav-accent/60 focus-within:bg-card focus-within:ring-[3px] focus-within:ring-nav-accent/20">
+      <div
+        className={cn(
+          "group/search flex h-10 items-center gap-2.5 rounded-full border border-nav-line bg-nav-soft px-3.5 shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)] transition-[color,box-shadow,background-color,border-color] hover:border-nav-accent/45 focus-within:border-nav-accent/60 focus-within:bg-card focus-within:ring-[3px] focus-within:ring-nav-accent/20",
+          error &&
+            "border-destructive/70 hover:border-destructive/70 focus-within:border-destructive/70 focus-within:ring-destructive/20",
+        )}
+      >
         <Search
           className="size-4 shrink-0 text-nav-accent transition-colors group-focus-within/search:text-foreground"
           strokeWidth={2.25}
@@ -68,13 +93,22 @@ export function CoordinateSearch({
           }}
           onFocus={() => setOpen(true)}
           // Deferred so a click on the suggestion lands before it unmounts.
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onBlur={() =>
+            setTimeout(() => {
+              setOpen(false);
+              // Read the live value: `query` here is from before the blur,
+              // and a clear button click would otherwise re-flag emptied text.
+              if (latLngError(inputRef.current?.value ?? "")) setTouched(true);
+            }, 150)
+          }
           onKeyDown={onKeyDown}
           placeholder="Lat, long…"
           aria-label="Go to coordinates (latitude, longitude)"
           role="combobox"
           aria-expanded={showSuggestion}
           aria-controls="coordinate-search-result"
+          aria-invalid={error !== null}
+          aria-describedby={error ? "coordinate-search-error" : undefined}
           inputMode="decimal"
           className="h-full min-w-0 flex-1 bg-transparent text-sm tabular-nums outline-none placeholder:text-muted-foreground"
         />
@@ -84,15 +118,22 @@ export function CoordinateSearch({
             size="icon-xs"
             className="shrink-0"
             aria-label="Clear search"
-            onClick={() => {
-              reset();
-              inputRef.current?.focus();
-            }}
+            onClick={clear}
           >
             <X />
           </Button>
         )}
       </div>
+
+      {error && (
+        <p
+          id="coordinate-search-error"
+          role="alert"
+          className="absolute top-full left-0 z-50 mt-2 w-full min-w-56 rounded-xl border border-destructive/30 bg-popover px-3 py-2 text-xs text-destructive shadow-e3 ring-1 ring-black/5"
+        >
+          {error}
+        </p>
+      )}
 
       {showSuggestion && (
         <div

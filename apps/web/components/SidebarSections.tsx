@@ -1,17 +1,33 @@
 import { memo, useState } from "react";
-import { PanelLeftClose, RotateCcw, X } from "lucide-react";
+import { GripVertical, PanelLeftClose, RotateCcw, X } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LayerDot } from "@/components/LayerDot";
 import {
   DEFAULT_RASTER_OPACITY,
-  sectionLayers,
-  type RasterYear,
   type SectionAccent,
   type SectionDef,
   type SectionItem,
   type SectionLayer,
 } from "@/lib/sections";
+import { selectedRows, type PanelRow } from "@/lib/layer-order";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,9 +41,14 @@ import { cn } from "@/lib/utils";
  * the map, and the map gets the full width of the window.
  *
  * Selecting is the picker's job, and a layer arrives here already switched
- * on; this panel is where you switch it back off, pick a year and set
- * opacity. A row's × takes it out of the selection, so the panel can be
+ * on; this panel is where you switch it back off and set opacity —
+ * years are stepped in the year bar along the map's bottom edge. A row's × takes it out of the selection, so the panel can be
  * tidied where the clutter is rather than only from the picker.
+ *
+ * Rows are one list in draw order: the top row draws on top of the map, the
+ * bottom row beneath everything else. Dragging a row by its handle restacks
+ * the map to match (see lib/layer-order.ts). Each row names the theme it came
+ * from underneath, since a priority list cannot also be grouped by theme.
  *
  * Each row leads with the colour the layer draws in, not an icon for its
  * geometry: matching a row to what is on the map is the question a legend
@@ -64,56 +85,6 @@ const FILTER_OF: Partial<Record<SectionAccent, string>> = Object.fromEntries(
 const OTHER = { id: "other", label: "Other" };
 const ALL = "all";
 
-/**
- * The selected layers under one top-level group, in the same flattened order
- * the picker lists them in — so a row sits under the same heading in both.
- * Pending layers can't be selected, so they never reach here.
- */
-function panelRows(section: SectionDef, selected: Record<string, boolean>): SectionLayer[] {
-  return sectionLayers(section).filter((layer) => selected[layer.key]);
-}
-
-/**
- * Years as chips rather than a dropdown: the whole series is visible at once,
- * so how many years a theme has — and which are missing — is readable without
- * opening anything.
- */
-function YearChips({
-  label,
-  years,
-  year,
-  onChange,
-}: {
-  label: string;
-  years: RasterYear[];
-  year: number | null;
-  onChange: (year: number) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1" role="group" aria-label={`${label} year`}>
-      {years.map((y) => {
-        const active = y.year === year;
-        return (
-          <button
-            key={y.year}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(y.year)}
-            className={cn(
-              "rounded-md px-1.5 py-0.5 text-[11px] tabular-nums transition-colors",
-              active
-                ? "bg-brand font-semibold text-brand-foreground"
-                : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
-            )}
-          >
-            {y.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function OpacityControl({
   label,
   opacity,
@@ -144,7 +115,7 @@ function OpacityControl({
 
 /**
  * An options group's rows, as chips under its switch. Any number can be on,
- * unlike a year. A row with no data yet is shown but can't be picked.
+ * unlike a raster's year. A row with no data yet is shown but can't be picked.
  */
 function OptionChips({
   label,
@@ -188,25 +159,40 @@ function OptionChips({
 
 function LayerRow({
   row,
+  group,
   checked,
   onToggle,
   onRemove,
+  tour,
   children,
 }: {
   row: SectionLayer;
+  /** The theme it was picked from, shown under its name. */
+  group: string;
   checked: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  /** The walkthrough's anchor, on the first row only. */
+  tour?: string;
   /** Expanded controls — only rendered while the layer is switched on. */
   children?: React.ReactNode;
 }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: row.key });
+
   return (
     <div
+      ref={setNodeRef}
+      data-tour={tour}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "group/row rounded-lg transition-colors",
+        "group/row relative rounded-lg transition-colors",
         // Chrome appears only around what is drawing, so the eye lands on the
         // layers in play rather than on the containers they sit in.
         checked && "bg-foreground/6 ring-1 ring-border/70",
+        // Lifted while dragged, so it reads as picked up and passes over the
+        // rows it moves between rather than under them.
+        isDragging && "z-10 bg-card shadow-e3 ring-1 ring-border",
       )}
     >
       {/* The whole row is the hit target — the checkbox is the indicator, not
@@ -223,8 +209,24 @@ function LayerRow({
             onToggle();
           }
         }}
-        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors hover:bg-foreground/5"
+        className="flex cursor-pointer items-center gap-2.5 rounded-lg py-1.5 pr-2 pl-0.5 text-[13px] transition-colors hover:bg-foreground/5"
       >
+        {/* The drag handle. The rest of the row is a click target for the
+            switch, so dragging has a grip of its own rather than competing
+            with it. No touch scrolling from here, or a finger drag on a phone
+            scrolls the sheet instead of moving the row. */}
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Reorder ${row.label}`}
+          title="Drag to change what draws on top"
+          className="-mr-1.5 shrink-0 cursor-grab touch-none rounded text-muted-foreground/40 transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none active:cursor-grabbing"
+        >
+          <GripVertical className="size-3.5" strokeWidth={2} />
+        </button>
         <Checkbox checked={checked} tabIndex={-1} className="pointer-events-none" />
         <LayerDot color={row.color} raster={row.raster} />
         {/* Wraps rather than truncating. A layer's name is how it is
@@ -232,8 +234,9 @@ function LayerRow({
             Historical Land Use (Satellite: 1978–2025) — are exactly the
             ones a clipped row rendered unidentifiable. Two lines cost
             this panel nothing; it scrolls. */}
-        <span className={cn("min-w-0 flex-1 leading-tight", checked && "font-medium")}>
-          {row.label}
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className={cn("block", checked && "font-medium")}>{row.label}</span>
+          <span className="block truncate text-[10px] text-muted-foreground/70">{group}</span>
         </span>
         {/* Deselect. Kept quiet until the row is hovered or focused, so the
             panel does not read as a column of close buttons. */}
@@ -284,19 +287,23 @@ function FilterChip({
 function SidebarSectionsImpl({
   sections,
   selected,
+  order,
+  onReorder,
   visibility,
   onToggleLayer,
   onDeselectLayer,
   onResetLayers,
   onCollapse,
-  rasterYear,
-  onRasterYearChange,
   rasterOpacity,
   onRasterOpacityChange,
 }: {
   sections: SectionDef[];
   /** Toggle key → selected in the navbar picker, i.e. listed in this panel. */
   selected: Record<string, boolean>;
+  /** The selected keys in draw order, top first — see lib/layer-order.ts. */
+  order: string[];
+  /** A row was dragged onto another row's place. */
+  onReorder: (key: string, overKey: string) => void;
   /** Toggle key → drawing on the map. A subset of `selected`. */
   visibility: Record<string, boolean>;
   onToggleLayer: (key: string) => void;
@@ -306,35 +313,35 @@ function SidebarSectionsImpl({
   onResetLayers: () => void;
   /** Folds the panel away. Omitted where there is nothing to fold into. */
   onCollapse?: () => void;
-  /** Group id → selected year. */
-  rasterYear: Record<string, number>;
-  onRasterYearChange: (sectionId: string, year: number) => void;
   /** Group id → 0..1 opacity. Absent means DEFAULT_RASTER_OPACITY. */
   rasterOpacity: Record<string, number>;
   onRasterOpacityChange: (sectionId: string, opacity: number) => void;
 }) {
   const [filter, setFilter] = useState(ALL);
+  const sensors = useSensors(
+    // A few pixels of travel before a press becomes a drag, so a tap on the
+    // handle is not a zero-distance reorder.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-  // Only the groups that have something selected in them are drawn, so the
-  // panel is exactly as tall as the work in progress.
-  const all = sections
-    .map((section) => ({ section, rows: panelRows(section, selected) }))
-    .filter(({ rows }) => rows.length > 0);
+  // Every selected layer, in draw order, so the panel is exactly as tall as
+  // the work in progress and reads top to bottom the way the map stacks.
+  const byKey = new Map(selectedRows(sections, selected).map((r) => [r.layer.key, r]));
+  const all = order.flatMap((key) => {
+    const row = byKey.get(key);
+    return row ? [row] : [];
+  });
 
   // The counts describe the whole selection, not the filtered view: the header
   // is there to say what is on, and a filter is a way of looking rather than a
   // change to what is drawn.
-  const total = all.reduce((sum, g) => sum + g.rows.length, 0);
-  const onCount = all.reduce(
-    (sum, g) => sum + g.rows.filter((row) => visibility[row.key]).length,
-    0,
-  );
+  const total = all.length;
+  const onCount = all.filter(({ layer }) => visibility[layer.key]).length;
 
   // Only the filters that have something behind them, and only when there is
   // more than one — a filter offering a single choice is noise.
-  const present = new Set(
-    all.flatMap(({ rows }) => rows.map((row) => FILTER_OF[row.accent] ?? "other")),
-  );
+  const present = new Set(all.map(({ layer }) => FILTER_OF[layer.accent] ?? OTHER.id));
   const chips = [...FILTERS.map(({ id, label }) => ({ id, label })), OTHER].filter((f) =>
     present.has(f.id),
   );
@@ -345,15 +352,16 @@ function SidebarSectionsImpl({
   // showing nothing, with no effect needed to repair it.
   const active = showChips && chips.some((f) => f.id === filter) ? filter : ALL;
 
-  const groups =
+  // Filtering hides rows without changing their order, so a drag in a
+  // filtered view still lands relative to the row dropped on.
+  const rows: PanelRow[] =
     active === ALL
       ? all
-      : all
-          .map(({ section, rows }) => ({
-            section,
-            rows: rows.filter((row) => (FILTER_OF[row.accent] ?? OTHER.id) === active),
-          }))
-          .filter(({ rows }) => rows.length > 0);
+      : all.filter(({ layer }) => (FILTER_OF[layer.accent] ?? OTHER.id) === active);
+
+  function onDragEnd({ active: dragged, over }: DragEndEvent) {
+    if (over && dragged.id !== over.id) onReorder(String(dragged.id), String(over.id));
+  }
 
   return (
     <div data-tour="sections" className="flex min-h-0 flex-1 flex-col">
@@ -413,63 +421,50 @@ function SidebarSectionsImpl({
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 scrollbar-thin">
-        {groups.map(({ section, rows }, i) => (
-            <section key={section.id} data-tour={i === 0 ? "section-theme" : undefined}>
-              <div className="flex items-center justify-between gap-2 px-2 pt-2 pb-1">
-                {/* Uppercase and letter-spaced, as the reference image sets
-                    its panel headings — it is what separates a heading from
-                    the layer names under it without a rule or a heavier
-                    weight. */}
-                <h3 className="min-w-0 truncate text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
-                  {section.label}
-                </h3>
-                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/40">
-                  {rows.length}
-                </span>
-              </div>
-
-              {/* Spaced rather than stacked flush: a switched-on row is a
-                  card with its own controls inside it, and two of those
-                  touching read as one box with a seam. */}
-              <div className="flex flex-col gap-2">
-                {rows.map((row) => (
-                  <LayerRow
-                    key={row.key}
-                    row={row}
-                    checked={Boolean(visibility[row.key])}
-                    onToggle={() => onToggleLayer(row.key)}
-                    onRemove={() => onDeselectLayer(row.key)}
-                  >
-                    {row.options && (
-                      <OptionChips
-                        label={row.label}
-                        options={row.options}
-                        visibility={visibility}
-                        onToggle={onToggleLayer}
-                      />
-                    )}
-                    {row.raster && (
-                      <div className="flex flex-col gap-2">
-                        {row.raster.years.length > 1 && (
-                          <YearChips
-                            label={row.label}
-                            years={row.raster.years}
-                            year={rasterYear[row.raster.id] ?? row.raster.years.at(-1)?.year ?? null}
-                            onChange={(year) => onRasterYearChange(row.raster!.id, year)}
-                          />
-                        )}
-                        <OpacityControl
-                          label={row.label}
-                          opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
-                          onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
-                        />
-                      </div>
-                    )}
-                  </LayerRow>
-                ))}
-              </div>
-            </section>
-          ))}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+          onDragEnd={onDragEnd}
+        >
+          <SortableContext
+            items={rows.map(({ layer }) => layer.key)}
+            strategy={verticalListSortingStrategy}
+          >
+            {/* Spaced rather than stacked flush: a switched-on row is a card
+                with its own controls inside it, and two of those touching
+                read as one box with a seam. */}
+            <div className="flex flex-col gap-2 pt-1">
+              {rows.map(({ layer: row, group }, i) => (
+                <LayerRow
+                  key={row.key}
+                  row={row}
+                  group={group}
+                  tour={i === 0 ? "section-theme" : undefined}
+                  checked={Boolean(visibility[row.key])}
+                  onToggle={() => onToggleLayer(row.key)}
+                  onRemove={() => onDeselectLayer(row.key)}
+                >
+                  {row.options && (
+                    <OptionChips
+                      label={row.label}
+                      options={row.options}
+                      visibility={visibility}
+                      onToggle={onToggleLayer}
+                    />
+                  )}
+                  {row.raster && (
+                    <OpacityControl
+                      label={row.label}
+                      opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
+                      onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
+                    />
+                  )}
+                </LayerRow>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );

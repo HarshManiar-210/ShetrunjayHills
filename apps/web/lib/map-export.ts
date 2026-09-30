@@ -361,7 +361,7 @@ function columnBlocks(input: ExportInput, measured: MeasuredRaster[]): ((c: Curs
 
   blocks.push((c) => {
     sectionHeading(c, "Statistics");
-    keyValue(c, "Study area", `${COUNT.format(STUDY_AREA_HA)} ha`);
+    keyValue(c, "Study Area", `${COUNT.format(STUDY_AREA_HA)} ha`);
     c.y += 4;
   });
 

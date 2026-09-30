@@ -12,10 +12,15 @@ import type { LayerFeature } from "@/lib/layers-api";
  */
 
 /**
- * Real surveyed area of the Shetrunjay study area, in hectares — read off
- * StudyArea.geojson's own `areaSqKm` property, not estimated.
+ * The study area's official area in hectares, as the client states it. One
+ * fixed figure, shown the same whatever layers are on, in the statistics
+ * panel and the JPG export alike.
+ *
+ * Deliberately not read off StudyArea.geojson: its `area` property says
+ * 3,395.963 ha and its name says 8,397 acres (~3,398 ha), and neither is the
+ * figure the client quotes.
  */
-export const STUDY_AREA_HA = 3396;
+export const STUDY_AREA_HA = 3394;
 
 /** One row per vector layer, counted off the features actually loaded. */
 export interface VectorLayerCount {

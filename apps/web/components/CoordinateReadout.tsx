@@ -4,18 +4,21 @@ import { useEffect, useState, type RefObject } from "react";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { cn } from "@/lib/utils";
 
-/** How long the pointer must stay still before its position is shown. */
-const DWELL_MS = 2000;
-
 /**
- * Pointer position, bottom-centre of the map.
+ * Live position, bottom-centre of the map — always showing a value.
+ *
+ * Under the pointer while it is over the map; the map centre otherwise (the
+ * pointer has left, or it is a touch device with no hover), following the
+ * map as it pans. So the pill is never empty and never stale.
  *
  * Latitude and longitude only. The brief is explicit that the EPSG code and
  * the zoom level are not wanted here — the earlier mockups showed all four and
  * the client asked for the other two to go.
  *
- * Driven by a `mousemove` subscription rather than React state on the map, so
- * nothing above this component re-renders as the pointer moves.
+ * Driven by map event subscriptions rather than React state on the map, so
+ * nothing above this component re-renders as the pointer moves, and batched
+ * to one update per animation frame so this component does not re-render at
+ * the raw mousemove rate either.
  */
 export function CoordinateReadout({
   mapRef,
@@ -33,29 +36,43 @@ export function CoordinateReadout({
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Only shown once the pointer has rested on one spot for DWELL_MS: moving
-    // hides it again, so it never flickers along behind a pointer in motion.
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const onMove = (e: { lngLat: { lat: number; lng: number } }) => {
-      const { lat, lng } = e.lngLat;
-      clearTimeout(timer);
-      setPosition(null);
-      timer = setTimeout(() => setPosition({ lat, lng }), DWELL_MS);
-    };
-    // Touch devices have no hover, so the readout would otherwise stay empty
-    // and then freeze on wherever was last tapped — clearing on leave keeps it
-    // honest about only describing where the pointer actually is.
-    const onLeave = () => {
-      clearTimeout(timer);
-      setPosition(null);
+    let pointerOver = false;
+    let frame = 0;
+    let next: { lat: number; lng: number } | null = null;
+    const show = (at: { lat: number; lng: number }) => {
+      next = { lat: at.lat, lng: at.lng };
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setPosition(next);
+      });
     };
 
+    const onMove = (e: { lngLat: { lat: number; lng: number } }) => {
+      pointerOver = true;
+      show(e.lngLat);
+    };
+    const onLeave = () => {
+      pointerOver = false;
+      show(map.getCenter());
+    };
+    // Panning or zooming with the pointer off the map (keyboard, the tool
+    // stack, a search fly-to, a touch drag) moves the centre under the pill.
+    const onCameraMove = () => {
+      if (!pointerOver) show(map.getCenter());
+    };
+
+    // Filled straight away with where the map is looking, not left blank
+    // until the pointer first moves.
+    show(map.getCenter());
     map.on("mousemove", onMove);
     map.on("mouseout", onLeave);
+    map.on("move", onCameraMove);
     return () => {
-      clearTimeout(timer);
+      cancelAnimationFrame(frame);
       map.off("mousemove", onMove);
       map.off("mouseout", onLeave);
+      map.off("move", onCameraMove);
     };
   }, [mapRef, mapLoaded]);
 
@@ -63,8 +80,8 @@ export function CoordinateReadout({
     <div
       className={cn(
         "pointer-events-none rounded-full bg-card/95 px-3 py-1.5 shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm",
-        // Hidden, not unmounted, off the map: it keeps its place in the
-        // bottom stack, so nothing below it shifts as the pointer comes and goes.
+        // Hidden only for the frame before the map has loaded, holding its
+        // place in the bottom stack so nothing below it shifts.
         !position && "invisible",
         className,
       )}
@@ -81,7 +98,7 @@ export function CoordinateReadout({
             <span className="text-foreground">{position.lng.toFixed(4)}</span>
           </>
         ) : (
-          // Sized like a reading so the hidden pill holds the same space.
+          // Sized like a reading so the not-yet-filled pill holds the same space.
           <span aria-hidden>Lat 00.0000 · Lng 00.0000</span>
         )}
       </p>

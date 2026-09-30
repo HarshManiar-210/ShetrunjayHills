@@ -406,7 +406,7 @@ function CompareStatsBlock({
  *
  * These replace the synthetic filler this panel used to show. The numbers are
  * now real enough to check: Forest Cover's measured footprint comes to
- * 33.6 km² against the study area boundary's own surveyed 33.96 km².
+ * 33.6 km² against the study area's official 33.94 km².
  */
 export function StatsPanel({
   rasterLayers,
@@ -426,7 +426,7 @@ export function StatsPanel({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">Study area</span>
+        <span className="text-muted-foreground">Study Area</span>
         <span className="font-medium tabular-nums">{COUNT.format(STUDY_AREA_HA)} ha</span>
       </div>
 

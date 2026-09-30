@@ -93,16 +93,13 @@ export function Header({
         <img
           src="/logo.png"
           alt=""
-          className="size-9 shrink-0 rounded-xl object-cover shadow-e1 ring-1 ring-nav-line"
+          className="size-11 shrink-0 rounded-xl object-cover shadow-e1 ring-1 ring-nav-line"
         />
         {/* Dropped below sm so the search bar has room on a phone; the mobile
             navigation sheet carries the wordmark in full. */}
         <div className="hidden min-w-0 sm:block">
-          <p className="truncate text-sm font-semibold tracking-tight text-foreground leading-tight">
+          <p className="truncate text-base font-semibold tracking-tight text-foreground leading-tight">
             Shatrunjay Hills
-          </p>
-          <p className="truncate text-[11px] tracking-wide leading-tight text-muted-foreground">
-            Web GIS Dashboard
           </p>
         </div>
 
