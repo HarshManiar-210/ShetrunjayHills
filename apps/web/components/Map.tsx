@@ -787,9 +787,8 @@ export default function Map({
       style: mapStyle(basemapRef.current),
       center: INITIAL_CENTER,
       zoom: INITIAL_ZOOM,
-      // Stops the camera where the basemaps stop having imagery, so nobody
-      // can zoom into Esri's "Map data not yet available" tile. See
-      // MAX_MAP_ZOOM for why this gives up no real detail.
+      // Stops the camera where the basemaps and drone tiles stop having data.
+      // See MAX_MAP_ZOOM for why this gives up no real detail.
       maxZoom: MAX_MAP_ZOOM,
       attributionControl: false,
       // Needed to read the canvas back for the JPG export. WebGL discards the
@@ -926,7 +925,7 @@ export default function Map({
         map.setLayoutProperty(layerId, "visibility", shown.has(layerId) ? "visible" : "none");
       }
     }
-    // Esri and OpenStreetMap require different credits, and only the visible
+    // Google and OpenStreetMap require different credits, and only the visible
     // one may be shown.
     attributionRef.current?.setHTML(basemapById(basemap).attribution);
   }, [basemap, mapLoaded]);

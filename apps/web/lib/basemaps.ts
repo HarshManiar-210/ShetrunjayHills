@@ -1,13 +1,13 @@
 /**
  * The three selectable basemaps, per the client's UI/UX brief.
  *
- * The brief names Google Satellite and Google Hybrid. Google's tile endpoints
- * (mt*.google.com/vt) are not licensed for use outside Google's own SDKs, so
- * those two are served from Esri's World Imagery instead — visually
- * equivalent, and the standard substitution. Esri asks only for the
- * attribution below. Swapping in Google's official Map Tiles API later is a
- * change to the `tiles` URLs here plus a key proxied through the Go API;
- * nothing outside this file knows where the imagery comes from.
+ * Satellite and Hybrid are Google's own tiles (the mt*.google.com/vt
+ * endpoints: lyrs=s imagery, lyrs=y imagery with Google's roads and labels
+ * baked in), so they look exactly like Google Maps. Those endpoints are not
+ * Google's licensed Map Tiles API: Google may throttle or block them, and
+ * moving to the official API later is a change to the `tiles` URLs here plus
+ * a key proxied through the Go API. Nothing outside this file knows where the
+ * imagery comes from.
  *
  * All three basemaps live in the style at once and are switched by layer
  * visibility rather than by map.setStyle(), which would tear down every
@@ -17,8 +17,7 @@
 
 export type BasemapId = "hybrid" | "satellite" | "osm";
 
-const ESRI_ATTRIBUTION =
-  'Imagery &copy; <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics, and the GIS User Community';
+const GOOGLE_ATTRIBUTION = 'Imagery &copy; <a href="https://www.google.com/maps">Google</a>';
 
 const OSM_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
@@ -32,19 +31,14 @@ const OSM_ATTRIBUTION =
  * These are measured, not assumed, and they differ per provider, which is why
  * there is no single constant:
  *
- *   Esri World Imagery  real tiles to z18. From z19 it answers 200 with an
- *                       identical 2,521-byte "Map data not yet available"
- *                       placeholder rather than a 404, so nothing errors —
- *                       the grey tile simply gets drawn. Capping at 18 is the
- *                       only way to stop it.
- *   Esri reference      same ceiling. Both are fully transparent out here
- *                       anyway, so this only saves pointless requests.
+ *   Google (s and y)    tiles to z22, then HTTP 400. The deepest levels are
+ *                       Google's own upscaling here, so 21 is plenty — and the
+ *                       camera stops at MAX_MAP_ZOOM before either matters.
  *   OpenStreetMap       real tiles to z19, then HTTP 400.
  *
- * Coverage is per-region: somewhere denser than rural Gujarat, Esri may well
- * publish deeper. Re-measure before treating these as global truths.
+ * Coverage is per-region. Re-measure before treating these as global truths.
  */
-const ESRI_MAX_ZOOM = 18;
+const GOOGLE_MAX_ZOOM = 21;
 const OSM_MAX_ZOOM = 19;
 
 interface TileSourceDef {
@@ -54,41 +48,27 @@ interface TileSourceDef {
   maxZoom: number;
 }
 
-/**
- * Note the {z}/{y}/{x} ordering on the Esri services — ArcGIS REST puts row
- * before column, the opposite of OSM's {z}/{x}/{y}. Getting this backwards
- * yields a map that loads real tiles in entirely the wrong places.
- */
+/** Google spreads tile load over four hosts; MapLibre rotates through them. */
+function googleTiles(lyrs: string): string[] {
+  return [0, 1, 2, 3].map(
+    (n) => `https://mt${n}.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}`,
+  );
+}
+
 const SOURCES: TileSourceDef[] = [
   {
-    id: "esri-imagery",
-    tiles: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    ],
-    attribution: ESRI_ATTRIBUTION,
-    maxZoom: ESRI_MAX_ZOOM,
+    id: "google-satellite",
+    tiles: googleTiles("s"),
+    attribution: GOOGLE_ATTRIBUTION,
+    maxZoom: GOOGLE_MAX_ZOOM,
   },
   {
-    // Roads. Transparent, and by far the denser of the two reference layers —
-    // over the study area's rural hills the places layer is nearly empty
-    // while this one still carries the road network, which is most of what
-    // makes a hybrid readable here.
-    id: "esri-transportation",
-    tiles: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
-    ],
-    attribution: ESRI_ATTRIBUTION,
-    maxZoom: ESRI_MAX_ZOOM,
-  },
-  {
-    // Place names and administrative boundaries, also transparent. Sparse out
-    // in the hills, but it is what labels Palitana, Bhavnagar and the talukas.
-    id: "esri-places",
-    tiles: [
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-    ],
-    attribution: ESRI_ATTRIBUTION,
-    maxZoom: ESRI_MAX_ZOOM,
+    // Imagery with roads and place names already drawn in, so Hybrid is one
+    // layer rather than imagery plus separate reference overlays.
+    id: "google-hybrid",
+    tiles: googleTiles("y"),
+    attribution: GOOGLE_ATTRIBUTION,
+    maxZoom: GOOGLE_MAX_ZOOM,
   },
   {
     id: "osm",
@@ -99,16 +79,13 @@ const SOURCES: TileSourceDef[] = [
 ];
 
 /**
- * Draw order, bottom to top. The two reference layers sit above the imagery
- * (and above OSM, which never shows at the same time as either), with place
- * names last so a label is never buried under a road — that ordering is what
- * makes Hybrid legible.
+ * Draw order, bottom to top. Only one basemap shows at a time, so the order
+ * among them does not matter — only that the last is the top of the stack.
  */
 const LAYERS: { id: string; source: string }[] = [
-  { id: "basemap-imagery", source: "esri-imagery" },
+  { id: "basemap-satellite", source: "google-satellite" },
+  { id: "basemap-hybrid", source: "google-hybrid" },
   { id: "basemap-osm", source: "osm" },
-  { id: "basemap-roads", source: "esri-transportation" },
-  { id: "basemap-places", source: "esri-places" },
 ];
 
 export interface BasemapDef {
@@ -142,16 +119,16 @@ export const BASEMAPS: BasemapDef[] = [
   {
     id: "hybrid",
     label: "Hybrid",
-    layers: ["basemap-imagery", "basemap-roads", "basemap-places"],
-    attribution: ESRI_ATTRIBUTION,
-    thumbnail: previewTile("esri-imagery"),
+    layers: ["basemap-hybrid"],
+    attribution: GOOGLE_ATTRIBUTION,
+    thumbnail: previewTile("google-hybrid"),
   },
   {
     id: "satellite",
     label: "Satellite",
-    layers: ["basemap-imagery"],
-    attribution: ESRI_ATTRIBUTION,
-    thumbnail: previewTile("esri-imagery"),
+    layers: ["basemap-satellite"],
+    attribution: GOOGLE_ATTRIBUTION,
+    thumbnail: previewTile("google-satellite"),
   },
   {
     id: "osm",
@@ -172,16 +149,14 @@ export function basemapById(id: BasemapId): BasemapDef {
 /**
  * How far in the map lets anyone zoom.
  *
- * Capping each source stops the placeholder being *fetched* — MapLibre then
+ * Capping each source stops missing tiles being *fetched* — MapLibre then
  * upscales its deepest real tile instead. That is honest, but it still lets
  * someone zoom to a blurry z22 and wonder what is broken, so the camera stops
- * where the imagery does.
+ * where the data does.
  *
- * One level past the shallowest provider (Esri, z18), because the drone
- * rasters are sharper than any basemap: ~0.41 m per pixel, against z18's
- * ~0.56 m here. Their tiles run to z19 (~0.28 m, see
- * tools/prepare-raster-tiles.sh), so stopping at 18 would hide a quarter of
- * the delivered detail. For that last level Esri shows its z18 upscaled.
+ * z19 is where OSM stops, and where the drone rasters' own tiles stop
+ * (~0.28 m per pixel, see tools/prepare-raster-tiles.sh). Google goes deeper,
+ * but past z19 there is nothing of ours to look at.
  */
 export const MAX_MAP_ZOOM = 19;
 
