@@ -134,6 +134,13 @@ CREATE TABLE static_overlays (
     -- A 'line' row drawn dotted rather than solid (Fireline), in the map and
     -- in its legend swatch.
     dotted BOOLEAN NOT NULL DEFAULT false,
+    -- Stroke width in pixels for a 'line'/'fill'/'outline' row. NULL draws at
+    -- the frontend's default width for its kind; set it to make one boundary
+    -- stand out from the rest (the Study Area).
+    line_width DOUBLE PRECISION CHECK (line_width > 0),
+    -- Drawn in one continuous colour, without the animated "marching ants"
+    -- gaps every other line and boundary carries.
+    solid BOOLEAN NOT NULL DEFAULT false,
     -- Selected and switched on when the dashboard opens, before anything is
     -- picked. Which layers start on is this flag, not a key in the frontend.
     default_on BOOLEAN NOT NULL DEFAULT false
@@ -676,8 +683,10 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('talukaBoundary', 'Taluka Boundary', grp('administrative-boundaries'), 'vector', 'outline', '#C98BDB', 'vector-data/Talukas.geojson', 6, 71.352470, 21.144960, 72.298580, 22.353210);
 
--- The study area frames everything else on the map, so it is on from the start.
-UPDATE static_overlays SET default_on = true WHERE key = 'studyArea';
+-- The study area frames everything else on the map, so it is on from the start,
+-- and draws bold and unbroken so it reads as the frame rather than as one more
+-- reference boundary.
+UPDATE static_overlays SET default_on = true, line_width = 3, solid = true WHERE key = 'studyArea';
 
 -- ---------------------------------------------------------------------------
 -- Seed: delivered class statistics (see overlay_class_stats above). Joined on

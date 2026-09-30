@@ -59,6 +59,12 @@ type StaticOverlay struct {
 	DefaultOn bool `json:"default_on,omitempty"`
 	// Dotted draws a 'line' row dotted rather than solid (Fireline).
 	Dotted bool `json:"dotted,omitempty"`
+	// LineWidth overrides the default stroke width for the row's kind, in
+	// pixels. nil draws at the default.
+	LineWidth *float64 `json:"line_width,omitempty"`
+	// Solid draws the row in one continuous colour, without the animated
+	// dash gaps other lines and boundaries carry.
+	Solid bool `json:"solid,omitempty"`
 	// SizeBytes is the asset's size on disk, filled in by the Overlays
 	// handler rather than stored in the DB — statting the file cannot drift
 	// out of step with it the way a seeded column would. Lets the frontend

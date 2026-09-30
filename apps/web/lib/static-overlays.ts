@@ -26,6 +26,10 @@ export interface OverlayDef {
   popupFields?: string[];
   /** See OverlayMeta.dotted. */
   dotted?: boolean;
+  /** See OverlayMeta.line_width. */
+  lineWidth?: number;
+  /** See OverlayMeta.solid. */
+  solid?: boolean;
   /**
    * SW/NE corners of the layer's own geometry, from its `static_overlays`
    * row. The map frames a layer from this the moment its switch is flipped,
@@ -60,6 +64,8 @@ export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
       categories: o.categories,
       popupFields: o.popup_fields,
       dotted: o.dotted,
+      lineWidth: o.line_width,
+      solid: o.solid,
       tiled: o.tiled ?? false,
       bounds:
         o.min_lon != null && o.min_lat != null && o.max_lon != null && o.max_lat != null

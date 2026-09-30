@@ -34,6 +34,10 @@ export interface OverlayMeta {
   default_on?: boolean;
   /** A 'line' row drawn dotted rather than solid (Fireline). */
   dotted?: boolean;
+  /** Stroke width in pixels, overriding the default for the kind. */
+  line_width?: number;
+  /** One continuous colour, without the animated dash gaps. */
+  solid?: boolean;
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
   min_lon?: number;

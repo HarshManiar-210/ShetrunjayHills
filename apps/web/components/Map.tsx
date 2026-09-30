@@ -66,6 +66,8 @@ const INITIAL_ZOOM = 11;
 // animates over: narrower leaves a sliver of layer colour down each side of
 // every gap, wider paints over the neighbouring geometry. As constants the
 // pairing is structural, so thinning a line cannot silently break its dashes.
+// These are defaults: a row's static_overlays.line_width replaces them, and
+// its flow layer is built from the same resolved width.
 const LINE_WIDTH = 1;
 const LINE_CASING_WIDTH = 2;
 const OUTLINE_WIDTH = 0.75;
@@ -418,7 +420,7 @@ function addLayers(
  * gaps in that line rather than a second line of its own.
  */
 function flowLayerIds(defs: OverlayDef[]): string[] {
-  return defs.map(({ key }) => `overlay-${key}-flow`);
+  return defs.filter((d) => !d.solid).map(({ key }) => `overlay-${key}-flow`);
 }
 
 // Static overlays (Base Layers + Watershed Analysis sections): added once,
@@ -450,7 +452,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url, dotted } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted, lineWidth, solid } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -488,13 +490,14 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         },
       });
     } else if (kind === "line") {
+      const width = lineWidth ?? LINE_WIDTH;
       map.addLayer({
         id: `${sourceId}-casing`,
         type: "line",
         source: sourceId,
         ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": CASING, "line-width": LINE_CASING_WIDTH },
+        paint: { "line-color": CASING, "line-width": width + LINE_CASING_WIDTH - LINE_WIDTH },
       });
       map.addLayer({
         id: `${sourceId}-line`,
@@ -502,22 +505,24 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": fillColor, "line-width": LINE_WIDTH },
+        paint: { "line-color": fillColor, "line-width": width },
       });
-      map.addLayer({
-        id: `${sourceId}-flow`,
-        type: "line",
-        source: sourceId,
-        ...from,
-        // Butt caps, not round: a round cap on every dash bleeds the dashes
-        // into each other and the flow stops reading as movement.
-        layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
-        paint: {
-          "line-color": CASING,
-          "line-width": LINE_WIDTH,
-          "line-dasharray": DASH_SEQUENCE[0],
-        },
-      });
+      if (!solid) {
+        map.addLayer({
+          id: `${sourceId}-flow`,
+          type: "line",
+          source: sourceId,
+          ...from,
+          // Butt caps, not round: a round cap on every dash bleeds the dashes
+          // into each other and the flow stops reading as movement.
+          layout: { visibility: "none", "line-cap": "butt", "line-join": "round" },
+          paint: {
+            "line-color": CASING,
+            "line-width": width,
+            "line-dasharray": DASH_SEQUENCE[0],
+          },
+        });
+      }
     } else if (kind === "point") {
       // No casing/flow here — the dash animation is a line-only effect, and
       // startDashAnimation already no-ops on a layer id that doesn't exist.
@@ -552,21 +557,25 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         type: "line",
         source: sourceId,
         ...from,
-        layout: { visibility: "none" },
-        paint: { "line-color": fillColor, "line-width": OUTLINE_WIDTH },
+        // Round joins, so a thick boundary does not spike at every vertex.
+        layout: { visibility: "none", "line-join": "round" },
+        paint: { "line-color": fillColor, "line-width": lineWidth ?? OUTLINE_WIDTH },
       });
-      map.addLayer({
-        id: `${sourceId}-flow`,
-        type: "line",
-        source: sourceId,
-        ...from,
-        layout: { visibility: "none" },
-        paint: {
-          "line-color": CASING,
-          "line-width": OUTLINE_WIDTH,
-          "line-dasharray": DASH_SEQUENCE[0],
-        },
-      });
+      // A `solid` row has no flow layer at all: its colour runs unbroken.
+      if (!solid) {
+        map.addLayer({
+          id: `${sourceId}-flow`,
+          type: "line",
+          source: sourceId,
+          ...from,
+          layout: { visibility: "none" },
+          paint: {
+            "line-color": CASING,
+            "line-width": lineWidth ?? OUTLINE_WIDTH,
+            "line-dasharray": DASH_SEQUENCE[0],
+          },
+        });
+      }
     }
   }
 }
