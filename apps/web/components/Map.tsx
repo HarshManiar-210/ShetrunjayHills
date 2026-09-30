@@ -682,10 +682,11 @@ export default function Map({
   bottomCenter?: React.ReactNode;
   /**
    * Whether the legend and statistics column has grown down far enough to
-   * reach the bottom-right corner. When it has, the tool stack steps left of
-   * it and the bottom-centre band gives up the width to match. Both read
-   * the column's width from `--info-col-w`, set by the dashboard, because
-   * the column widens while two years are being compared.
+   * reach the bottom-right corner. When it has, the tool stack turns into a
+   * row in the corner beneath it, and the bottom-centre band gives up the
+   * column's width so the year bar never runs underneath either. The band
+   * reads that width from `--info-col-w`, set by the dashboard, because the
+   * column widens while two years are being compared.
    */
   infoReachesCorner?: boolean;
   /**
@@ -1123,7 +1124,7 @@ export default function Map({
           percentage sizing sidesteps that fight. */}
       <div ref={containerRef} className="size-full" />
       <MapControls
-        className={infoReachesCorner ? "xl:right-[calc(var(--info-col-w,18rem)+1.5rem)]" : undefined}
+        horizontal={infoReachesCorner}
         measureMode={measureMode}
         onMeasureModeChange={setMeasureMode}
         mapRef={mapRef}
@@ -1143,8 +1144,9 @@ export default function Map({
 
           Centred in the band the corner controls leave free: the basemap
           switcher on the left, the tool stack on the right. When the legend
-          and statistics column reaches the corner the stack steps left of it,
-          and the band's right edge follows so the bar never runs underneath.
+          and statistics column reaches the corner the stack becomes a row
+          beneath it, and the band's right edge moves to the column's left
+          edge so the bar runs under neither.
           Click-through, so the empty space beside the bar does not eat map
           drags.
 
@@ -1157,7 +1159,7 @@ export default function Map({
         className={cn(
           "pointer-events-none absolute right-3 bottom-[5.5rem] left-3 z-10 flex flex-col items-center gap-2 md:bottom-3 md:left-[13.5rem]",
           infoReachesCorner
-            ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+5rem)]"
+            ? "md:right-14 xl:right-[calc(var(--info-col-w,18rem)+1.5rem)]"
             : "md:right-14",
         )}
       >
