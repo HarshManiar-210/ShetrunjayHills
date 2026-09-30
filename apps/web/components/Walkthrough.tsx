@@ -35,7 +35,7 @@ const STEPS: Step[] = [
   {
     target: "sections",
     title: "Your layers panel",
-    body: "The layers you chose are listed here, grouped by theme, and drawing — as many at once as you like, with vector layers always above raster imagery. Untick one to hide it without losing your place, the × beside it takes it back out altogether, and the panel folds away when you want the map clear.",
+    body: "The layers you chose are listed here in drawing order — the top row draws on top of the map. Drag a row by its handle to change what sits above what. Untick one to hide it without losing your place, the × beside it takes it back out altogether, and the panel folds away when you want the map clear.",
   },
   {
     target: "section-theme",

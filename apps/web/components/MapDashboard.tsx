@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ListTree, Menu as MenuIcon, PanelLeftOpen } from "lucide-react";
+import { arrayMove } from "@dnd-kit/sortable";
+import { compareRasterId, mapStack, mergeOrder, selectedRows } from "@/lib/layer-order";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { BasemapSwitcher } from "@/components/BasemapSwitcher";
@@ -136,6 +138,10 @@ export function MapDashboard() {
   const [activeSections, setActiveSections] = useState<Record<string, boolean>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [visible, setVisible] = useState<Record<string, boolean>>({});
+  // The layers panel's draw order as the last drag left it, top first. Only
+  // the user's arrangement is stored; layers selected since are slotted in by
+  // mergeOrder (lib/layer-order.ts), so selecting needs no bookkeeping here.
+  const [userOrder, setUserOrder] = useState<string[]>([]);
 
   // The floating panel can be folded away to clear the map. It follows the
   // selection: folded while nothing is picked (an empty panel is just clutter
@@ -323,6 +329,22 @@ export function MapDashboard() {
     [allSections],
   );
   const overlayDefs = useMemo(() => vectorOverlayDefs(overlayMeta), [overlayMeta]);
+
+  // Draw priority: the panel lists `layerOrder` top to bottom and the map
+  // stacks `stack` the same way. Both Map and panel props, so memoised.
+  const panelRows = useMemo(() => selectedRows(sections, selected), [sections, selected]);
+  const layerOrder = useMemo(() => mergeOrder(panelRows, userOrder), [panelRows, userOrder]);
+  const stack = useMemo(() => mapStack(layerOrder, panelRows), [layerOrder, panelRows]);
+
+  const reorderLayer = useCallback(
+    (key: string, overKey: string) => {
+      const from = layerOrder.indexOf(key);
+      const to = layerOrder.indexOf(overKey);
+      if (from === -1 || to === -1) return;
+      setUserOrder(arrayMove(layerOrder, from, to));
+    },
+    [layerOrder],
+  );
 
   /**
    * Size per toggle key for the layers that are fetched whole, so the warning
@@ -566,7 +588,7 @@ export function MapDashboard() {
         return [
           base,
           {
-            id: `${section.id}:compare`,
+            id: compareRasterId(section.id),
             url: overlayDataUrl(other.key),
             bounds: other.bounds,
             tiled: other.tiled,
@@ -671,6 +693,8 @@ export function MapDashboard() {
       <SidebarSections
         sections={sections}
         selected={selected}
+        order={layerOrder}
+        onReorder={reorderLayer}
         visibility={visible}
         onToggleLayer={toggleItem}
         onDeselectLayer={deselectLayer}
@@ -816,6 +840,7 @@ export function MapDashboard() {
               basemap={basemap}
               infoReachesCorner={infoReachesCorner}
               pin={pin}
+              stack={stack}
               // Handed to the map rather than positioned here, so it shares
               // the bottom-centre stack with the coordinate readout: the
               // readout then rides above whatever height the bar happens to

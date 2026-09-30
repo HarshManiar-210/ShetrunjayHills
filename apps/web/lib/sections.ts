@@ -392,6 +392,8 @@ export interface SectionLayer {
   pending: boolean;
   /** The colour it draws in, when it has one of its own. */
   color?: string;
+  /** How a plain vector row draws. Absent on raster themes and options groups. */
+  geometryKind?: SwatchGeometryKind;
   icon: LucideIcon;
   /** The subject colour of the group it came from. */
   accent: SectionAccent;
@@ -438,6 +440,7 @@ export function sectionLayers(section: SectionDef): SectionLayer[] {
           label: item.label,
           pending: Boolean(item.pending),
           color: item.color,
+          geometryKind: item.geometryKind,
           icon: item.icon ?? iconForGeometry(item.geometryKind),
           accent: section.accent,
         }));

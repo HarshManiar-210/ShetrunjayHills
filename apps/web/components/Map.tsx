@@ -32,6 +32,7 @@ import { MapControls } from "@/components/MapControls";
 import { MeasureTool, type MeasureMode } from "@/components/MeasureTool";
 import { CoordinateReadout } from "@/components/CoordinateReadout";
 import type { OverlayDef } from "@/lib/static-overlays";
+import type { MapStackEntry } from "@/lib/layer-order";
 import type { LegendClass } from "@/lib/legend-config";
 import type { LayerFeature, LayerCollection } from "@/lib/layers-api";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,10 @@ const OUTLINE_WIDTH = 0.75;
 // merge into a faint solid line, so it draws wider.
 const DOTTED_WIDTH = 2.5;
 const DOTTED_GAP = 2;
+
+// The lowest of the shared permissioned layers (see addLayers). The panel's
+// ordered layers are stacked beneath it.
+const STACK_CEILING = "polygons-fill";
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -596,6 +601,38 @@ function flyToIfCloser(map: MapLibreMap, bounds: LngLatBoundsLike | undefined) {
   }
 }
 
+/**
+ * Restacks the overlays and rasters to the layers panel's order.
+ *
+ * Every entry is moved beneath the shared permissioned layers
+ * (STACK_CEILING), top entry first, each one directly under the last. So the
+ * ordered layers keep to the band between the basemap and those, and
+ * anything added above them later — the measure tool, the location circle —
+ * is never buried by a reorder. A layer not on the map yet is skipped; the
+ * effect that calls this runs again once it has been added.
+ */
+function applyStack(map: MapLibreMap, stack: MapStackEntry[], defs: OverlayDef[]) {
+  if (!map.getLayer(STACK_CEILING)) return;
+  const kindOf = new globalThis.Map(defs.map((d) => [d.key, d.kind]));
+  let before = STACK_CEILING;
+  for (const entry of stack) {
+    // Bottom to top within the entry, walked backwards so each move lands
+    // directly beneath the one placed before it.
+    const ids = [
+      ...entry.rasters.map(rasterLayerId),
+      ...entry.overlays.flatMap((key) => {
+        const kind = kindOf.get(key);
+        return kind ? overlayLayerIds(kind, `overlay-${key}`) : [];
+      }),
+    ];
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if (!map.getLayer(ids[i])) continue;
+      map.moveLayer(ids[i], before);
+      before = ids[i];
+    }
+  }
+}
+
 function overlayLayerIds(kind: OverlayDef["kind"], sourceId: string) {
   if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
   if (kind === "point") return [`${sourceId}-circle`];
@@ -671,6 +708,7 @@ export default function Map({
   bottomCenter,
   infoReachesCorner = false,
   pin = null,
+  stack,
 }: {
   data: LayerCollection;
   visibility: Record<number, boolean>;
@@ -703,6 +741,11 @@ export default function Map({
    * marker; a new object for the same point flies there again.
    */
   pin?: LatLng | null;
+  /**
+   * Draw order, top first, from the layers panel (see lib/layer-order.ts).
+   * Absent keeps the order layers were added in, rasters under vectors.
+   */
+  stack?: MapStackEntry[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -711,6 +754,9 @@ export default function Map({
   // the overlayDefs captured at mount time otherwise — the metadata fetch
   // that populates this typically resolves after that.
   const overlayDefsRef = useRef(overlayDefs);
+  // Whether a panel order is driving the stack. Read by the raster reconcile,
+  // which must leave stacking alone when one is.
+  const hasStackRef = useRef(stack !== undefined);
   const fitOnceRef = useRef({ done: false });
   const popupRef = useRef<Popup | null>(null);
   const attributionRef = useRef<CompactAttribution | null>(null);
@@ -1013,6 +1059,11 @@ export default function Map({
     // matters for compare mode: the compared year has to sit above the base
     // year for the blend to read correctly. Moving each layer in turn to just
     // below the first vector layer leaves the last entry on top.
+    //
+    // Only without a panel order: with one, the restack effect owns stacking,
+    // and this — which also runs on every opacity change — would drag
+    // imagery the user had raised back under the vectors.
+    if (hasStackRef.current) return;
     const floor = firstVectorLayerId(map);
     for (const raster of rasterOverlays) {
       const layerId = rasterLayerId(raster.id);
@@ -1029,6 +1080,17 @@ export default function Map({
     if (!map || !mapLoaded) return;
     addOverlaySources(map, overlayDefs);
   }, [overlayDefs, mapLoaded]);
+
+  // Restack after the raster reconcile and the overlay-source effect above
+  // have added whatever is new — hence keyed on which rasters exist, not on
+  // the raster objects, so dragging an opacity slider does not restack.
+  const rasterIds = rasterOverlays.map((r) => r.id).join("|");
+  useEffect(() => {
+    const map = mapRef.current;
+    hasStackRef.current = stack !== undefined;
+    if (!map || !mapLoaded || !stack) return;
+    applyStack(map, stack, overlayDefs);
+  }, [stack, rasterIds, overlayDefs, mapLoaded]);
 
   // static overlays: each file is handed to MapLibre once, as a URL rather
   // than as parsed GeoJSON. That hands the fetch, the JSON parse and the
