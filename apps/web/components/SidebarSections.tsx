@@ -6,7 +6,6 @@ import { LayerDot } from "@/components/LayerDot";
 import {
   DEFAULT_RASTER_OPACITY,
   sectionLayers,
-  type RasterYear,
   type SectionAccent,
   type SectionDef,
   type SectionItem,
@@ -25,8 +24,8 @@ import { cn } from "@/lib/utils";
  * the map, and the map gets the full width of the window.
  *
  * Selecting is the picker's job, and a layer arrives here already switched
- * on; this panel is where you switch it back off, pick a year and set
- * opacity. A row's × takes it out of the selection, so the panel can be
+ * on; this panel is where you switch it back off and set opacity —
+ * years are stepped in the year bar along the map's bottom edge. A row's × takes it out of the selection, so the panel can be
  * tidied where the clutter is rather than only from the picker.
  *
  * Each row leads with the colour the layer draws in, not an icon for its
@@ -73,47 +72,6 @@ function panelRows(section: SectionDef, selected: Record<string, boolean>): Sect
   return sectionLayers(section).filter((layer) => selected[layer.key]);
 }
 
-/**
- * Years as chips rather than a dropdown: the whole series is visible at once,
- * so how many years a theme has — and which are missing — is readable without
- * opening anything.
- */
-function YearChips({
-  label,
-  years,
-  year,
-  onChange,
-}: {
-  label: string;
-  years: RasterYear[];
-  year: number | null;
-  onChange: (year: number) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1" role="group" aria-label={`${label} year`}>
-      {years.map((y) => {
-        const active = y.year === year;
-        return (
-          <button
-            key={y.year}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(y.year)}
-            className={cn(
-              "rounded-md px-1.5 py-0.5 text-[11px] tabular-nums transition-colors",
-              active
-                ? "bg-brand font-semibold text-brand-foreground"
-                : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
-            )}
-          >
-            {y.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function OpacityControl({
   label,
   opacity,
@@ -144,7 +102,7 @@ function OpacityControl({
 
 /**
  * An options group's rows, as chips under its switch. Any number can be on,
- * unlike a year. A row with no data yet is shown but can't be picked.
+ * unlike a raster's year. A row with no data yet is shown but can't be picked.
  */
 function OptionChips({
   label,
@@ -289,8 +247,6 @@ function SidebarSectionsImpl({
   onDeselectLayer,
   onResetLayers,
   onCollapse,
-  rasterYear,
-  onRasterYearChange,
   rasterOpacity,
   onRasterOpacityChange,
 }: {
@@ -306,9 +262,6 @@ function SidebarSectionsImpl({
   onResetLayers: () => void;
   /** Folds the panel away. Omitted where there is nothing to fold into. */
   onCollapse?: () => void;
-  /** Group id → selected year. */
-  rasterYear: Record<string, number>;
-  onRasterYearChange: (sectionId: string, year: number) => void;
   /** Group id → 0..1 opacity. Absent means DEFAULT_RASTER_OPACITY. */
   rasterOpacity: Record<string, number>;
   onRasterOpacityChange: (sectionId: string, opacity: number) => void;
@@ -449,21 +402,11 @@ function SidebarSectionsImpl({
                       />
                     )}
                     {row.raster && (
-                      <div className="flex flex-col gap-2">
-                        {row.raster.years.length > 1 && (
-                          <YearChips
-                            label={row.label}
-                            years={row.raster.years}
-                            year={rasterYear[row.raster.id] ?? row.raster.years.at(-1)?.year ?? null}
-                            onChange={(year) => onRasterYearChange(row.raster!.id, year)}
-                          />
-                        )}
-                        <OpacityControl
-                          label={row.label}
-                          opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
-                          onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
-                        />
-                      </div>
+                      <OpacityControl
+                        label={row.label}
+                        opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
+                        onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
+                      />
                     )}
                   </LayerRow>
                 ))}

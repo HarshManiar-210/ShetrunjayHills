@@ -492,8 +492,8 @@ export function MapDashboard() {
         .filter((section) => section.mode === "layer" && visible[rasterToggleKey(section.id)])
         .toSorted((a, b) => Number(b.drawBelow) - Number(a.drawBelow))
         .flatMap((section) => {
-          // Falls back to the newest year, which is what the sidebar's own
-          // year control shows when nothing has been picked yet.
+          // Falls back to the newest year, which is what the year bar
+          // shows when nothing has been picked yet.
           const year = rasterYear[section.id] ?? section.years.at(-1)?.year ?? null;
           const image = section.years.find((y) => y.year === year) ?? section.years.at(-1);
           return image ? [{ section, image }] : [];
@@ -676,8 +676,6 @@ export function MapDashboard() {
         onDeselectLayer={deselectLayer}
         onResetLayers={resetLayers}
         onCollapse={onCollapse}
-        rasterYear={rasterYear}
-        onRasterYearChange={changeRasterYear}
         rasterOpacity={rasterOpacity}
         onRasterOpacityChange={changeRasterOpacity}
       />
