@@ -24,6 +24,29 @@ function signed(value: string, hemisphere: string | undefined): number {
  * them a pair whose first number cannot be a latitude is read as long, lat.
  */
 export function parseLatLng(query: string): LatLng | null {
+  const pair = readPair(query);
+  return pair && inRange(pair) ? pair : null;
+}
+
+/**
+ * Why a query is not a usable coordinate, worded for the search box, or null
+ * when it is fine (or empty — an empty field is not an error).
+ */
+export function latLngError(query: string): string | null {
+  if (query.trim() === "") return null;
+  const pair = readPair(query);
+  if (!pair) return "Enter as latitude, longitude — e.g. 21.4816, 71.8000";
+  if (Math.abs(pair.lat) > 90) return "Latitude must be between -90 and 90";
+  if (Math.abs(pair.lng) > 180) return "Longitude must be between -180 and 180";
+  return null;
+}
+
+function inRange({ lat, lng }: LatLng): boolean {
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+}
+
+/** The pair in lat, long order, before any range check. */
+function readPair(query: string): LatLng | null {
   const match = PAIR.exec(query);
   if (!match) return null;
   const [, v1, h1, v2, h2] = match;
@@ -35,7 +58,6 @@ export function parseLatLng(query: string): LatLng | null {
     [a, b] = [b, a];
   }
 
-  if (Math.abs(a) > 90 || Math.abs(b) > 180) return null;
   return { lat: a, lng: b };
 }
 
