@@ -492,7 +492,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.7280348, 21.4510837, 71.8225266, 21.5130027),
     ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7280361, 21.4512032, 71.8225123, 21.5130427),
     ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7280248, 21.4513280, 71.8225252, 21.5129805),
-    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7277442, 21.4511012, 71.8227026, 21.5133776);
+    ('lulc_2026', '2026', grp('historical-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7280402, 21.4513279, 71.8225400, 21.5130106),
+    -- The drone-classified current LULC: its own key and folder, so the
+    -- satellite series' lulc_<year> keys (and LULC.xlsx's 2026 column) never
+    -- collide with it.
+    ('lulc_drone_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc-drone/2026.png', 2026, 71.7277442, 21.4511012, 71.8227026, 21.5133776);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
@@ -776,11 +780,16 @@ FROM (VALUES
     ('lulc_2025', '3', 'Dense Vegetation', NULL, 1051.58, 30.99, 3),
     ('lulc_2025', '4', 'Scrub / Sparse Vegetation', NULL, 2137.9, 63.0, 4),
     ('lulc_2025', '5', 'Waterbody', NULL, 1.92, 0.06, 5),
-    ('lulc_2026', '1', 'Barren', NULL, 1743.03, 51.3623, 1),
-    ('lulc_2026', '2', 'Builtup', NULL, 7.93, 0.2337, 2),
-    ('lulc_2026', '3', 'Dense Vegetation', NULL, 660.24, 19.4554, 3),
-    ('lulc_2026', '4', 'Scrub / Sparse Vegetation', NULL, 981.8, 28.9309, 4),
-    ('lulc_2026', '5', 'Waterbody', NULL, 0.6, 0.0177, 5),
+    ('lulc_2026', '1', 'Barren', NULL, 377.06, 11.11, 1),
+    ('lulc_2026', '2', 'Builtup', NULL, 10.92, 0.32, 2),
+    ('lulc_2026', '3', 'Dense Vegetation', NULL, 911.81, 26.87, 3),
+    ('lulc_2026', '4', 'Scrub / Sparse Vegetation', NULL, 2092.67, 61.67, 4),
+    ('lulc_2026', '5', 'Waterbody', NULL, 1.14, 0.03, 5),
+    ('lulc_drone_2026', '1', 'Barren', NULL, 1743.03, 51.3623, 1),
+    ('lulc_drone_2026', '2', 'Builtup', NULL, 7.93, 0.2337, 2),
+    ('lulc_drone_2026', '3', 'Dense Vegetation', NULL, 660.24, 19.4554, 3),
+    ('lulc_drone_2026', '4', 'Scrub / Sparse Vegetation', NULL, 981.8, 28.9309, 4),
+    ('lulc_drone_2026', '5', 'Waterbody', NULL, 0.6, 0.0177, 5),
     ('fragmentation_1980', 'patch', 'Patch', NULL, 46.1, 4.11, 1),
     ('fragmentation_1980', 'edge', 'Edge', NULL, 6.66, 0.59, 2),
     ('fragmentation_1980', 'perforated', 'Perforated', NULL, 369.34, 32.9, 3),

@@ -86,6 +86,7 @@ PRODUCTS = [
     ("green-cover/*.png", "utm", "nearest"),
     ("vegetation-change/*.png", "utm", "nearest"),
     ("lulc/*.png", "utm", "nearest"),
+    ("lulc-drone/*.png", "utm", "nearest"),
     ("fragmentation/*.png", "extent", "nearest"),
     ("growingstock.png", "4326", None),
     ("habitat.png", "4326", None),
