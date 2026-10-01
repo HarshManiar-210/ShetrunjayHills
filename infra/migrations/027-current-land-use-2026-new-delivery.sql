@@ -12,11 +12,8 @@
 --   docker compose exec -T db psql -U shetrunjay -d shetrunjay \
 --     < infra/migrations/027-current-land-use-2026-new-delivery.sql
 --
--- Idempotent: a plain UPDATE by file path, limited to the Current Land Use
--- group -- 030 moves the drone image to lulc-drone/ and gives lulc/2026.png
--- to Historical Land Use, after which this matches nothing.
+-- Idempotent: a plain UPDATE by file path.
 
 BEGIN;
-UPDATE static_overlays SET min_lon=71.7277442, min_lat=21.4511012, max_lon=71.8227026, max_lat=21.5133776 WHERE file_path='raster-data/lulc/2026.png'
-  AND group_id = (SELECT id FROM layer_groups WHERE key = 'current-land-use');
+UPDATE static_overlays SET min_lon=71.7277442, min_lat=21.4511012, max_lon=71.8227026, max_lat=21.5133776 WHERE file_path='raster-data/lulc/2026.png';
 COMMIT;
