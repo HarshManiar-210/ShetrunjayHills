@@ -1,7 +1,7 @@
 -- Current Land Use (Drone: 2026): the client's new delivery of the 2026 LULC
--- image (raster-data/originals/lulc/2026.png). It is the image the official
--- class statistics already seeded for lulc_2026 were computed from -- its
--- class shares match them to 0.01% -- so only its placement changes. Refitted
+-- image (raster-data/originals/lulc/2026.png). Its class shares match the
+-- figures then seeded for lulc_2026 from LULC Drone.xlsx to 0.01%, so only its
+-- placement changed here (030 later replaces those figures). Refitted
 -- to the study-area outline and resampled from UTM 42N by
 -- tools/prepare-study-area-rasters.py (IoU 0.9989, 0.84 m pixels).
 --
