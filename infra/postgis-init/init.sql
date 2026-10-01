@@ -141,6 +141,9 @@ CREATE TABLE static_overlays (
     -- Drawn in one continuous colour, without the animated "marching ants"
     -- gaps every other line and boundary carries.
     solid BOOLEAN NOT NULL DEFAULT false,
+    -- A GeoJSON property drawn as a text label on every feature, whenever the
+    -- layer is on (the Tree Statistics grid's cell numbers). NULL draws none.
+    label_field TEXT,
     -- Selected and switched on when the dashboard opens, before anything is
     -- picked. Which layers start on is this flag, not a key in the frontend.
     default_on BOOLEAN NOT NULL DEFAULT false
@@ -405,6 +408,10 @@ UPDATE static_overlays SET color_field = 'Predicted_SN',
         {"value": "Other", "label": "Other species", "color": "#bab0ac"}
     ]'::jsonb
 WHERE key = 'treeStatistics';
+
+-- Each grid cell carries its number on the map, so a cell can be matched to
+-- its row in the delivered totals without clicking it.
+UPDATE static_overlays SET label_field = 'GridNum' WHERE key = 'treeGrid';
 
 -- Forest Survey of India (FSI) 2023 notification: official density-class and
 -- species-type polygons, delivered as vector data rather than as imagery.

@@ -65,6 +65,9 @@ type StaticOverlay struct {
 	// Solid draws the row in one continuous colour, without the animated
 	// dash gaps other lines and boundaries carry.
 	Solid bool `json:"solid,omitempty"`
+	// LabelField names a GeoJSON property drawn as a text label on every
+	// feature. Empty draws no labels.
+	LabelField string `json:"label_field,omitempty"`
 	// SizeBytes is the asset's size on disk, filled in by the Overlays
 	// handler rather than stored in the DB — statting the file cannot drift
 	// out of step with it the way a seeded column would. Lets the frontend
