@@ -342,8 +342,8 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         id: group.key,
         ...style,
         mode: "layer",
-        // Vector rows seeded beside the imagery (Wildlife Corridors' lines)
-        // draw with the theme's own switch, like an options group's rows.
+        // Vector rows seeded beside the imagery draw with the theme's own
+        // switch, like an options group's rows.
         items: rows.filter((o) => o.asset_type === "vector").map(toItem),
         years,
         children,

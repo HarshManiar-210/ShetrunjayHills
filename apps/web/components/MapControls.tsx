@@ -65,6 +65,11 @@ export function MapControls({
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const [fix, setFix] = useState<{ accuracy: number } | null>(null);
+  // Whether the location status is shown beside the stack. The status also
+  // sits in the button's tooltip, but a phone never hovers, so on a phone a
+  // refusal (an http page, a declined permission) used to look like a button
+  // that did nothing at all.
+  const [notice, setNotice] = useState(false);
 
   const watchRef = useRef<number | null>(null);
   const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,9 +109,17 @@ export function MapControls({
   // radio awake for a map nobody is looking at.
   useEffect(() => stopWatching, [stopWatching]);
 
+  // Shown for as long as a search runs, then long enough to read the outcome.
+  useEffect(() => {
+    if (locating || !notice) return;
+    const timer = setTimeout(() => setNotice(false), locateError ? 6000 : 4000);
+    return () => clearTimeout(timer);
+  }, [locating, notice, locateError, fix]);
+
   function showLocation() {
     const map = mapRef.current;
     if (!map) return;
+    setNotice(true);
     if (!navigator.geolocation) {
       setLocateError("This browser cannot report a location.");
       return;
@@ -184,6 +197,19 @@ export function MapControls({
         className,
       )}
     >
+      {notice && (
+        <p
+          role="status"
+          className={cn(
+            "pointer-events-none absolute w-max max-w-60 rounded-lg bg-card/95 px-2.5 py-1.5 text-xs shadow-e2 ring-1 ring-foreground/10 backdrop-blur-sm",
+            // Beside the location button: left of a column, above a row.
+            horizontal ? "right-0 bottom-full mb-2" : "right-full bottom-1 mr-2",
+            locateError && "text-destructive",
+          )}
+        >
+          {locateLabel}
+        </p>
+      )}
       <ToolButton horizontal={horizontal} label="Zoom in" onClick={() => mapRef.current?.zoomIn()}>
         <Plus />
       </ToolButton>
@@ -300,6 +326,9 @@ function ToolButton({
           disabled={disabled}
           onClick={onClick}
           className={cn(
+            // A finger needs a bigger target than a cursor: 40 px on touch
+            // screens, the compact 28 px everywhere else.
+            "pointer-coarse:size-10",
             pressed && "bg-primary text-primary-foreground hover:bg-primary/90",
             className,
           )}

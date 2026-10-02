@@ -465,19 +465,6 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 5, label: "> 5.0 m³/ha", color: "#7a0403" },
     ],
   },
-  "wildlife-corridors": {
-    layerId: "wildlife-corridors",
-    ramp: "low-to-high",
-    rampOnly: true,
-    rampLabels: ["Low cost", "High cost"],
-    classes: [
-      { value: 1, label: "Low cost", color: "#a6611a" },
-      { value: 2, label: "", color: "#dfc27d" },
-      { value: 3, label: "", color: "#f5f5f5" },
-      { value: 4, label: "", color: "#80cdc1" },
-      { value: 5, label: "High cost", color: "#018571" },
-    ],
-  },
   slope: {
     layerId: "slope",
     ramp: "low-to-high",

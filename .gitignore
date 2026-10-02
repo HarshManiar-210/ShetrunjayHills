@@ -174,3 +174,6 @@ apps/raster-data/Slope.png
 apps/raster-data/Aspect.png
 apps/raster-data/CHM.png
 apps/raster-data/*.pmtiles
+# The Toposheet's tiles (~135 MB, lossless) fit within LFS, so this one is
+# committed rather than copied to the server by hand.
+!apps/raster-data/toposheet.pmtiles

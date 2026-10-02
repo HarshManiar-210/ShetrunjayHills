@@ -618,17 +618,17 @@ WHERE key = 'geology';
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds. Its pixels are square in metres (aspect
 -- 1.466, vs 1.465 for that box on the ground), not in degrees.
--- Growing Stock, Habitat Suitability, Wildlife Corridors: EPSG:4326 grids
+-- Growing Stock, Habitat Suitability: EPSG:4326 grids
 -- clipped to the study area; bounds fitted to its outline by
 -- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033),
-    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7285633, 21.4520919, 71.8217935, 21.5118928);
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033);
 
--- Wildlife Corridors' corridor lines (7, with Length), in the same group as
--- the corridor raster so the theme's one switch draws both.
+-- Wildlife Corridors: the corridor lines alone (7, with Length). The group
+-- had a least-cost raster beside them, since removed; with only this row it
+-- is one entry in the Layers dropdown whose switch draws the lines.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('wildlifeCorridorLines', 'Wildlife Corridor', grp('wildlife-corridors'), 'vector', 'line', '#f60b10', 'vector-data/WildlifeCorridor.geojson', 2, 71.752679, 21.461982, 71.820672, 21.507573);
 
@@ -660,7 +660,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- tools/prepare-study-area-rasters.py fits it to instead. These bounds are
 -- the whole canvas, including its transparent margin.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.4870089, 21.2403840, 72.0156875, 21.7609689);
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.pmtiles', 1, 71.707074, 21.416648, 71.874999, 21.583427);
 
 -- TOF (Trees Outside Forests): 212,969 tree polygons, delivered as
 -- TreeOutsideForest.parquet (UTM 42N) and served as PMTiles like Tree Statistics.
@@ -694,6 +694,9 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- and draws bold and unbroken so it reads as the frame rather than as one more
 -- reference boundary.
 UPDATE static_overlays SET default_on = true, line_width = 3, solid = true WHERE key = 'studyArea';
+
+-- Streams draw as plain solid lines, without the animated flow gaps.
+UPDATE static_overlays SET solid = true WHERE key = 'streams';
 
 -- ---------------------------------------------------------------------------
 -- Seed: delivered class statistics (see overlay_class_stats above). Joined on
