@@ -139,9 +139,11 @@ func RasterStats(repo overlayStatsGetter, dataRoot string) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		// Long: these numbers change only when the imagery is replaced, and
-		// the panel asks for them every time a year is stepped through.
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		// Not cached by the browser: OverlayStats serves this from the same
+		// URL as delivered figures, so a cached measurement would hide them
+		// once they are seeded. Repeat requests are cheap regardless — the
+		// measurement itself is kept in `cache` above.
+		w.Header().Set("Cache-Control", "no-cache")
 		json.NewEncoder(w).Encode(stats)
 	}
 }
