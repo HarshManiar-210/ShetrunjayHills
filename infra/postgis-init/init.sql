@@ -698,7 +698,6 @@ UPDATE static_overlays SET default_on = true, line_width = 3, solid = true WHERE
 -- ---------------------------------------------------------------------------
 -- Seed: delivered class statistics (see overlay_class_stats above). Joined on
 -- the overlay key so the rows survive any change to the overlays' ids.
--- Forest Cover 2026 has no delivered figures yet and keeps the measured ones.
 -- ---------------------------------------------------------------------------
 INSERT INTO overlay_class_stats (overlay_id, class_value, label, class_group, area_ha, percentage, sort_order)
 SELECT o.id, v.class_value, v.label, v.class_group, v.area_ha, v.percentage, v.sort_order
@@ -733,6 +732,11 @@ FROM (VALUES
     ('forest_cover_2025', '3', 'Open Forest', NULL, 594.47, 17.52, 3),
     ('forest_cover_2025', '4', 'Scrub', NULL, 1492.23, 43.97, 4),
     ('forest_cover_2025', '5', 'Non Forest', NULL, 178.65, 5.26, 5),
+    ('forest_cover_2026', '1', 'Very Dense Forest', NULL, 501.01, 14.76, 1),
+    ('forest_cover_2026', '2', 'Moderately Dense Forest', NULL, 519.27, 15.3, 2),
+    ('forest_cover_2026', '3', 'Open Forest', NULL, 266.2, 7.84, 3),
+    ('forest_cover_2026', '4', 'Scrub', NULL, 1693, 49.89, 4),
+    ('forest_cover_2026', '5', 'Non Forest', NULL, 414.12, 12.2, 5),
     ('green_cover_1980', '2', 'Green Cover', NULL, 2980.39, 87.82, 1),
     ('green_cover_1980', '1', 'Non-Green Cover', NULL, 413.21, 12.18, 2),
     ('green_cover_1989', '2', 'Green Cover', NULL, 2820.49, 83.11, 1),
