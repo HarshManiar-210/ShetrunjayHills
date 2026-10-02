@@ -56,7 +56,11 @@ export interface DeliveredStats {
 export type OverlayStats = (RasterStats & { source?: undefined }) | DeliveredStats;
 
 export async function fetchOverlayStats(overlayKey: string): Promise<OverlayStats> {
-  const res = await fetch(`${API_URL}/api/overlays/${overlayKey}/stats`);
+  // Always asks the API rather than trusting a cached copy. The same URL
+  // answers with a measurement until official figures are seeded, and a hard
+  // refresh does not reach this request (it is made after the page loads), so
+  // a stored measurement would otherwise keep hiding newly seeded figures.
+  const res = await fetch(`${API_URL}/api/overlays/${overlayKey}/stats`, { cache: "no-cache" });
   if (!res.ok) throw new Error(`failed to load statistics for ${overlayKey}`);
   return res.json();
 }
