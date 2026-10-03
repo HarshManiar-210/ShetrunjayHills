@@ -385,8 +385,8 @@ WHERE key = 'watershed';
 -- tab); the API stamps that from the .pmtiles extension. The grid is an
 -- outline so the trees show through it, and sorts first so the trees draw on
 -- top — a click on a tree opens the tree, anywhere else in a cell the cell.
--- Trees are coloured by the ten most common species (91% of trees); the
--- other 24 and the unnamed fall through to `color`, the "Other species" row.
+-- Trees are coloured by species, one colour per Predicted_SN value in the tiles;
+-- the unnamed trees fall through to `color`, the "Unidentified" row.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
     ('treeGrid',       'Grid',  grp('tree-statistics'), 'vector', 'outline', '#FFFFFF', 'vector-data/tree-grid.geojson',        1, 71.728476, 21.451971, 71.821823, 21.512008,
         '{GridNum,Zone,Total_Tree_Count,Total_Tree_Species,Total_Carbon_Tonnes,Carbon_Density_t_ha}'),
@@ -405,7 +405,31 @@ UPDATE static_overlays SET color_field = 'Predicted_SN',
         {"value": "Prosopis juliflora", "label": "Prosopis juliflora", "color": "#ff9da7"},
         {"value": "Boswellia serrata", "label": "Boswellia serrata", "color": "#9c755f"},
         {"value": "Mangifera indica", "label": "Mangifera indica", "color": "#17becf"},
-        {"value": "Other", "label": "Other species", "color": "#bab0ac"}
+        {"value": "Vachellia nilotica", "label": "Vachellia nilotica", "color": "#1f77b4"},
+        {"value": "Tamarindus indica L", "label": "Tamarindus indica L", "color": "#d62728"},
+        {"value": "Senna cericulata", "label": "Senna cericulata", "color": "#2ca02c"},
+        {"value": "Pongamia pinnata", "label": "Pongamia pinnata", "color": "#9467bd"},
+        {"value": "Neltuma juliflora", "label": "Neltuma juliflora", "color": "#8c564b"},
+        {"value": "Manilkara hexandra", "label": "Manilkara hexandra", "color": "#e377c2"},
+        {"value": "Leucaena leucocephala", "label": "Leucaena leucocephala", "color": "#7f7f7f"},
+        {"value": "Lannea coromandelica (Houtt.) Merr.", "label": "Lannea coromandelica (Houtt.) Merr.", "color": "#bcbd22"},
+        {"value": "Fugeea Sp", "label": "Fugeea Sp", "color": "#aec7e8"},
+        {"value": "Ficus religiosa", "label": "Ficus religiosa", "color": "#ffbb78"},
+        {"value": "Ficus benghalensis", "label": "Ficus benghalensis", "color": "#98df8a"},
+        {"value": "Ficus bengalensis", "label": "Ficus bengalensis", "color": "#ff9896"},
+        {"value": "Euphorbia", "label": "Euphorbia", "color": "#c5b0d5"},
+        {"value": "Diospyros melanoxylon Roxb.", "label": "Diospyros melanoxylon Roxb.", "color": "#c49c94"},
+        {"value": "Diospyros melanoxylon", "label": "Diospyros melanoxylon", "color": "#f7b6d2"},
+        {"value": "Delonix regia", "label": "Delonix regia", "color": "#dbdb8d"},
+        {"value": "Cassia fistula", "label": "Cassia fistula", "color": "#9edae5"},
+        {"value": "Butea monosperma var. lutea", "label": "Butea monosperma var. lutea", "color": "#393b79"},
+        {"value": "Bambusa vulgaris", "label": "Bambusa vulgaris", "color": "#637939"},
+        {"value": "Balanites roxburghii", "label": "Balanites roxburghii", "color": "#8c6d31"},
+        {"value": "Bahunia", "label": "Bahunia", "color": "#843c39"},
+        {"value": "Albizia amara", "label": "Albizia amara", "color": "#7b4173"},
+        {"value": "Albizia Sp", "label": "Albizia Sp", "color": "#3182bd"},
+        {"value": "Ailanthus excelsa", "label": "Ailanthus excelsa", "color": "#e6550d"},
+        {"value": "Unidentified", "label": "Unidentified", "color": "#bab0ac"}
     ]'::jsonb
 WHERE key = 'treeStatistics';
 
