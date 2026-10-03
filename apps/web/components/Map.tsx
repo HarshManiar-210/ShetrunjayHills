@@ -78,6 +78,9 @@ const OUTLINE_WIDTH = 0.75;
 const DOTTED_WIDTH = 2.5;
 const DOTTED_GAP = 2;
 
+// The one font in public/fonts, used for every overlay label.
+const LABEL_FONT = "Open Sans Semibold";
+
 // The lowest of the shared permissioned layers (see addLayers). The panel's
 // ordered layers are stacked beneath it.
 const STACK_CEILING = "polygons-fill";
@@ -245,6 +248,10 @@ class CompactAttribution implements IControl {
 function mapStyle(basemap: BasemapId) {
   return {
     version: 8 as const,
+    // Served from public/fonts rather than a third-party glyph server. Only
+    // the 0-255 range is there, which covers what labels carry today (cell
+    // numbers); MapLibre has to be given an absolute URL.
+    glyphs: `${window.location.origin}/fonts/{fontstack}/{range}.pbf`,
     sources: basemapSources(),
     layers: [
       {
@@ -457,7 +464,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url, dotted, lineWidth, solid } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted, lineWidth, solid, labelField } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -582,6 +589,31 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         });
       }
     }
+
+    if (labelField) {
+      // Added last, so it draws above the layer's own geometry; restacking
+      // keeps it there (see overlayLayerIds).
+      map.addLayer({
+        id: `${sourceId}-label`,
+        type: "symbol",
+        source: sourceId,
+        ...from,
+        layout: {
+          visibility: "none",
+          "text-field": ["to-string", ["get", labelField]],
+          "text-font": [LABEL_FONT],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 12, 11, 16, 16],
+          // One label per feature, never stacked: the collision pass drops
+          // the ones with no room at this zoom and brings them back closer in.
+          "text-allow-overlap": false,
+        },
+        paint: {
+          "text-color": "#FFFFFF",
+          "text-halo-color": "rgba(0, 0, 0, 0.75)",
+          "text-halo-width": 1.25,
+        },
+      });
+    }
   }
 }
 
@@ -617,13 +649,18 @@ function applyStack(map: MapLibreMap, stack: MapStackEntry[], defs: OverlayDef[]
   let before = STACK_CEILING;
   for (const entry of stack) {
     // Bottom to top within the entry, walked backwards so each move lands
-    // directly beneath the one placed before it.
+    // directly beneath the one placed before it. Labels go above all of the
+    // entry's geometry, not just their own layer's: the Tree Statistics grid
+    // numbers would otherwise sit under the trees drawn in the same row.
+    const overlayIds = entry.overlays.flatMap((key) => {
+      const kind = kindOf.get(key);
+      return kind ? overlayLayerIds(kind, `overlay-${key}`) : [];
+    });
+    const isLabel = (id: string) => id.endsWith("-label");
     const ids = [
       ...entry.rasters.map(rasterLayerId),
-      ...entry.overlays.flatMap((key) => {
-        const kind = kindOf.get(key);
-        return kind ? overlayLayerIds(kind, `overlay-${key}`) : [];
-      }),
+      ...overlayIds.filter((id) => !isLabel(id)),
+      ...overlayIds.filter(isLabel),
     ];
     for (let i = ids.length - 1; i >= 0; i--) {
       if (!map.getLayer(ids[i])) continue;
@@ -633,10 +670,13 @@ function applyStack(map: MapLibreMap, stack: MapStackEntry[], defs: OverlayDef[]
   }
 }
 
+// Bottom to top. The label layer is listed for every kind; it only exists
+// for a def with a labelField, and callers skip ids not on the map.
 function overlayLayerIds(kind: OverlayDef["kind"], sourceId: string) {
-  if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`];
-  if (kind === "point") return [`${sourceId}-circle`];
-  return [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`];
+  const label = `${sourceId}-label`;
+  if (kind === "line") return [`${sourceId}-casing`, `${sourceId}-line`, `${sourceId}-flow`, label];
+  if (kind === "point") return [`${sourceId}-circle`, label];
+  return [`${sourceId}-fill`, `${sourceId}-outline`, `${sourceId}-flow`, label];
 }
 
 /**

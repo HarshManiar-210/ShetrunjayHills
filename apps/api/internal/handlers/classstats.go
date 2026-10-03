@@ -55,7 +55,10 @@ func OverlayStats(repo overlayClassStatsGetter, dataRoot string) http.HandlerFun
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		// Revalidated every time: the same URL answers with a measurement
+		// until figures are seeded, so a cached copy would keep showing the
+		// measured numbers after the delivered ones arrive.
+		w.Header().Set("Cache-Control", "no-cache")
 		json.NewEncoder(w).Encode(deliveredStats{Source: "delivered", AreaSqM: total, Classes: classes})
 	}
 }

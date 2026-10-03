@@ -5,8 +5,9 @@ The client delivered one .xlsx per theme (the file name says which), holding
 the official area and share of each class, per year where the theme has years:
 
     Forest Cover.xlsx        forest_cover_<year>, one column pair per year
-    LULC.xlsx                lulc_<year>, likewise
-    LULC Drone.xlsx          lulc_2026 (the drone-classified current LULC)
+    Green Cover.xlsx         green_cover_<year>, likewise
+    LULC.xlsx                lulc_<year>, likewise; its 2026 column is
+                             Current Land Use (Drone: 2026)
     Fragmentation.xlsx       fragmentation_<year>
     Vegetation Change.xlsx   vegetation_change_<from>_<to>, one sheet each
     Tree Density Drone.xlsx  treeDensity
@@ -54,6 +55,16 @@ DENSITY_LABEL = {
     "3": "Open Forest",
     "4": "Scrub",
     "5": "Non Forest",
+}
+
+# Green Cover's legend has two classes: 2 the green cover, 1 everything else.
+GREEN = {
+    "green cover": "2",
+    "non-green cover": "1",
+}
+GREEN_LABEL = {
+    "2": "Green Cover",
+    "1": "Non-Green Cover",
 }
 
 LULC = {
@@ -219,8 +230,8 @@ def main() -> int:
 
     rows: list[Row] = []
     rows += yearwise(d / "Forest Cover.xlsx", "forest_cover", 0, DENSITY, DENSITY_LABEL)
+    rows += yearwise(d / "Green Cover.xlsx", "green_cover", 0, GREEN, GREEN_LABEL)
     rows += yearwise(d / "LULC.xlsx", "lulc", 0, LULC, LULC_LABEL)
-    rows += single(d / "LULC Drone.xlsx", "lulc_2026", LULC, LULC_LABEL)
     rows += yearwise(d / "Fragmentation.xlsx", "fragmentation", 1, FRAGMENTATION, None)
     rows += vegetation_change(d / "Vegetation Change.xlsx")
     rows += single(d / "Tree Density Drone.xlsx", "treeDensity", DENSITY, DENSITY_LABEL)

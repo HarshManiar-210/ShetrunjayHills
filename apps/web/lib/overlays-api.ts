@@ -38,6 +38,8 @@ export interface OverlayMeta {
   line_width?: number;
   /** One continuous colour, without the animated dash gaps. */
   solid?: boolean;
+  /** A feature property drawn as a text label on every feature. */
+  label_field?: string;
   /** 'pending' rows carry no kind/color/file_path — data hasn't arrived yet. */
   status: "available" | "pending";
   min_lon?: number;

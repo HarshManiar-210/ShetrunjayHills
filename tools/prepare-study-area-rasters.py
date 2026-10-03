@@ -31,7 +31,7 @@ its own delivered extent):
    fitted to that extent's UTM corners, which gives the UTM box of the whole
    canvas (square 7.04 m pixels, corners within ~1 px).
 
-2. Growing Stock, Habitat Suitability and Wildlife Corridors are on an
+2. Growing Stock and Habitat Suitability are on an
    EPSG:4326 grid (equal degrees per pixel, as prepare-drone-rasters.py found
    for the drone products) -- they fit best as a plain lat/lng box, but not
    the one seeded. Only their bounds change; a 4326 grid over ~0.06 deg is
@@ -89,7 +89,6 @@ PRODUCTS = [
     ("fragmentation/*.png", "extent", "nearest"),
     ("growingstock.png", "4326", None),
     ("habitat.png", "4326", None),
-    ("wildlifecorridor.png", "4326", None),
 ]
 
 # The delivered Toposheet's sheet extent: W, S, E, N in EPSG:4326.
@@ -370,6 +369,13 @@ def main():
             pat = re.compile(r"('raster-data/" + re.escape(rel) + r"', \d+, )"
                              r"[-\d.]+, [-\d.]+, [-\d.]+, [-\d.]+\)")
             sql, n = pat.subn(lambda m: m.group(1) + ", ".join(f"{v:.7f}" for v in b) + ")", sql)
+            # A product now served as tiles (the Toposheet) has its row on the
+            # .pmtiles file, with bounds set by prepare-raster-tiles.sh -- e.g.
+            # a CLIP window -- so the PNG's full extent must not overwrite them.
+            tiled = "'raster-data/" + os.path.splitext(rel)[0] + ".pmtiles'"
+            if n == 0 and tiled in sql:
+                print(f"{rel}: served as {tiled}; re-tile it with tools/prepare-raster-tiles.sh")
+                continue
             if n != 1:
                 raise SystemExit(f"expected one init.sql row for {rel}, found {n}")
         with open(INIT_SQL, "w", encoding="utf-8", newline="") as f:

@@ -141,6 +141,9 @@ CREATE TABLE static_overlays (
     -- Drawn in one continuous colour, without the animated "marching ants"
     -- gaps every other line and boundary carries.
     solid BOOLEAN NOT NULL DEFAULT false,
+    -- A GeoJSON property drawn as a text label on every feature, whenever the
+    -- layer is on (the Tree Statistics grid's cell numbers). NULL draws none.
+    label_field TEXT,
     -- Selected and switched on when the dashboard opens, before anything is
     -- picked. Which layers start on is this flag, not a key in the frontend.
     default_on BOOLEAN NOT NULL DEFAULT false
@@ -406,6 +409,10 @@ UPDATE static_overlays SET color_field = 'Predicted_SN',
     ]'::jsonb
 WHERE key = 'treeStatistics';
 
+-- Each grid cell carries its number on the map, so a cell can be matched to
+-- its row in the delivered totals without clicking it.
+UPDATE static_overlays SET label_field = 'GridNum' WHERE key = 'treeGrid';
+
 -- Forest Survey of India (FSI) 2023 notification: official density-class and
 -- species-type polygons, delivered as vector data rather than as imagery.
 -- Distinct from the yearwise Forest Cover/Forest Type raster themes above
@@ -485,7 +492,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('lulc_2008', '2008', grp('historical-land-use'), 'raster', 'raster-data/lulc/2008.png', 2008, 71.7280348, 21.4510837, 71.8225266, 21.5130027),
     ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7280361, 21.4512032, 71.8225123, 21.5130427),
     ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7280248, 21.4513280, 71.8225252, 21.5129805),
-    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7280402, 21.4513279, 71.8225400, 21.5130106);
+    ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7277442, 21.4511012, 71.8227026, 21.5133776);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
@@ -611,17 +618,17 @@ WHERE key = 'geology';
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds. Its pixels are square in metres (aspect
 -- 1.466, vs 1.465 for that box on the ground), not in degrees.
--- Growing Stock, Habitat Suitability, Wildlife Corridors: EPSG:4326 grids
+-- Growing Stock, Habitat Suitability: EPSG:4326 grids
 -- clipped to the study area; bounds fitted to its outline by
 -- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
-    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033),
-    ('wildlifeCorridors', 'Wildlife Corridors', grp('wildlife-corridors'), 'raster', 'raster-data/wildlifecorridor.png', 1, 71.7285633, 21.4520919, 71.8217935, 21.5118928);
+    ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033);
 
--- Wildlife Corridors' corridor lines (7, with Length), in the same group as
--- the corridor raster so the theme's one switch draws both.
+-- Wildlife Corridors: the corridor lines alone (7, with Length). The group
+-- had a least-cost raster beside them, since removed; with only this row it
+-- is one entry in the Layers dropdown whose switch draws the lines.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('wildlifeCorridorLines', 'Wildlife Corridor', grp('wildlife-corridors'), 'vector', 'line', '#f60b10', 'vector-data/WildlifeCorridor.geojson', 2, 71.752679, 21.461982, 71.820672, 21.507573);
 
@@ -653,7 +660,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- tools/prepare-study-area-rasters.py fits it to instead. These bounds are
 -- the whole canvas, including its transparent margin.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.png', 1, 71.4870089, 21.2403840, 72.0156875, 21.7609689);
+    ('toposheet', 'Toposheet', grp('toposheet'), 'raster', 'raster-data/toposheet.pmtiles', 1, 71.707074, 21.416648, 71.874999, 21.583427);
 
 -- TOF (Trees Outside Forests): 212,969 tree polygons, delivered as
 -- TreeOutsideForest.parquet (UTM 42N) and served as PMTiles like Tree Statistics.
@@ -688,10 +695,12 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- reference boundary.
 UPDATE static_overlays SET default_on = true, line_width = 3, solid = true WHERE key = 'studyArea';
 
+-- Streams draw as plain solid lines, without the animated flow gaps.
+UPDATE static_overlays SET solid = true WHERE key = 'streams';
+
 -- ---------------------------------------------------------------------------
 -- Seed: delivered class statistics (see overlay_class_stats above). Joined on
 -- the overlay key so the rows survive any change to the overlays' ids.
--- Forest Cover 2026 has no delivered figures yet and keeps the measured ones.
 -- ---------------------------------------------------------------------------
 INSERT INTO overlay_class_stats (overlay_id, class_value, label, class_group, area_ha, percentage, sort_order)
 SELECT o.id, v.class_value, v.label, v.class_group, v.area_ha, v.percentage, v.sort_order
@@ -726,6 +735,25 @@ FROM (VALUES
     ('forest_cover_2025', '3', 'Open Forest', NULL, 594.47, 17.52, 3),
     ('forest_cover_2025', '4', 'Scrub', NULL, 1492.23, 43.97, 4),
     ('forest_cover_2025', '5', 'Non Forest', NULL, 178.65, 5.26, 5),
+    ('forest_cover_2026', '1', 'Very Dense Forest', NULL, 501.01, 14.76, 1),
+    ('forest_cover_2026', '2', 'Moderately Dense Forest', NULL, 519.27, 15.3, 2),
+    ('forest_cover_2026', '3', 'Open Forest', NULL, 266.2, 7.84, 3),
+    ('forest_cover_2026', '4', 'Scrub', NULL, 1693, 49.89, 4),
+    ('forest_cover_2026', '5', 'Non Forest', NULL, 414.12, 12.2, 5),
+    ('green_cover_1980', '2', 'Green Cover', NULL, 2980.39, 87.82, 1),
+    ('green_cover_1980', '1', 'Non-Green Cover', NULL, 413.21, 12.18, 2),
+    ('green_cover_1989', '2', 'Green Cover', NULL, 2820.49, 83.11, 1),
+    ('green_cover_1989', '1', 'Non-Green Cover', NULL, 573.11, 16.89, 2),
+    ('green_cover_1998', '2', 'Green Cover', NULL, 2782.88, 82, 1),
+    ('green_cover_1998', '1', 'Non-Green Cover', NULL, 610.72, 18, 2),
+    ('green_cover_2008', '2', 'Green Cover', NULL, 2844.73, 83.83, 1),
+    ('green_cover_2008', '1', 'Non-Green Cover', NULL, 548.88, 16.17, 2),
+    ('green_cover_2018', '2', 'Green Cover', NULL, 2922.15, 86.11, 1),
+    ('green_cover_2018', '1', 'Non-Green Cover', NULL, 471.45, 13.89, 2),
+    ('green_cover_2025', '2', 'Green Cover', NULL, 3214.95, 94.74, 1),
+    ('green_cover_2025', '1', 'Non-Green Cover', NULL, 178.65, 5.26, 2),
+    ('green_cover_2026', '2', 'Green Cover', NULL, 2979.48, 87.8, 1),
+    ('green_cover_2026', '1', 'Non-Green Cover', NULL, 414.12, 12.2, 2),
     ('lulc_1980', '1', 'Barren', NULL, 421.9, 12.43, 1),
     ('lulc_1980', '2', 'Builtup', NULL, 8.7, 0.26, 2),
     ('lulc_1980', '3', 'Dense Vegetation', NULL, 225.2, 6.64, 3),
@@ -755,11 +783,11 @@ FROM (VALUES
     ('lulc_2025', '3', 'Dense Vegetation', NULL, 1051.58, 30.99, 3),
     ('lulc_2025', '4', 'Scrub / Sparse Vegetation', NULL, 2137.9, 63.0, 4),
     ('lulc_2025', '5', 'Waterbody', NULL, 1.92, 0.06, 5),
-    ('lulc_2026', '1', 'Barren', NULL, 1743.03, 51.3623, 1),
-    ('lulc_2026', '2', 'Builtup', NULL, 7.93, 0.2337, 2),
-    ('lulc_2026', '3', 'Dense Vegetation', NULL, 660.24, 19.4554, 3),
-    ('lulc_2026', '4', 'Scrub / Sparse Vegetation', NULL, 981.8, 28.9309, 4),
-    ('lulc_2026', '5', 'Waterbody', NULL, 0.6, 0.0177, 5),
+    ('lulc_2026', '1', 'Barren', NULL, 377.06, 11.11, 1),
+    ('lulc_2026', '2', 'Builtup', NULL, 10.92, 0.32, 2),
+    ('lulc_2026', '3', 'Dense Vegetation', NULL, 911.81, 26.87, 3),
+    ('lulc_2026', '4', 'Scrub / Sparse Vegetation', NULL, 2092.67, 61.67, 4),
+    ('lulc_2026', '5', 'Waterbody', NULL, 1.14, 0.03, 5),
     ('fragmentation_1980', 'patch', 'Patch', NULL, 46.1, 4.11, 1),
     ('fragmentation_1980', 'edge', 'Edge', NULL, 6.66, 0.59, 2),
     ('fragmentation_1980', 'perforated', 'Perforated', NULL, 369.34, 32.9, 3),
