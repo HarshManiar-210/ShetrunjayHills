@@ -295,7 +295,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
-    ('administrative-boundaries',   'Admin Layers',   NULL, 8);
+    ('administrative-boundaries',   'Admin Boundaries',   NULL, 8);
 
 -- Boundaries are reference context laid over whatever else is on, not a
 -- subject of their own, so they get a dropdown of their own in the navbar.
@@ -988,7 +988,7 @@ FROM (VALUES
 JOIN static_overlays o ON o.key = v.overlay_key;
 
 -- Zones: the six study-area zones cut into their grid cells (Zones.geojson),
--- with the Admin Layers group (was "Administrative Boundaries") as its home.
+-- with the Admin Boundaries group (was "Administrative Boundaries") as its home.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
     ('zones', 'Zones', grp('administrative-boundaries'), 'vector', 'outline', '#E4572E', 'vector-data/Zones.geojson', 13, 71.728476, 21.451971, 71.821823, 21.512008,
         '{ZName,GridNum,Name,Area_SqM}');
