@@ -987,3 +987,8 @@ JOIN static_overlays o ON o.key = v.overlay_key;
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
     ('zones', 'Zones', grp('administrative-boundaries'), 'vector', 'outline', '#E4572E', 'vector-data/Zones.geojson', 13, 71.728476, 21.451971, 71.821823, 21.512008,
         '{ZName,GridNum,Name,Area_SqM}');
+
+-- Both Vantalavadi layers show their Volume when clicked. The existing file
+-- names the column "VolumeVolume" (labelled "Volume" in feature-popup.ts).
+UPDATE static_overlays SET popup_fields = '{VolumeVolume}' WHERE key = 'vantalawadi';
+UPDATE static_overlays SET popup_fields = '{Volume,Zone_2}' WHERE key = 'proposedVantalavadi';

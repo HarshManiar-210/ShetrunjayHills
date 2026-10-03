@@ -143,6 +143,8 @@ const UNTRUNCATED: Record<string, string> = {
   cat: "Category",
   polygonid: "Polygon ID",
   predicted_sn: "Species",
+  // The existing Vantalavadi file names its column "VolumeVolume".
+  volumevolume: "Volume",
 };
 
 /**
