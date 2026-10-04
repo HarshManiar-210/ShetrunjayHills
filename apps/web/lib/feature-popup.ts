@@ -204,13 +204,21 @@ function humanise(key: string): string {
 /** The showable attributes of a feature, in the order the source lists them. */
 export function popupFields(
   properties: Record<string, unknown> | null,
-  /** The layer's own field list (static_overlays.popup_fields), when it has one. */
+  /**
+   * The layer's own field list (static_overlays.popup_fields), when it has one.
+   * An entry may be `Field:Label` to caption the row itself, for a column
+   * whose name (NAME) means something more specific on this layer (Road Name).
+   */
   only?: string[],
 ): PopupField[] {
   if (!properties) return [];
   const entries = only?.length
-    ? only.map((key) => [key, properties[key]] as const)
-    : Object.entries(properties);
+    ? only.map((entry) => {
+        const i = entry.indexOf(":");
+        const key = i < 0 ? entry : entry.slice(0, i);
+        return [key, properties[key], i < 0 ? undefined : entry.slice(i + 1)] as const;
+      })
+    : Object.entries(properties).map(([k, v]) => [k, v, undefined] as const);
   const fields: PopupField[] = [];
   // Two columns can land on the same label — StudyArea carries both `area`
   // (hectares) and `areaSqKm`, which are one measurement stated twice. Showing
@@ -218,12 +226,12 @@ export function popupFields(
   // the first spelling wins.
   const seen = new Set<string>();
 
-  for (const [key, raw] of entries) {
+  for (const [key, raw, custom] of entries) {
     if (!only?.length && INTERNAL_KEYS.has(key.toLowerCase())) continue;
     const value = formatValue(raw);
     if (value === null) continue;
 
-    const label = humanise(key);
+    const label = custom || humanise(key);
     if (seen.has(label)) continue;
     seen.add(label);
 
