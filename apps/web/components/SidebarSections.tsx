@@ -406,7 +406,7 @@ function SidebarSectionsImpl({
         <div
           role="group"
           aria-label="Filter layers by subject"
-          className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2 scrollbar-none"
+          className="flex shrink-0 gap-1.5 overflow-x-auto px-3 pb-2 pt-3 scrollbar-none"
         >
           <FilterChip label="All" active={active === ALL} onSelect={() => setFilter(ALL)} />
           {chips.map((f) => (

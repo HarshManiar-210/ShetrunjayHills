@@ -26,6 +26,8 @@ export interface OverlayDef {
   popupFields?: string[];
   /** See OverlayMeta.dotted. */
   dotted?: boolean;
+  /** See OverlayMeta.dashed. */
+  dashed?: boolean;
   /** See OverlayMeta.line_width. */
   lineWidth?: number;
   /** See OverlayMeta.solid. */
@@ -66,6 +68,7 @@ export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
       categories: o.categories,
       popupFields: o.popup_fields,
       dotted: o.dotted,
+      dashed: o.dashed,
       lineWidth: o.line_width,
       solid: o.solid,
       labelField: o.label_field,

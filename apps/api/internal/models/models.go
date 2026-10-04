@@ -59,6 +59,8 @@ type StaticOverlay struct {
 	DefaultOn bool `json:"default_on,omitempty"`
 	// Dotted draws a 'line' row dotted rather than solid (Fireline).
 	Dotted bool `json:"dotted,omitempty"`
+	// Dashed draws the row's line or boundary with long dashes (Grazing Land).
+	Dashed bool `json:"dashed,omitempty"`
 	// LineWidth overrides the default stroke width for the row's kind, in
 	// pixels. nil draws at the default.
 	LineWidth *float64 `json:"line_width,omitempty"`

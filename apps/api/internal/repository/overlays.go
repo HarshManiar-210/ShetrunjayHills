@@ -15,7 +15,7 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, key, label, group_id, asset_type, COALESCE(kind, ''), COALESCE(color, ''),
 			COALESCE(color_field, ''), categories, COALESCE(popup_fields, '{}'),
-			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status, default_on, dotted,
+			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status, default_on, dotted, dashed,
 			line_width, solid, COALESCE(label_field, ''),
 			EXISTS (SELECT 1 FROM overlay_class_stats s WHERE s.overlay_id = static_overlays.id)
 		FROM static_overlays
@@ -32,7 +32,7 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 		if err := rows.Scan(
 			&o.ID, &o.Key, &o.Label, &o.GroupID, &o.AssetType, &o.Kind, &o.Color,
 			&o.ColorField, &o.Categories, &o.PopupFields,
-			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status, &o.DefaultOn, &o.Dotted,
+			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status, &o.DefaultOn, &o.Dotted, &o.Dashed,
 			&o.LineWidth, &o.Solid, &o.LabelField,
 			&o.HasStats,
 		); err != nil {

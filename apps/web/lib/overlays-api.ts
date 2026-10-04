@@ -34,6 +34,8 @@ export interface OverlayMeta {
   default_on?: boolean;
   /** A 'line' row drawn dotted rather than solid (Fireline). */
   dotted?: boolean;
+  /** A line or boundary drawn with long dashes (Grazing Land). */
+  dashed?: boolean;
   /** Stroke width in pixels, overriding the default for the kind. */
   line_width?: number;
   /** One continuous colour, without the animated dash gaps. */

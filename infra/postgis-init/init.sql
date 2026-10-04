@@ -134,6 +134,8 @@ CREATE TABLE static_overlays (
     -- A 'line' row drawn dotted rather than solid (Fireline), in the map and
     -- in its legend swatch.
     dotted BOOLEAN NOT NULL DEFAULT false,
+    -- A line or boundary drawn with long dashes (Grazing Land).
+    dashed BOOLEAN NOT NULL DEFAULT false,
     -- Stroke width in pixels for a 'line'/'fill'/'outline' row. NULL draws at
     -- the frontend's default width for its kind; set it to make one boundary
     -- stand out from the rest (the Study Area).
@@ -295,7 +297,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('hydrogeology',                'Hydrogeology',                NULL, 4),
     ('drone-analysis',              'Drone Analysis',              NULL, 5),
     ('wildlife-movement',           'Wildlife Movement',           NULL, 7),
-    ('administrative-boundaries',   'Administrative Boundaries',   NULL, 8);
+    ('administrative-boundaries',   'Admin Boundaries',   NULL, 8);
 
 -- Boundaries are reference context laid over whatever else is on, not a
 -- subject of their own, so they get a dropdown of their own in the navbar.
@@ -385,8 +387,8 @@ WHERE key = 'watershed';
 -- tab); the API stamps that from the .pmtiles extension. The grid is an
 -- outline so the trees show through it, and sorts first so the trees draw on
 -- top — a click on a tree opens the tree, anywhere else in a cell the cell.
--- Trees are coloured by the ten most common species (91% of trees); the
--- other 24 and the unnamed fall through to `color`, the "Other species" row.
+-- Trees are coloured by species, one colour per Predicted_SN value in the tiles;
+-- the unnamed trees fall through to `color`, the "Unidentified" row.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
     ('treeGrid',       'Grid',  grp('tree-statistics'), 'vector', 'outline', '#FFFFFF', 'vector-data/tree-grid.geojson',        1, 71.728476, 21.451971, 71.821823, 21.512008,
         '{GridNum,Zone,Total_Tree_Count,Total_Tree_Species,Total_Carbon_Tonnes,Carbon_Density_t_ha}'),
@@ -405,7 +407,31 @@ UPDATE static_overlays SET color_field = 'Predicted_SN',
         {"value": "Prosopis juliflora", "label": "Prosopis juliflora", "color": "#ff9da7"},
         {"value": "Boswellia serrata", "label": "Boswellia serrata", "color": "#9c755f"},
         {"value": "Mangifera indica", "label": "Mangifera indica", "color": "#17becf"},
-        {"value": "Other", "label": "Other species", "color": "#bab0ac"}
+        {"value": "Vachellia nilotica", "label": "Vachellia nilotica", "color": "#1f77b4"},
+        {"value": "Tamarindus indica L", "label": "Tamarindus indica L", "color": "#d62728"},
+        {"value": "Senna cericulata", "label": "Senna cericulata", "color": "#2ca02c"},
+        {"value": "Pongamia pinnata", "label": "Pongamia pinnata", "color": "#9467bd"},
+        {"value": "Neltuma juliflora", "label": "Neltuma juliflora", "color": "#8c564b"},
+        {"value": "Manilkara hexandra", "label": "Manilkara hexandra", "color": "#e377c2"},
+        {"value": "Leucaena leucocephala", "label": "Leucaena leucocephala", "color": "#7f7f7f"},
+        {"value": "Lannea coromandelica (Houtt.) Merr.", "label": "Lannea coromandelica (Houtt.) Merr.", "color": "#bcbd22"},
+        {"value": "Fugeea Sp", "label": "Fugeea Sp", "color": "#aec7e8"},
+        {"value": "Ficus religiosa", "label": "Ficus religiosa", "color": "#ffbb78"},
+        {"value": "Ficus benghalensis", "label": "Ficus benghalensis", "color": "#98df8a"},
+        {"value": "Ficus bengalensis", "label": "Ficus bengalensis", "color": "#ff9896"},
+        {"value": "Euphorbia", "label": "Euphorbia", "color": "#c5b0d5"},
+        {"value": "Diospyros melanoxylon Roxb.", "label": "Diospyros melanoxylon Roxb.", "color": "#c49c94"},
+        {"value": "Diospyros melanoxylon", "label": "Diospyros melanoxylon", "color": "#f7b6d2"},
+        {"value": "Delonix regia", "label": "Delonix regia", "color": "#dbdb8d"},
+        {"value": "Cassia fistula", "label": "Cassia fistula", "color": "#9edae5"},
+        {"value": "Butea monosperma var. lutea", "label": "Butea monosperma var. lutea", "color": "#393b79"},
+        {"value": "Bambusa vulgaris", "label": "Bambusa vulgaris", "color": "#637939"},
+        {"value": "Balanites roxburghii", "label": "Balanites roxburghii", "color": "#8c6d31"},
+        {"value": "Bahunia", "label": "Bahunia", "color": "#843c39"},
+        {"value": "Albizia amara", "label": "Albizia amara", "color": "#7b4173"},
+        {"value": "Albizia Sp", "label": "Albizia Sp", "color": "#3182bd"},
+        {"value": "Ailanthus excelsa", "label": "Ailanthus excelsa", "color": "#e6550d"},
+        {"value": "Unidentified", "label": "Unidentified", "color": "#bab0ac"}
     ]'::jsonb
 WHERE key = 'treeStatistics';
 
@@ -638,20 +664,15 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- flood0_5m/flood1m/flood2m/flood5m/flood10m entries, resolved by the
 -- selected image's own key rather than the theme's).
 --
--- The delivered "Flood All Layers" extent (71.7282, 21.4169 - 71.8245,
--- 21.4756) put the flooding ~4 km south of the hills, over farmland, and
--- doesn't match the images' EPSG:4326 aspect. The PNGs carry no georeference,
--- so these bounds are fitted instead: square 4326 pixels, positioned where
--- the flooded pixels best follow Streams.geojson (2/5/10 m: 56-66% within
--- ~15 m of a channel, vs 5-7% at the delivered extent; 0.5/1 m fit less
--- tightly, 35-39%). Replace with exact numbers if the client sends GeoTIFFs
--- or world files.
+-- All five share the client's "Flood All Layers" extent (71.7282, 21.4169 -
+-- 71.8245, 21.4756), which the client confirmed is authoritative. An earlier
+-- fit to Streams.geojson (migration 025) is superseded by migration 037.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.7283593, 21.4569948, 71.8255269, 21.5139052),
-    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.7266993, 21.4519680, 71.8221845, 21.5128352),
-    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.7276993, 21.4532273, 71.8215193, 21.5127352),
-    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.7276993, 21.4536271, 71.8214723, 21.5131052),
-    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7281293, 21.4537554, 71.8219049, 21.5132352);
+    ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.7282, 21.4169, 71.8245, 21.4756),
+    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above. A UTM 42N image like Forest Cover (see there), but
@@ -962,3 +983,84 @@ FROM (VALUES
     ('forestTypeFSI', 'Water', 'Water', NULL, 8.3442, 0.3532, 7)
 ) AS v (overlay_key, class_value, label, class_group, area_ha, percentage, sort_order)
 JOIN static_overlays o ON o.key = v.overlay_key;
+
+-- Zones: the six study-area zones cut into their grid cells (Zones.geojson),
+-- with the Admin Boundaries group (was "Administrative Boundaries") as its home.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('zones', 'Zones', grp('administrative-boundaries'), 'vector', 'outline', '#E4572E', 'vector-data/Zones.geojson', 13, 71.728476, 21.451971, 71.821823, 21.512008,
+        '{ZName,GridNum,Name,Area_SqM}');
+
+-- Both Vantalavadi layers show their Volume when clicked. The existing file
+-- names the column "VolumeVolume" (labelled "Volume" in feature-popup.ts).
+UPDATE static_overlays SET popup_fields = '{VolumeVolume}' WHERE key = 'vantalawadi';
+UPDATE static_overlays SET popup_fields = '{Volume,Zone_2}' WHERE key = 'proposedVantalavadi';
+
+-- Forest Boundary: a dark, 2 px solid outline (was a tinted fill) whose popup shows only F_TYPE.
+UPDATE static_overlays SET kind = 'outline', solid = true, color = '#0B3D24', line_width = 2, popup_fields = '{F_TYPE}' WHERE key = 'forestBoundary';
+
+-- Streams: the popup shows only Stream Order and Length.
+UPDATE static_overlays SET popup_fields = '{strmOrder,Length}' WHERE key = 'streams';
+
+-- District Boundary: a solid outline whose popup shows only District.
+UPDATE static_overlays SET solid = true, popup_fields = '{District}' WHERE key = 'districtBoundary';
+
+-- Taluka Boundary: a solid outline whose popup shows District and Taluka.
+UPDATE static_overlays SET solid = true, popup_fields = '{District,Taluka}' WHERE key = 'talukaBoundary';
+
+-- Village Boundary: a solid outline whose popup shows District, Taluka and Village.
+UPDATE static_overlays SET solid = true, popup_fields = '{District,Taluka,Village}' WHERE key = 'villages';
+
+-- Roads: the popup shows Category and the road's name (NAME, captioned "Road Name").
+UPDATE static_overlays SET popup_fields = '{Category,"NAME:Road Name"}' WHERE key = 'roads';
+
+-- Tree Statistics (trees): popup shows Tree Id, Species, Max Height, Carbon and
+-- Grid Number (True_Heigh is dropped).
+UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Species","Max_Height:Max Height","Carbon_kg:Carbon","GridNum:Grid Number"}' WHERE key = 'treeStatistics';
+
+-- Rivers: the popup shows only the Categories column, captioned "Type".
+UPDATE static_overlays SET popup_fields = '{"Categories:Type"}' WHERE key = 'rivers';
+
+-- Tree Statistics grid: a solid outline whose popup shows the cell's totals.
+UPDATE static_overlays SET solid = true, popup_fields = '{"GridNum:Grid Number",Zone,"Total_Tree_Count:Total tree Count","Total_Tree_Species:Total Species","Total_Carbon_Tonnes:Total Carbon/Tonnes","Carbon_Density_t_ha:Carbon Density Tonnes/Ha"}' WHERE key = 'treeGrid';
+
+-- Zones: a solid outline whose popup shows only the zone's name.
+UPDATE static_overlays SET solid = true, popup_fields = '{"ZName:Zone Name"}' WHERE key = 'zones';
+
+-- Existing Soil & Moisture Conservation: solid outlines (were tinted fills)
+-- whose popups show Feature (and Vantalavadi's volume, in m³).
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{Feature}'
+    WHERE key IN ('matiPala', 'checkDam', 'causeway');
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{Feature,"VolumeVolume:Volume(m³)"}'
+    WHERE key = 'vantalawadi';
+
+-- Proposed Conservation Sites: solid outlines (were tinted fills) whose popups
+-- show Feature, Volume (m³, not Matipala) and Zone.
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Name:Feature","Volume:Volume(m³)","Zone_2:Zone"}'
+    WHERE key IN ('proposedVantalavadi', 'proposedCheckdam');
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Name:Feature","Zone_2:Zone"}'
+    WHERE key = 'proposedMatipala';
+
+-- Popups and symbology for the Drone Analysis / Geology / boundary layers.
+-- Fireline: dotted line (already), Length and Zone.
+UPDATE static_overlays SET popup_fields = '{length_km,Zone}' WHERE key = 'fireline';
+-- Geology, Dykes, Greenwash and the FSI layers: solid lines (polygon ones were tinted fills).
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"lithologic:Geology Type"}' WHERE key = 'geology';
+UPDATE static_overlays SET solid = true, popup_fields = '{"lithology:Dyke Type"}' WHERE key = 'dyke';
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"area:Greenwash Area"}' WHERE key = 'greenwash';
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Type:Forest Cover Category"}' WHERE key = 'forestCoverFSI';
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Type:Forest Type Category"}' WHERE key = 'forestTypeFSI';
+-- Geomorphology: dotted boundary; Lineaments: dotted line.
+UPDATE static_overlays SET kind = 'outline', dotted = true, popup_fields = '{"descriptio:Geomorphology Type"}' WHERE key = 'geomorphology';
+UPDATE static_overlays SET dotted = true, popup_fields = '{"l1descript:Lineament"}' WHERE key = 'lineament';
+-- Wildlife Corridor: solid line, Length (the file has no Zone column).
+UPDATE static_overlays SET solid = true, popup_fields = '{Length}' WHERE key = 'wildlifeCorridorLines';
+-- Study Area: Name and Area.
+UPDATE static_overlays SET popup_fields = '{Name,area}' WHERE key = 'studyArea';
+-- Grazing Land: dashed boundary.
+UPDATE static_overlays SET kind = 'outline', dashed = true WHERE key = 'grazingLand';
+
+-- Field Plots: drawn with the Growing Stock raster's own switch, as a solid line;
+-- the popup shows the plot number (Name).
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, solid, line_width) VALUES
+    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Name:Plot Number"}', true, 2)
+ON CONFLICT (key) DO NOTHING;
