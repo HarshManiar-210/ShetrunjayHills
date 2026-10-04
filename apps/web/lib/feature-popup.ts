@@ -131,7 +131,7 @@ const UNTRUNCATED: Record<string, string> = {
   first_dist: "District code",
   areasqkm: "Area",
   plot_no: "Plot no",
-  f_type: "Forest type",
+  f_type: "Forest Type",
   linkno: "Link no",
   dslinkno: "Downstream link",
   uslinkno1: "Upstream link 1",
