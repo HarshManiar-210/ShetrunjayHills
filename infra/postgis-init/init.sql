@@ -1023,3 +1023,10 @@ UPDATE static_overlays SET solid = true, popup_fields = '{"GridNum:Grid Number",
 
 -- Zones: a solid outline whose popup shows only the zone's name.
 UPDATE static_overlays SET solid = true, popup_fields = '{"ZName:Zone Name"}' WHERE key = 'zones';
+
+-- Existing Soil & Moisture Conservation: solid outlines (were tinted fills)
+-- whose popups show Feature (and Vantalavadi's volume, in m³).
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{Feature}'
+    WHERE key IN ('matiPala', 'checkDam', 'causeway');
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{Feature,"VolumeVolume:Volume(m³)"}'
+    WHERE key = 'vantalawadi';
