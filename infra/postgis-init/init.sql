@@ -998,3 +998,6 @@ UPDATE static_overlays SET kind = 'outline', solid = true, color = '#0B3D24', li
 
 -- Streams: the popup shows only Stream Order and Length.
 UPDATE static_overlays SET popup_fields = '{strmOrder,Length}' WHERE key = 'streams';
+
+-- District Boundary: a solid outline whose popup shows only District.
+UPDATE static_overlays SET solid = true, popup_fields = '{District}' WHERE key = 'districtBoundary';
