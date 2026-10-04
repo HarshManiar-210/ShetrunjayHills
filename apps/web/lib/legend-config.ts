@@ -465,6 +465,17 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 5, label: "> 5.0 m³/ha", color: "#7a0403" },
     ],
   },
+  "habitat-suitability": {
+    layerId: "habitat-suitability",
+    ramp: "low-to-high",
+    classes: [
+      { value: 1, label: "Not Suitable", color: "#d7191c" },
+      { value: 2, label: "Least Suitable", color: "#fdae61" },
+      { value: 3, label: "Moderately Suitable", color: "#ffffc0" },
+      { value: 4, label: "Highly Suitable", color: "#a6d96a" },
+      { value: 5, label: "Best Suitable", color: "#1a9641" },
+    ],
+  },
   slope: {
     layerId: "slope",
     ramp: "low-to-high",
@@ -538,7 +549,6 @@ const PROVISIONAL_IDS = [
   "ecological-degradation",
   "tof",
   "tree-height",
-  "habitat-suitability",
   "agb",
   "carbon-stock",
 ];
