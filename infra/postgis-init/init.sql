@@ -1001,3 +1001,6 @@ UPDATE static_overlays SET popup_fields = '{strmOrder,Length}' WHERE key = 'stre
 
 -- District Boundary: a solid outline whose popup shows only District.
 UPDATE static_overlays SET solid = true, popup_fields = '{District}' WHERE key = 'districtBoundary';
+
+-- Taluka Boundary: a solid outline whose popup shows District and Taluka.
+UPDATE static_overlays SET solid = true, popup_fields = '{District,Taluka}' WHERE key = 'talukaBoundary';
