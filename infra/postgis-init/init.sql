@@ -1014,3 +1014,6 @@ UPDATE static_overlays SET popup_fields = '{Category,"NAME:Road Name"}' WHERE ke
 -- Tree Statistics (trees): popup shows Tree Id, Species, Max Height, Carbon and
 -- Grid Number (True_Heigh is dropped).
 UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Species","Max_Height:Max Height","Carbon_kg:Carbon","GridNum:Grid Number"}' WHERE key = 'treeStatistics';
+
+-- Rivers: the popup shows only the Categories column, captioned "Type".
+UPDATE static_overlays SET popup_fields = '{"Categories:Type"}' WHERE key = 'rivers';
