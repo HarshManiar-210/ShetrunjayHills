@@ -77,6 +77,9 @@ const OUTLINE_WIDTH = 0.75;
 // merge into a faint solid line, so it draws wider.
 const DOTTED_WIDTH = 2.5;
 const DOTTED_GAP = 2;
+// A dashed line (static_overlays.dashed): butt-capped dashes, in line-widths.
+const DASHED_WIDTH = 1.5;
+const DASHED_PATTERN = [4, 2];
 
 // The one font in public/fonts, used for every overlay label.
 const LABEL_FONT = "Open Sans Semibold";
@@ -464,7 +467,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url, dotted, lineWidth, solid, labelField } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted, dashed, lineWidth, solid, labelField } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -486,20 +489,29 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
     // per-layer lookup — see tools/prepare-vector-tiles.sh.
     const from = tiled ? { "source-layer": key } : {};
 
-    if (kind === "line" && dotted) {
-      // No casing or flow: a solid casing would show between the dots, and
-      // the flow's moving gaps would scramble them.
+    // A dotted or dashed 'line' or 'outline' row: one patterned stroke, no
+    // casing or flow — a solid casing would show between the dashes, and the
+    // flow's moving gaps would scramble them.
+    const patterned = (dotted || dashed) && (kind === "line" || kind === "outline");
+    const strokePaint = {
+      "line-color": fillColor,
+      "line-width": dotted ? DOTTED_WIDTH : (lineWidth ?? DASHED_WIDTH),
+      "line-dasharray": dotted ? [0, DOTTED_GAP] : DASHED_PATTERN,
+    };
+    const strokeLayout = {
+      visibility: "none" as const,
+      "line-cap": dotted ? ("round" as const) : ("butt" as const),
+      "line-join": "round" as const,
+    };
+
+    if (patterned && kind === "line") {
       map.addLayer({
         id: `${sourceId}-line`,
         type: "line",
         source: sourceId,
         ...from,
-        layout: { visibility: "none", "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": fillColor,
-          "line-width": DOTTED_WIDTH,
-          "line-dasharray": [0, DOTTED_GAP],
-        },
+        layout: strokeLayout,
+        paint: strokePaint,
       });
     } else if (kind === "line") {
       const width = lineWidth ?? LINE_WIDTH;
@@ -570,11 +582,12 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         // Round joins, so a thick boundary does not spike at every vertex.
-        layout: { visibility: "none", "line-join": "round" },
-        paint: { "line-color": fillColor, "line-width": lineWidth ?? OUTLINE_WIDTH },
+        layout: patterned ? strokeLayout : { visibility: "none", "line-join": "round" },
+        paint: patterned ? strokePaint : { "line-color": fillColor, "line-width": lineWidth ?? OUTLINE_WIDTH },
       });
-      // A `solid` row has no flow layer at all: its colour runs unbroken.
-      if (!solid) {
+      // A `solid` row has no flow layer at all: its colour runs unbroken, and
+      // a patterned one keeps its own dashes.
+      if (!solid && !patterned) {
         map.addLayer({
           id: `${sourceId}-flow`,
           type: "line",
