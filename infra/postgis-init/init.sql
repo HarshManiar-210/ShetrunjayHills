@@ -1030,3 +1030,10 @@ UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{Feat
     WHERE key IN ('matiPala', 'checkDam', 'causeway');
 UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{Feature,"VolumeVolume:Volume(m³)"}'
     WHERE key = 'vantalawadi';
+
+-- Proposed Conservation Sites: solid outlines (were tinted fills) whose popups
+-- show Feature, Volume (m³, not Matipala) and Zone.
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Name:Feature","Volume:Volume(m³)","Zone_2:Zone"}'
+    WHERE key IN ('proposedVantalavadi', 'proposedCheckdam');
+UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Name:Feature","Zone_2:Zone"}'
+    WHERE key = 'proposedMatipala';
