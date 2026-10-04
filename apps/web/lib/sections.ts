@@ -155,6 +155,8 @@ export interface SectionDef {
   ownPicker: boolean;
   /** Drawn beneath every other raster — see layer_groups.draw_below. */
   drawBelow: boolean;
+  /** What one of its images is called on the year bar — see layer_groups.step_noun. */
+  stepNoun: string;
 }
 
 /**
@@ -350,6 +352,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         depth,
         ownPicker: Boolean(group.own_picker),
         drawBelow: Boolean(group.draw_below),
+        stepNoun: group.step_noun || "year",
       };
     }
 
@@ -365,6 +368,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       depth,
       ownPicker: Boolean(group.own_picker),
       drawBelow: Boolean(group.draw_below),
+      stepNoun: group.step_noun || "year",
       items: rows.map(toItem),
     };
   }

@@ -86,6 +86,8 @@ export interface LayerGroup {
   own_picker?: boolean;
   /** A raster group drawn beneath every other raster (the Toposheet). */
   draw_below?: boolean;
+  /** What one of its images is called on the year bar: "year", or "depth". */
+  step_noun?: string;
 }
 
 export async function fetchLayerGroups(): Promise<LayerGroup[]> {

@@ -25,6 +25,12 @@ export interface TemporalTheme {
   id: string;
   label: string;
   years: RasterYear[];
+  /**
+   * What one step is called, singular: "year" for a time series, "depth" for
+   * Flood Depth's depth levels. From layer_groups.step_noun, so the bar's
+   * wording follows the data rather than assuming every series is years.
+   */
+  stepNoun: string;
 }
 
 /**
@@ -104,6 +110,7 @@ export function YearBar({
   if (!theme || years.length < 2) return null;
 
   const comparing = compareYear !== null;
+  const step = theme.stepNoun;
   const compareLabel = years.find((y) => y.year === compareYear)?.label;
 
   return (
@@ -123,7 +130,7 @@ export function YearBar({
         <Button
           size="icon-sm"
           className="size-7 shrink-0 rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
-          aria-label={playing ? "Pause the timeline" : "Play through the years"}
+          aria-label={playing ? "Pause the timeline" : `Play through the ${step}s`}
           onClick={() => {
             if (playing) {
               onPlayingChange(false);
@@ -167,7 +174,7 @@ export function YearBar({
             </Select>
           ) : (
             <p className="truncate text-[10px] leading-tight text-muted-foreground" title={theme.label}>
-              {theme.label} · {years.length} years
+              {theme.label} · {years.length} {step}s
             </p>
           )}
         </div>
@@ -247,7 +254,7 @@ export function YearBar({
           }}
         >
           {comparing ? <X /> : <Columns2 />}
-          {comparing ? "Stop comparing" : "Compare two years"}
+          {comparing ? "Stop comparing" : `Compare two ${step}s`}
         </Button>
       </div>
 
@@ -257,7 +264,7 @@ export function YearBar({
             value={String(compareYear)}
             onValueChange={(v) => onCompareYearChange(Number(v))}
           >
-            <SelectTrigger className="h-7 w-32 text-xs" aria-label="Year to compare against">
+            <SelectTrigger className="h-7 w-32 text-xs" aria-label={`${step[0].toUpperCase()}${step.slice(1)} to compare against`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

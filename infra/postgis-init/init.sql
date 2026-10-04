@@ -66,7 +66,11 @@ CREATE TABLE layer_groups (
     -- A raster group set true draws beneath every other raster (the
     -- Toposheet, a full-sheet reference map that would otherwise cover
     -- them). Vectors always draw above all rasters regardless.
-    draw_below BOOLEAN NOT NULL DEFAULT false
+    draw_below BOOLEAN NOT NULL DEFAULT false,
+    -- What one step of a multi-image raster group is called on the year bar,
+    -- singular ("5 years", "Compare two years"). Flood Depth steps through
+    -- depths, not years, so its row says so here rather than in the frontend.
+    step_noun TEXT NOT NULL DEFAULT 'year'
 );
 
 CREATE INDEX layer_groups_parent_idx ON layer_groups (parent_id);
@@ -333,6 +337,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('wildlife-corridors',  'Wildlife Corridors',  grp('wildlife-movement'), 2);
 
 UPDATE layer_groups SET draw_below = true WHERE key = 'toposheet';
+UPDATE layer_groups SET step_noun = 'depth' WHERE key = 'flood-depth';
 
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
