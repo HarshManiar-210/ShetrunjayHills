@@ -620,8 +620,8 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- code needed.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#289acc', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
-    ('geology',       'Geology',       grp('hydrogeology'),       'vector', 'fill', '#bb856c', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('geomorphology', 'Geomorphology', grp('hydrogeology'), 'vector', 'fill', '#e77aae', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('geology',       'Geology (GSI layer)', grp('hydrogeology'),       'vector', 'fill', '#bb856c', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('geomorphology', 'Geomorphology (GSI layer)', grp('hydrogeology'), 'vector', 'fill', '#e77aae', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
     ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#00340a', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
     ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#ff0000', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
