@@ -137,7 +137,7 @@ const UNTRUNCATED: Record<string, string> = {
   uslinkno1: "Upstream link 1",
   uslinkno2: "Upstream link 2",
   dsnodeid: "Downstream node",
-  strmorder: "Stream order",
+  strmorder: "Stream Order",
   dscontarea: "Downstream contributing area",
   strmdrop: "Stream drop",
   cat: "Category",
