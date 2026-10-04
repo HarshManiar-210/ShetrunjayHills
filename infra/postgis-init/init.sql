@@ -1064,3 +1064,6 @@ UPDATE static_overlays SET kind = 'outline', dashed = true WHERE key = 'grazingL
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, solid, line_width) VALUES
     ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Name:Plot Number"}', true, 2)
 ON CONFLICT (key) DO NOTHING;
+
+-- Cadastral: a solid outline whose popup shows Village and Plot Number (Plot_No).
+UPDATE static_overlays SET label = 'Cadastral', solid = true, popup_fields = '{Village,"Plot_No:Plot Number"}' WHERE key = 'cadastralMap';
