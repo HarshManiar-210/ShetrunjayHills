@@ -345,7 +345,7 @@ UPDATE layer_groups SET step_noun = 'depth' WHERE key = 'flood-depth';
 -- Tree Statistics is a nested group of two vector rows, so it is one layer
 -- whose switch turns on both (see lib/sections.ts, mode "options").
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
-    ('tree-density',    'Tree Density',    grp('drone-analysis'), 1),
+    ('tree-density',    'Tree Density (Drone)', grp('drone-analysis'), 1),
     ('growing-stock',   'Growing Stock',   grp('drone-analysis'), 2),
     ('tree-statistics', 'Tree Statistics', grp('drone-analysis'), 3);
 
@@ -653,7 +653,7 @@ WHERE key = 'geology';
 -- clipped to the study area; bounds fitted to its outline by
 -- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('treeDensity',   'Tree Density',   grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
+    ('treeDensity',   'Tree Density (Drone)', grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033);
 
@@ -669,15 +669,17 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- flood0_5m/flood1m/flood2m/flood5m/flood10m entries, resolved by the
 -- selected image's own key rather than the theme's).
 --
--- All five share the client's "Flood All Layers" extent (71.7282, 21.4169 -
--- 71.8245, 21.4756), which the client confirmed is authoritative. An earlier
--- fit to Streams.geojson (migration 025) is superseded by migration 037.
+-- All five share the client's corrected extent (71.727678, 21.452812 -
+-- 71.823911, 21.512044, migration 056). It replaces the earlier "Flood All
+-- Layers" extent (71.7282, 21.4169 - 71.8245, 21.4756, migration 037), which
+-- placed the flooding ~4 km south of the hills, and before that a fit to
+-- Streams.geojson (migration 025).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.7282, 21.4169, 71.8245, 21.4756),
-    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7282, 21.4169, 71.8245, 21.4756);
+    ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.727678, 21.452812, 71.823911, 21.512044),
+    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.727678, 21.452812, 71.823911, 21.512044),
+    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.727678, 21.452812, 71.823911, 21.512044),
+    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.727678, 21.452812, 71.823911, 21.512044),
+    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.727678, 21.452812, 71.823911, 21.512044);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above. A UTM 42N image like Forest Cover (see there), but
