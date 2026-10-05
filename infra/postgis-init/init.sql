@@ -669,17 +669,21 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- flood0_5m/flood1m/flood2m/flood5m/flood10m entries, resolved by the
 -- selected image's own key rather than the theme's).
 --
--- All five share the client's corrected extent (71.727678, 21.452812 -
--- 71.823911, 21.512044, migration 056). It replaces the earlier "Flood All
--- Layers" extent (71.7282, 21.4169 - 71.8245, 21.4756, migration 037), which
--- placed the flooding ~4 km south of the hills, and before that a fit to
--- Streams.geojson (migration 025).
+-- Each image has its own bounds: they are cut to different heights (4798 to
+-- 5222 px at 8192 wide), so no single extent fits all five. 1/2/5/10 m are
+-- fitted to Streams.geojson -- flood water lies on the drainage lines --
+-- which brings their flooded pixels to ~10-22 m of a stream on average, the
+-- four fits agreeing to within tens of metres (migration 056). 0.5 m follows
+-- the streams too loosely to fit, so it keeps the client's corrected extent
+-- (71.727678, 21.452812 - 71.823911, 21.512044); that extent puts the other
+-- four ~40 m off, its east edge ~250 m too far east and south edge ~175 m
+-- too far south. GeoTIFFs from the client would replace all of this.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('flood0_5m', '0.5', grp('flood-depth'), 'raster', 'raster-data/flood/0_5MeterFlood.png', 1, 71.727678, 21.452812, 71.823911, 21.512044),
-    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.727678, 21.452812, 71.823911, 21.512044),
-    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.727678, 21.452812, 71.823911, 21.512044),
-    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.727678, 21.452812, 71.823911, 21.512044),
-    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.727678, 21.452812, 71.823911, 21.512044);
+    ('flood1m',   '1',   grp('flood-depth'), 'raster', 'raster-data/flood/1MeterFlood.png',   2, 71.7282297, 21.4544679, 71.8213600, 21.5124344),
+    ('flood2m',   '2',   grp('flood-depth'), 'raster', 'raster-data/flood/2MeterFlood.png',   3, 71.7277826, 21.4543953, 71.8213511, 21.5123328),
+    ('flood5m',   '5',   grp('flood-depth'), 'raster', 'raster-data/flood/5MeterFlood.png',   4, 71.7277128, 21.4543664, 71.8213571, 21.5123994),
+    ('flood10m',  '10',  grp('flood-depth'), 'raster', 'raster-data/flood/10MeterFlood.png',  5, 71.7281620, 21.4543791, 71.8218351, 21.5125551);
 
 -- Toposheet: single reference raster, same one-raster-section pattern as
 -- Ortho/DSM/etc above. A UTM 42N image like Forest Cover (see there), but
