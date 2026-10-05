@@ -65,7 +65,7 @@ func (r *Repository) GetStaticOverlayFilePath(ctx context.Context, key string) (
 // nesting; keeping it flat here means one query and no recursive CTE.
 func (r *Repository) GetLayerGroups(ctx context.Context) ([]models.LayerGroup, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, key, label, parent_id, sort_order, own_picker, draw_below
+		SELECT id, key, label, parent_id, sort_order, own_picker, draw_below, step_noun
 		FROM layer_groups
 		ORDER BY COALESCE(parent_id, 0), sort_order, id
 	`)
@@ -77,7 +77,7 @@ func (r *Repository) GetLayerGroups(ctx context.Context) ([]models.LayerGroup, e
 	groups := make([]models.LayerGroup, 0)
 	for rows.Next() {
 		var g models.LayerGroup
-		if err := rows.Scan(&g.ID, &g.Key, &g.Label, &g.ParentID, &g.SortOrder, &g.OwnPicker, &g.DrawBelow); err != nil {
+		if err := rows.Scan(&g.ID, &g.Key, &g.Label, &g.ParentID, &g.SortOrder, &g.OwnPicker, &g.DrawBelow, &g.StepNoun); err != nil {
 			return nil, fmt.Errorf("repository: scan layer group: %w", err)
 		}
 		groups = append(groups, g)

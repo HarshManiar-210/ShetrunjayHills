@@ -119,4 +119,7 @@ type LayerGroup struct {
 	OwnPicker bool `json:"own_picker"`
 	// DrawBelow puts a raster group beneath every other raster on the map.
 	DrawBelow bool `json:"draw_below"`
+	// StepNoun is what one step of a multi-image raster group is called on
+	// the year bar ("year", or "depth" for Flood Depth's depth levels).
+	StepNoun string `json:"step_noun"`
 }

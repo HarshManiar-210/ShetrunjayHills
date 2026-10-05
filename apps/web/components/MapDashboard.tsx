@@ -528,7 +528,12 @@ export function MapDashboard() {
     () =>
       activeRasters
         .filter(({ section }) => section.years.length > 1)
-        .map(({ section }) => ({ id: section.id, label: section.label, years: section.years })),
+        .map(({ section }) => ({
+          id: section.id,
+          label: section.label,
+          years: section.years,
+          stepNoun: section.stepNoun,
+        })),
     [activeRasters],
   );
 
