@@ -489,10 +489,10 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
     // per-layer lookup — see tools/prepare-vector-tiles.sh.
     const from = tiled ? { "source-layer": key } : {};
 
-    // A dotted or dashed 'line' or 'outline' row: one patterned stroke, no
-    // casing or flow — a solid casing would show between the dashes, and the
-    // flow's moving gaps would scramble them.
-    const patterned = (dotted || dashed) && (kind === "line" || kind === "outline");
+    // A dotted or dashed 'line', 'outline' or 'fill' row: one patterned stroke
+    // (a fill's edge), no casing or flow — a solid casing would show between
+    // the dashes, and the flow's moving gaps would scramble them.
+    const patterned = (dotted || dashed) && kind !== "point";
     const strokePaint = {
       "line-color": fillColor,
       "line-width": dotted ? DOTTED_WIDTH : (lineWidth ?? DASHED_WIDTH),

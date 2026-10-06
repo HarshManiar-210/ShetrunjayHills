@@ -1078,3 +1078,13 @@ ON CONFLICT (key) DO NOTHING;
 
 -- Cadastral: a solid outline whose popup shows Village and Plot Number (Plot_No).
 UPDATE static_overlays SET label = 'Cadastral', solid = true, popup_fields = '{Village,"Plot_No:Plot Number"}' WHERE key = 'cadastralMap';
+
+-- Polygon styling (client's request, 2026-10-06): every polygon layer draws
+-- as a transparent fill inside its outline -- the outline keeping its own
+-- style, solid/dotted/dashed and colour, from the rows above -- except the
+-- four drawn as lines only: Cadastral, Village, Forest Boundary and Grazing
+-- Land. Watershed's outline is solid, without the animated flow gaps.
+UPDATE static_overlays SET kind = 'fill'
+WHERE asset_type = 'vector' AND kind = 'outline'
+  AND key NOT IN ('cadastralMap', 'villages', 'forestBoundary', 'grazingLand');
+UPDATE static_overlays SET kind = 'fill', solid = true WHERE key = 'watershed';
