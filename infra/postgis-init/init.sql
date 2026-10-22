@@ -598,7 +598,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
     ('slope', 'Slope', grp('slope'), 'raster', 'raster-data/Slope.pmtiles', 1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
     ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.pmtiles', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.pmtiles',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380);
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053);
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
