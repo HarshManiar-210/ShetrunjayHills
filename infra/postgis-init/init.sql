@@ -363,7 +363,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('rivers',         'Rivers',             grp('administrative-boundaries'),        'vector', 'line', '#4C8ED9', 'vector-data/Rivers.geojson',             3, 71.711555, 21.433928, 71.841029, 21.525711),
     ('villages',       'Village Boundary', grp('administrative-boundaries'),        'vector', 'outline', '#C56E54', 'vector-data/Villages.geojson',           5, 71.697710, 21.426989, 71.855530, 21.553063),
     ('districtBoundary', 'District Boundary',    grp('administrative-boundaries'),        'vector', 'outline', '#9B6ED8', 'vector-data/DistrictBoundary.geojson',   7, 68.149498, 20.119593, 74.476251, 24.712427),
-    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#5AA469', 'vector-data/StudyArea.geojson',          1, 71.728476, 21.451971, 71.821823, 21.512008),
+    ('studyArea',      'Study Area Boundary',         grp('administrative-boundaries'),        'vector', 'outline', '#072c0d', 'vector-data/StudyArea.geojson',          1, 71.728476, 21.451971, 71.821823, 21.512008),
     ('forestBoundary', 'Forest Boundary',    grp('administrative-boundaries'),    'vector', 'fill', '#1E7145', 'vector-data/ForestBoundary.geojson',     8, 71.758100, 21.466484, 71.821988, 21.512142),
     ('cadastralMap',   'Cadastral Boundary',      grp('administrative-boundaries'),      'vector', 'outline', '#8B5E34', 'vector-data/SurveyNumber.geojson',       4, 71.697740, 21.427782, 71.855416, 21.552918);
 
@@ -549,7 +549,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
     ('vantalawadi',   'Vantalavadi',   grp('existing-water-conservation'), 'vector', 'fill', '#7B6D8D', 'vector-data/vantalawadi-existing-water-conservation.geojson',   2, 71.733656, 21.463890, 71.819923, 21.510452),
     ('matiPala',      'Matipala',      grp('existing-water-conservation'), 'vector', 'fill', '#4E8D5E', 'vector-data/maitpaala-existing-water-conservation.geojson',    1, 71.731340, 21.456625, 71.818964, 21.505978);
 
-UPDATE static_overlays SET dotted = true WHERE key = 'fireline';
+UPDATE static_overlays SET dotted = true, line_width = 1.74 WHERE key = 'fireline';
 
 -- Proposed Conservation Sites: the popup shows each feature's Zone_2 only.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
@@ -624,11 +624,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- pattern as Forest Boundary/Cadastral Map above) - no handler or component
 -- code needed.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#289acc', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
+    ('dyke',          'Dykes',          grp('hydrogeology'),          'vector', 'line', '#57f0e9', 'vector-data/dyke.geojson',          2, 71.753944, 21.453344, 71.819504, 21.498314),
     ('geology',       'Geology (GSI layer)', grp('hydrogeology'),       'vector', 'fill', '#bb856c', 'vector-data/geology.geojson',       3, 71.728476, 21.451971, 71.821823, 21.512008),
     ('geomorphology', 'Geomorphology (GSI layer)', grp('hydrogeology'), 'vector', 'fill', '#e77aae', 'vector-data/geomorphology.geojson', 4, 71.728476, 21.451971, 71.821823, 21.512008),
-    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#00340a', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
-    ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#ff0000', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
+    ('greenwash',     'Greenwash Area',     grp('administrative-boundaries'),     'vector', 'fill', '#00ff4b', 'vector-data/greenwash.geojson',     10, 71.758298, 21.466727, 71.821811, 21.511256),
+    ('lineament',     'Lineaments',     grp('hydrogeology'),     'vector', 'line', '#e4a9fc', 'vector-data/lineament.geojson',     1, 71.788766, 21.462642, 71.820057, 21.501667);
 
 -- The client's per-class colours for the two classed geology layers.
 UPDATE static_overlays SET color_field = 'descriptio',
@@ -661,7 +661,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
 -- had a least-cost raster beside them, since removed; with only this row it
 -- is one entry in the Layers dropdown whose switch draws the lines.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('wildlifeCorridorLines', 'Wildlife Corridor', grp('wildlife-corridors'), 'vector', 'line', '#f60b10', 'vector-data/WildlifeCorridor.geojson', 2, 71.752679, 21.461982, 71.820672, 21.507573);
+    ('wildlifeCorridorLines', 'Wildlife Corridor', grp('wildlife-corridors'), 'vector', 'line', '#f60b16', 'vector-data/WildlifeCorridor.geojson', 2, 71.752679, 21.461982, 71.820672, 21.507573);
 
 -- Flood Depth: one raster theme, five simulated flood-depth images (0.5/1/2/
 -- 5/10 m) picked the same way Forest/Green Cover pick a year. Each level's
@@ -725,7 +725,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- The study area frames everything else on the map, so it is on from the start,
 -- and draws bold and unbroken so it reads as the frame rather than as one more
 -- reference boundary.
-UPDATE static_overlays SET default_on = true, line_width = 3, solid = true WHERE key = 'studyArea';
+UPDATE static_overlays SET default_on = true, line_width = 4.01, solid = true WHERE key = 'studyArea';
 
 -- Streams draw as plain solid lines, without the animated flow gaps.
 UPDATE static_overlays SET solid = true WHERE key = 'streams';
@@ -1056,15 +1056,15 @@ UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Nam
 UPDATE static_overlays SET popup_fields = '{length_km,Zone}' WHERE key = 'fireline';
 -- Geology, Dykes, Greenwash and the FSI layers: solid lines (polygon ones were tinted fills).
 UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"lithologic:Geology Type"}' WHERE key = 'geology';
-UPDATE static_overlays SET solid = true, popup_fields = '{"lithology:Dyke Type"}' WHERE key = 'dyke';
-UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"area:Greenwash Area"}' WHERE key = 'greenwash';
+UPDATE static_overlays SET solid = true, line_width = 1.74, popup_fields = '{"lithology:Dyke Type"}' WHERE key = 'dyke';
+UPDATE static_overlays SET kind = 'outline', solid = true, line_width = 2.49, popup_fields = '{"area:Greenwash Area"}' WHERE key = 'greenwash';
 UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Type:Forest Cover Category"}' WHERE key = 'forestCoverFSI';
 UPDATE static_overlays SET kind = 'outline', solid = true, popup_fields = '{"Type:Forest Type Category"}' WHERE key = 'forestTypeFSI';
 -- Geomorphology: dotted boundary; Lineaments: dotted line.
 UPDATE static_overlays SET kind = 'outline', dotted = true, popup_fields = '{"descriptio:Geomorphology Type"}' WHERE key = 'geomorphology';
-UPDATE static_overlays SET dotted = true, popup_fields = '{"l1descript:Lineament"}' WHERE key = 'lineament';
+UPDATE static_overlays SET dotted = true, line_width = 1.74, popup_fields = '{"l1descript:Lineament"}' WHERE key = 'lineament';
 -- Wildlife Corridor: solid line, Length (the file has no Zone column).
-UPDATE static_overlays SET solid = true, popup_fields = '{Length}' WHERE key = 'wildlifeCorridorLines';
+UPDATE static_overlays SET solid = true, line_width = 1.74, popup_fields = '{Length}' WHERE key = 'wildlifeCorridorLines';
 -- Study Area: Name and Area.
 UPDATE static_overlays SET popup_fields = '{Name,area}' WHERE key = 'studyArea';
 -- Grazing Land: dashed boundary.
