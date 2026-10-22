@@ -495,7 +495,7 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
     const patterned = (dotted || dashed) && kind !== "point";
     const strokePaint = {
       "line-color": fillColor,
-      "line-width": dotted ? DOTTED_WIDTH : (lineWidth ?? DASHED_WIDTH),
+      "line-width": lineWidth ?? (dotted ? DOTTED_WIDTH : DASHED_WIDTH),
       "line-dasharray": dotted ? [0, DOTTED_GAP] : DASHED_PATTERN,
     };
     const strokeLayout = {
