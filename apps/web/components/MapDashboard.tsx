@@ -611,8 +611,10 @@ export function MapDashboard() {
         id: section.id,
         name: section.label,
         // A single-image theme labels its one row with the theme's own name,
-        // so repeating it would read "Orthomosaic · Orthomosaic".
-        yearLabel: image.label === section.label ? undefined : image.label,
+        // so repeating it would read "Orthomosaic · Orthomosaic". Satellite
+        // Imagery's images carry a real capture date (see sections.ts); every
+        // other theme falls back to the bare year/range label.
+        yearLabel: image.label === section.label ? undefined : (image.dateLabel ?? image.label),
         // The overlay row for the image on screen — see LegendRasterLayer.imageKey.
         imageKey: image.key,
       })),

@@ -123,6 +123,8 @@ export interface RasterYear {
   year: number;
   /** What the picker shows — a bare year, or a "start → end" range for a transition theme. */
   label: string;
+  /** The image's full capture date, for the legend — see SATELLITE_IMAGERY_DATES. */
+  dateLabel?: string;
   key: string;
   bounds: [[number, number], [number, number]];
   /** Served as a PMTiles raster archive rather than one image — see OverlayMeta.tiled. */
@@ -278,6 +280,19 @@ function yearOf(o: OverlayMeta, indexFallback = NaN): number {
   return indexFallback;
 }
 
+// Satellite Imagery's actual capture dates, keyed by the FCC overlay's own
+// seed key — the DB only carries the bare year (init.sql's fcc_* rows), and
+// the legend wants the full date behind the year it's showing.
+const SATELLITE_IMAGERY_DATES: Record<string, string> = {
+  fcc_1980: "28 October 1980",
+  fcc_1989: "08 January 1989",
+  fcc_1998: "19 December 1998",
+  fcc_2008: "14 December 2008",
+  fcc_2018: "26 December 2018",
+  fcc_2025: "29 December 2025",
+  fcc_2026: "19 May 2026",
+};
+
 /**
  * Assembles the group tree and hangs each overlay off its group.
  *
@@ -329,6 +344,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
         .map((o, i) => ({
           year: yearOf(o, i),
           label: o.label,
+          dateLabel: SATELLITE_IMAGERY_DATES[o.key],
           key: o.key,
           bounds: [
             [o.min_lon!, o.min_lat!],
