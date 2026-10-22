@@ -1006,8 +1006,9 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 UPDATE static_overlays SET popup_fields = '{VolumeVolume}' WHERE key = 'vantalawadi';
 UPDATE static_overlays SET popup_fields = '{Volume,Zone_2}' WHERE key = 'proposedVantalavadi';
 
--- Forest Boundary: a dark, 2 px solid outline (was a tinted fill) whose popup shows only F_TYPE.
-UPDATE static_overlays SET kind = 'outline', solid = true, color = '#0B3D24', line_width = 2, popup_fields = '{F_TYPE}' WHERE key = 'forestBoundary';
+-- Forest Boundary: a dark, 2 px solid outline (was a tinted fill) whose popup shows
+-- Forest Survey Number, Forest Type, Section, Range and Division.
+UPDATE static_overlays SET kind = 'outline', solid = true, color = '#0B3D24', line_width = 2, popup_fields = '{"F_SNO:Forest Survey Number",F_TYPE,SECTION,RANGE,DIVISION}' WHERE key = 'forestBoundary';
 
 -- Streams: the popup shows only Stream Order and Length.
 UPDATE static_overlays SET popup_fields = '{strmOrder,Length}' WHERE key = 'streams';
