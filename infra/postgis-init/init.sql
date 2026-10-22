@@ -342,8 +342,8 @@ UPDATE layer_groups SET step_noun = 'depth' WHERE key = 'flood-depth';
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
 -- layer, which would swallow the vector rows next to it.
--- Tree Statistics is a nested group of two vector rows, so it is one layer
--- whose switch turns on both (see lib/sections.ts, mode "options").
+-- Tree Statistics is a nested group (see lib/sections.ts, mode "options");
+-- the grid cells it used to pair with now live under Admin Boundaries.
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('tree-density',    'Tree Density (Drone)', grp('drone-analysis'), 1),
     ('growing-stock',   'Growing Stock',   grp('drone-analysis'), 2),
@@ -377,28 +377,30 @@ UPDATE static_overlays SET color_field = 'WatershedClass',
     ]'::jsonb
 WHERE key = 'watershed';
 
--- Tree Statistics: one layer (nested group, see above) of two rows drawn
--- together — the 822,994 surveyed trees, and the 189-cell grid their totals
--- are summarised over. Both delivered as parquet (not committed; the served
--- files are rebuilt from them):
+-- Tree Statistics: the 822,994 surveyed trees (points). Delivered as parquet
+-- (not committed; the served file is rebuilt from it):
 --   ogr2ogr -f GeoJSON tree-statistics.geojson tree-statistics.parquet \
 --     -t_srs EPSG:4326 -lco COORDINATE_PRECISION=7 \
 --     -select Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum
 --   tools/prepare-vector-tiles.sh treeStatistics tree-statistics.geojson
+-- Tiled (a whole-file GeoJSON of that many points kills the tab); the API
+-- stamps that from the .pmtiles extension. Trees are coloured by species, one
+-- colour per Predicted_SN value in the tiles; the unnamed trees fall through
+-- to `color`, the "Unidentified" row.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('treeStatistics', 'Trees', grp('tree-statistics'), 'vector', 'point',   '#bab0ac', 'vector-data/tree-statistics.pmtiles', 2, 71.728574, 21.451984, 71.821788, 21.511942,
+        '{Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum}');
+
+-- Tree Grid: the 189-cell grid the tree survey's totals are summarised over.
+-- Lives under Admin Boundaries, not Tree Statistics — it's reference context
+-- (cell outlines) the same way Zones is, not a subject of its own. Delivered
+-- as parquet (not committed; the served file is rebuilt from it):
 --   ogr2ogr -f GeoJSON apps/vector-data/tree-grid.geojson grid.parquet \
 --     -t_srs EPSG:4326 -dim XY -lco COORDINATE_PRECISION=7 \
 --     -select GridNum,Zone,Total_Tree_Count,Total_Tree_Species,Total_Carbon_kg,Total_Carbon_Tonnes,Carbon_Density_t_ha,Area_SqM
--- The trees are tiled (a whole-file GeoJSON of that many points kills the
--- tab); the API stamps that from the .pmtiles extension. The grid is an
--- outline so the trees show through it, and sorts first so the trees draw on
--- top — a click on a tree opens the tree, anywhere else in a cell the cell.
--- Trees are coloured by species, one colour per Predicted_SN value in the tiles;
--- the unnamed trees fall through to `color`, the "Unidentified" row.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
-    ('treeGrid',       'Grid',  grp('tree-statistics'), 'vector', 'outline', '#FFFFFF', 'vector-data/tree-grid.geojson',        1, 71.728476, 21.451971, 71.821823, 21.512008,
-        '{GridNum,Zone,Total_Tree_Count,Total_Tree_Species,Total_Carbon_Tonnes,Carbon_Density_t_ha}'),
-    ('treeStatistics', 'Trees', grp('tree-statistics'), 'vector', 'point',   '#bab0ac', 'vector-data/tree-statistics.pmtiles', 2, 71.728574, 21.451984, 71.821788, 21.511942,
-        '{Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum}');
+    ('treeGrid', 'Tree Grid', grp('administrative-boundaries'), 'vector', 'outline', '#FFFFFF', 'vector-data/tree-grid.geojson', 14, 71.728476, 21.451971, 71.821823, 21.512008,
+        '{"GridNum:Grid Number",Zone,"Total_Tree_Count:Total Tree Count","Total_Tree_Species:Total Species","Total_Carbon_Tonnes:Total Carbon (Tonnes)","Carbon_Density_t_ha:Carbon Density (Tonnes/Ha)"}');
 
 UPDATE static_overlays SET color_field = 'Predicted_SN',
     categories = '[
@@ -1032,8 +1034,8 @@ UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Spec
 -- Rivers: the popup shows only the Categories column, captioned "Type".
 UPDATE static_overlays SET popup_fields = '{"Categories:Type"}' WHERE key = 'rivers';
 
--- Tree Statistics grid: a solid outline whose popup shows the cell's totals.
-UPDATE static_overlays SET solid = true, popup_fields = '{"GridNum:Grid Number",Zone,"Total_Tree_Count:Total tree Count","Total_Tree_Species:Total Species","Total_Carbon_Tonnes:Total Carbon/Tonnes","Carbon_Density_t_ha:Carbon Density Tonnes/Ha"}' WHERE key = 'treeGrid';
+-- Tree Grid: a solid outline (popup fields set at insert, above).
+UPDATE static_overlays SET solid = true WHERE key = 'treeGrid';
 
 -- Zones: a solid outline whose popup shows only the zone's name.
 UPDATE static_overlays SET solid = true, popup_fields = '{"ZName:Zone Name"}' WHERE key = 'zones';
