@@ -418,12 +418,21 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   chm: {
     layerId: "chm",
     ramp: "low-to-high",
-    rampLabels: ["0 m", "30.64 m"],
+    rampLabels: ["1.50 m", "30 m"],
     classes: [
-      { value: 1, label: "0 – 7.66 m", color: "#28bceb" },
-      { value: 2, label: "7.66 – 15.32 m", color: "#a4fc3c" },
-      { value: 3, label: "15.32 – 22.98 m", color: "#fb7e21" },
-      { value: 4, label: "22.98 – 30.64 m", color: "#7a0403" },
+      { value: 1, label: "1.50 – 3.0 m", color: "#ffb300" },
+      { value: 2, label: "3.0 – 4.5 m", color: "#a4d02c" },
+      { value: 3, label: "4.5 – 6.0 m", color: "#6a992c" },
+      { value: 4, label: "6.0 – 7.5 m", color: "#4b862c" },
+      { value: 5, label: "7.5 – 9.0 m", color: "#306d24" },
+      { value: 6, label: "9.0 – 10.5 m", color: "#1f4d16" },
+      { value: 7, label: "10.5 – 12.0 m", color: "#134908" },
+      { value: 8, label: "12.0 – 13.5 m", color: "#103702" },
+      { value: 9, label: "13.5 – 15.0 m", color: "#1d3900" },
+      { value: 10, label: "15.0 – 16.5 m", color: "#435011" },
+      { value: 11, label: "16.5 – 18.0 m", color: "#5a5518" },
+      { value: 12, label: "18.0 – 19.5 m", color: "#71591f" },
+      { value: 13, label: "19.5 – 30.0 m", color: "#6c1b15" },
     ],
   },
   // DSM/DTM: the colour doc names a cpt-city gradient (DEM_screen,
@@ -498,7 +507,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     rampTicks: ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
     rampLabels: ["North · 0°", "North west · 360°"],
     classes: [
-      { value: "N", label: "North (337.5°–22.5°)", color: "#30123b" },
+      { value: "N1", label: "North (0°–22.5°)", color: "#30123b" },
       { value: "NE", label: "North East (22.5°–67.5°)", color: "#466be3" },
       { value: "E", label: "East (67.5°–112.5°)", color: "#28bceb" },
       { value: "SE", label: "South East (112.5°–157.5°)", color: "#32f298" },
@@ -506,6 +515,7 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: "SW", label: "South West (202.5°–247.5°)", color: "#eecf3a" },
       { value: "W", label: "West (247.5°–292.5°)", color: "#fb7e21" },
       { value: "NW", label: "North West (292.5°–337.5°)", color: "#d02f05" },
+      { value: "N2", label: "North (>337.5°)", color: "#30123b" },
     ],
   },
   // Not a class list — the generic R/G/B channel key for a photographic
@@ -542,12 +552,33 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
     ],
     note: "Band-to-channel mapping varies by year — see init.sql's FCC comment.",
   },
+  "wildlife-corridors": {
+    layerId: "wildlife-corridors",
+    ramp: "low-to-high",
+    rampOnly: true,
+    rampLabels: ["Low Cost", "High Cost"],
+    classes: [
+      { value: 1, label: "Low Cost", color: "#a6611a" },
+      { value: 2, label: "Low-Mid Cost", color: "#dfc27d" },
+      { value: 3, label: "Mid Cost", color: "#f5f5f5" },
+      { value: 4, label: "Mid-High Cost", color: "#80cdc1" },
+      { value: 5, label: "High Cost", color: "#018571" },
+    ],
+  },
+  tof: {
+    layerId: "tof",
+    classes: [
+      { value: "Block TOF", label: "Block TOF", color: "#234f1a" },
+      { value: "Built-up TOF", label: "Builtup TOF", color: "#00ffeb" },
+      { value: "Linear TOF", label: "Linear TOF", color: "#ffff00" },
+      { value: "Scattered TOF", label: "Scattered TOF", color: "#875400" },
+    ],
+  },
 };
 
 // Still-pending themes: no palette delivered yet.
 const PROVISIONAL_IDS = [
   "ecological-degradation",
-  "tof",
   "tree-height",
   "agb",
   "carbon-stock",
