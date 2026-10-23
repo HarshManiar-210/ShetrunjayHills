@@ -15,6 +15,8 @@ export type SwatchGeometryKind =
   | "line"
   | "dotted-line"
   | "polygon"
+  // A polygon filled with solid colour (a row with a high fill_opacity).
+  | "polygon-solid"
   | "polygon-outline"
   | "raster";
 
@@ -94,7 +96,7 @@ export function LayerSwatch({
     );
   }
 
-  // A raster class: opaque pixels, so an opaque block.
+  // A raster class (opaque pixels) or a solid-filled polygon: an opaque block.
   return (
     <span
       className="size-2.5 shrink-0 rounded-[2px]"

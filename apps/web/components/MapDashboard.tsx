@@ -43,6 +43,7 @@ import {
   type OverlayMeta,
 } from "@/lib/overlays-api";
 import { vectorOverlayDefs } from "@/lib/static-overlays";
+import { fetchSmcStats, type SmcZoneCount } from "@/lib/smc-stats-api";
 import {
   buildSections,
   flattenSections,
@@ -107,10 +108,15 @@ const EMPTY: LayerCollection = { type: "FeatureCollection", features: [] };
 
 type MobileSheet = "menu" | "legend" | null;
 
+const EMPTY_SMC: SmcZoneCount[] = [];
+
 export function MapDashboard() {
   const auth = useAuthState();
   const [layers, setLayers] = useState<LayerCollection | null>(null);
   const [overlayMeta, setOverlayMeta] = useState<OverlayMeta[]>([]);
+  // The client's SMC Statistics table. A failed fetch just leaves it empty:
+  // the panel then has no SMC block, and nothing else depends on it.
+  const [smcCounts, setSmcCounts] = useState<SmcZoneCount[]>([]);
   const [layerGroups, setLayerGroups] = useState<LayerGroup[]>([]);
   const [error, setError] = useState(false);
   // The tree fetch failing leaves the section list empty; this is what tells
@@ -171,6 +177,9 @@ export function MapDashboard() {
   // Group id → 0..1. Absent means DEFAULT_RASTER_OPACITY; kept per theme so
   // fading one raster to see another underneath does not fade both.
   const [rasterOpacity, setRasterOpacity] = useState<Record<string, number>>({});
+  // Layers-panel row key → 0..1, for rows with solid-filled overlays (see
+  // SectionLayer.opacityKeys). Absent means fully opaque.
+  const [overlayOpacity, setOverlayOpacity] = useState<Record<string, number>>({});
 
   // The year bar drives one theme at a time. Only the user's explicit choice
   // is stored; which theme is actually focused is derived below, so a theme
@@ -223,6 +232,18 @@ export function MapDashboard() {
   }, [token, retryTick]);
 
   const defaultsAppliedRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSmcStats()
+      .then((rows) => {
+        if (!cancelled) setSmcCounts(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The sidebar's whole shape — the tree, its order, every row's colour —
   // comes from these two seed-backed lists, so adding a layer or restructuring
@@ -477,6 +498,10 @@ export function MapDashboard() {
     setRasterOpacity((o) => ({ ...o, [sectionId]: opacity }));
   }, []);
 
+  const changeOverlayOpacity = useCallback((rowKey: string, opacity: number) => {
+    setOverlayOpacity((o) => ({ ...o, [rowKey]: opacity }));
+  }, []);
+
   // Everything switched on, split back into what the map takes: vector
   // overlay keys, and ids of the permissioned `layers` rows. Raster themes
   // are handled separately below — they share the visibility map but are not
@@ -687,6 +712,17 @@ export function MapDashboard() {
     [allSections, overlays],
   );
 
+  // The panel's per-row opacity, fanned out to the overlays each row fades.
+  const overlayKeyOpacity = useMemo(() => {
+    const byKey: Record<string, number> = {};
+    for (const layer of sections.flatMap(sectionLayers)) {
+      const opacity = overlayOpacity[layer.key];
+      if (opacity == null) continue;
+      for (const key of layer.opacityKeys ?? []) byKey[key] = opacity;
+    }
+    return byKey;
+  }, [sections, overlayOpacity]);
+
   const layersPanel = (onCollapse?: () => void) => (
     <>
       {error && (
@@ -709,6 +745,8 @@ export function MapDashboard() {
         onCollapse={onCollapse}
         rasterOpacity={rasterOpacity}
         onRasterOpacityChange={changeRasterOpacity}
+        overlayOpacity={overlayOpacity}
+        onOverlayOpacityChange={changeOverlayOpacity}
       />
     </>
   );
@@ -719,7 +757,11 @@ export function MapDashboard() {
   // A card with nothing to show is left out rather than drawn empty.
   const hasLegend =
     visibleFeatures.length > 0 || legendOverlays.length > 0 || legendRasterLayers.length > 0;
-  const hasStats = visibleFeatures.length > 0 || statsRasterLayers.length > 0;
+  // The SMC table shows while any layer it counts is on the map. Which layers
+  // those are is the rows' own overlay keys, not a list here.
+  const smcRows = smcCounts.some((row) => overlays[row.overlay_key]) ? smcCounts : EMPTY_SMC;
+  const hasStats =
+    visibleFeatures.length > 0 || statsRasterLayers.length > 0 || smcRows.length > 0;
 
   const infoPanel = (className?: string, ref?: React.Ref<HTMLDivElement>) => (
     <div ref={ref} className={cn("flex min-h-0 flex-col gap-2 overflow-hidden", className)}>
@@ -742,6 +784,7 @@ export function MapDashboard() {
         <StatsCard
           rasterLayers={statsRasterLayers}
           vectorFeatures={visibleFeatures}
+          smcRows={smcRows}
           className="min-h-0 max-h-fit flex-1"
         />
       )}
@@ -844,6 +887,7 @@ export function MapDashboard() {
               rasterOverlays={rasterOverlays}
               overlays={overlays}
               overlayDefs={overlayDefs}
+              overlayOpacity={overlayKeyOpacity}
               basemap={basemap}
               infoReachesCorner={infoReachesCorner}
               pin={pin}

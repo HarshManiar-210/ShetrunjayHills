@@ -16,7 +16,7 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 		SELECT id, key, label, group_id, asset_type, COALESCE(kind, ''), COALESCE(color, ''),
 			COALESCE(color_field, ''), categories, COALESCE(popup_fields, '{}'),
 			COALESCE(file_path, ''), min_lon, min_lat, max_lon, max_lat, status, default_on, dotted, dashed,
-			line_width, solid, COALESCE(label_field, ''),
+			line_width, fill_opacity, COALESCE(outline_color, ''), solid, COALESCE(label_field, ''),
 			EXISTS (SELECT 1 FROM overlay_class_stats s WHERE s.overlay_id = static_overlays.id)
 		FROM static_overlays
 		ORDER BY group_id, sort_order
@@ -33,7 +33,7 @@ func (r *Repository) GetStaticOverlays(ctx context.Context) ([]models.StaticOver
 			&o.ID, &o.Key, &o.Label, &o.GroupID, &o.AssetType, &o.Kind, &o.Color,
 			&o.ColorField, &o.Categories, &o.PopupFields,
 			&o.FilePath, &o.MinLon, &o.MinLat, &o.MaxLon, &o.MaxLat, &o.Status, &o.DefaultOn, &o.Dotted, &o.Dashed,
-			&o.LineWidth, &o.Solid, &o.LabelField,
+			&o.LineWidth, &o.FillOpacity, &o.OutlineColor, &o.Solid, &o.LabelField,
 			&o.HasStats,
 		); err != nil {
 			return nil, fmt.Errorf("repository: scan static overlay: %w", err)
@@ -141,4 +141,33 @@ func (r *Repository) GetOverlayClassStats(ctx context.Context, key string) ([]mo
 	}
 
 	return stats, nil
+}
+
+// GetSmcZoneCounts returns the client's SMC Statistics table, one row per
+// zone per SMC layer, in table order: zone, then column, then set.
+func (r *Repository) GetSmcZoneCounts(ctx context.Context) ([]models.SmcZoneCount, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT o.key, o.label, s.set_label, s.column_order, s.zone_no, s.zone_name, s.structure_count
+		FROM smc_zone_counts s
+		JOIN static_overlays o ON o.id = s.overlay_id
+		ORDER BY s.zone_no, s.column_order, s.set_label
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("repository: get smc zone counts: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make([]models.SmcZoneCount, 0)
+	for rows.Next() {
+		var c models.SmcZoneCount
+		if err := rows.Scan(&c.OverlayKey, &c.Structure, &c.SetLabel, &c.ColumnOrder, &c.ZoneNo, &c.ZoneName, &c.Count); err != nil {
+			return nil, fmt.Errorf("repository: scan smc zone count: %w", err)
+		}
+		counts = append(counts, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository: get smc zone counts: %w", err)
+	}
+
+	return counts, nil
 }

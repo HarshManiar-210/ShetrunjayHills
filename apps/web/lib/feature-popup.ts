@@ -77,8 +77,9 @@ function formatValue(value: unknown): string | null {
     if (!Number.isFinite(value)) return null;
     if (Number.isInteger(value)) return value.toLocaleString();
     // Source precision runs to 14 decimal places on some rows, which is noise
-    // at any scale a person reads a popup at.
-    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    // at any scale a person reads a popup at. A fraction below 1 keeps a third
+    // place: an SMC structure is 0.001–0.03 ha, which two places round to 0.
+    return value.toLocaleString(undefined, { maximumFractionDigits: Math.abs(value) < 1 ? 3 : 2 });
   }
 
   if (typeof value === "boolean") return value ? "Yes" : "No";
@@ -207,18 +208,21 @@ export function popupFields(
   /**
    * The layer's own field list (static_overlays.popup_fields), when it has one.
    * An entry may be `Field:Label` to caption the row itself, for a column
-   * whose name (NAME) means something more specific on this layer (Road Name).
+   * whose name (NAME) means something more specific on this layer (Road Name),
+   * and `Field:Label:unit` (or `Field::unit`, keeping the default caption) to
+   * print a unit after the value — for a field whose unit is this layer's
+   * alone, as Stream Network's Length is metres while Wildlife Corridor's
+   * Length is not known.
    */
   only?: string[],
 ): PopupField[] {
   if (!properties) return [];
   const entries = only?.length
     ? only.map((entry) => {
-        const i = entry.indexOf(":");
-        const key = i < 0 ? entry : entry.slice(0, i);
-        return [key, properties[key], i < 0 ? undefined : entry.slice(i + 1)] as const;
+        const [key, custom, unit] = entry.split(":");
+        return [key, properties[key], custom || undefined, unit || undefined] as const;
       })
-    : Object.entries(properties).map(([k, v]) => [k, v, undefined] as const);
+    : Object.entries(properties).map(([k, v]) => [k, v, undefined, undefined] as const);
   const fields: PopupField[] = [];
   // Two columns can land on the same label — StudyArea carries both `area`
   // (hectares) and `areaSqKm`, which are one measurement stated twice. Showing
@@ -226,7 +230,7 @@ export function popupFields(
   // the first spelling wins.
   const seen = new Set<string>();
 
-  for (const [key, raw, custom] of entries) {
+  for (const [key, raw, custom, ownUnit] of entries) {
     if (!only?.length && INTERNAL_KEYS.has(key.toLowerCase())) continue;
     const value = formatValue(raw);
     if (value === null) continue;
@@ -238,7 +242,7 @@ export function popupFields(
     fields.push({
       label,
       value,
-      unit: UNITS[key.toLowerCase()],
+      unit: ownUnit ?? UNITS[key.toLowerCase()],
       numeric: typeof raw === "number",
     });
   }

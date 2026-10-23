@@ -16,6 +16,8 @@ import {
 } from "@/lib/raster-stats-api";
 import type { LayerFeature } from "@/lib/layers-api";
 import type { LegendClass } from "@/lib/legend-config";
+import { SmcStatsBlock } from "@/components/SmcStats";
+import type { SmcZoneCount } from "@/lib/smc-stats-api";
 
 /**
  * A raster theme currently on the map, and the specific image it is showing —
@@ -411,15 +413,18 @@ function CompareStatsBlock({
 export function StatsPanel({
   rasterLayers,
   vectorFeatures,
+  smcRows = [],
   className,
 }: {
   rasterLayers: StatsRasterLayer[];
   vectorFeatures: LayerFeature[];
+  /** The SMC Statistics table, while an SMC layer is on; empty otherwise. */
+  smcRows?: SmcZoneCount[];
   className?: string;
 }) {
   const vectorCounts = countByLayer(vectorFeatures);
 
-  if (rasterLayers.length === 0 && vectorCounts.length === 0) {
+  if (rasterLayers.length === 0 && vectorCounts.length === 0 && smcRows.length === 0) {
     return null;
   }
 
@@ -444,6 +449,8 @@ export function StatsPanel({
           <RasterStatsBlock key={`${layer.id}:${layer.imageKey}`} layer={layer} />
         ),
       )}
+
+      {smcRows.length > 0 && <SmcStatsBlock rows={smcRows} />}
 
       {vectorCounts.length > 0 && (
         <div className="flex flex-col gap-1">
@@ -473,10 +480,12 @@ export function StatsPanel({
 export function StatsCard({
   rasterLayers,
   vectorFeatures,
+  smcRows,
   className,
 }: {
   rasterLayers: StatsRasterLayer[];
   vectorFeatures: LayerFeature[];
+  smcRows?: SmcZoneCount[];
   className?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -501,7 +510,7 @@ export function StatsCard({
 
       {!collapsed && (
         <div className="min-h-0 flex-1 overflow-y-auto px-(--card-spacing) scrollbar-thin">
-          <StatsPanel rasterLayers={rasterLayers} vectorFeatures={vectorFeatures} />
+          <StatsPanel rasterLayers={rasterLayers} vectorFeatures={vectorFeatures} smcRows={smcRows} />
         </div>
       )}
     </Card>

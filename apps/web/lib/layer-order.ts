@@ -38,6 +38,7 @@ const KIND_RANK: Record<SwatchGeometryKind, number> = {
   "dotted-line": 1,
   "polygon-outline": 2,
   polygon: 3,
+  "polygon-solid": 3,
   raster: 4,
 };
 const RASTER_RANK = 5;

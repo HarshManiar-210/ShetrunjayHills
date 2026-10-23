@@ -144,6 +144,12 @@ CREATE TABLE static_overlays (
     -- the frontend's default width for its kind; set it to make one boundary
     -- stand out from the rest (the Study Area).
     line_width DOUBLE PRECISION CHECK (line_width > 0),
+    -- Opacity of a 'fill' row's interior, 0-1. NULL draws the frontend's
+    -- default light wash; 1 is a solid fill (Existing Vantalavadi).
+    fill_opacity DOUBLE PRECISION CHECK (fill_opacity BETWEEN 0 AND 1),
+    -- A 'fill' row's edge colour, when it differs from its fill (the SMC
+    -- layers' black outlines). NULL draws the edge in the fill's colour.
+    outline_color TEXT,
     -- Drawn in one continuous colour, without the animated "marching ants"
     -- gaps every other line and boundary carries.
     solid BOOLEAN NOT NULL DEFAULT false,
@@ -182,6 +188,28 @@ CREATE TABLE overlay_class_stats (
     percentage  DOUBLE PRECISION NOT NULL,
     sort_order  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (overlay_id, class_value)
+);
+
+-- The client's SMC Statistics table: how many of each soil & moisture
+-- conservation structure stand in each study-area zone, existing and
+-- potential. Stored as delivered rather than counted from the layers' files,
+-- because a structure is not always one feature -- each Causeway is drawn as
+-- two parallel bars, so its file holds 72 features for 37 causeways. The other
+-- six layers' counts match their files feature for feature.
+--
+-- One row per zone per SMC layer. `set_label` is the table's own column
+-- heading for the layer's set (Existing / Potential) and `column_order` its
+-- column position; the structure itself is named by its overlay's label, so
+-- the existing and potential Checkdam share a column. A new zone or structure
+-- is a row here, not a code change.
+CREATE TABLE smc_zone_counts (
+    overlay_id      INTEGER NOT NULL REFERENCES static_overlays (id) ON DELETE CASCADE,
+    zone_no         INTEGER NOT NULL,
+    zone_name       TEXT NOT NULL,
+    set_label       TEXT NOT NULL,
+    column_order    INTEGER NOT NULL DEFAULT 0,
+    structure_count INTEGER NOT NULL CHECK (structure_count >= 0),
+    PRIMARY KEY (overlay_id, zone_no)
 );
 
 -- ---------------------------------------------------------------------------
@@ -1012,8 +1040,9 @@ UPDATE static_overlays SET popup_fields = '{Volume,Zone_2}' WHERE key = 'propose
 -- Forest Survey Number, Forest Type, Section, Range and Division.
 UPDATE static_overlays SET kind = 'outline', solid = true, color = '#0B3D24', line_width = 2, popup_fields = '{"F_SNO:Forest Survey Number",F_TYPE,SECTION,RANGE,DIVISION}' WHERE key = 'forestBoundary';
 
--- Streams: the popup shows only Stream Order and Length.
-UPDATE static_overlays SET popup_fields = '{strmOrder,Length}' WHERE key = 'streams';
+-- Streams: the popup shows only Stream Order and Length, with its unit (m)
+-- after the value.
+UPDATE static_overlays SET popup_fields = '{strmOrder,"Length::m"}' WHERE key = 'streams';
 
 -- District Boundary: a solid outline whose popup shows only District.
 UPDATE static_overlays SET solid = true, popup_fields = '{District}' WHERE key = 'districtBoundary';
@@ -1091,3 +1120,157 @@ UPDATE static_overlays SET kind = 'fill'
 WHERE asset_type = 'vector' AND kind = 'outline'
   AND key NOT IN ('cadastralMap', 'villages', 'forestBoundary', 'grazingLand');
 UPDATE static_overlays SET kind = 'fill', solid = true WHERE key = 'watershed';
+
+-- Existing Vantalavadi: solid-filled polygons classed by area (areaM) into five
+-- equal-interval classes, per the client's legend. A category carrying `min`
+-- is a range class (from its min up to the next class's), not an exact value.
+-- The delivered file names the volume column "VolumeVolu"; the popup also
+-- shows the area.
+UPDATE static_overlays SET kind = 'fill', fill_opacity = 1, color = '#128ed8', color_field = 'areaM',
+    categories = '[
+        {"value": "425-4373", "label": "425 – 4373 SqM", "min": 425, "max": 4373, "color": "#a2e4ff"},
+        {"value": "4373-8321", "label": "4373 – 8321 SqM", "min": 4373, "max": 8321, "color": "#67adf0"},
+        {"value": "8321-12270", "label": "8321 – 12270 SqM", "min": 8321, "max": 12270, "color": "#128ed8"},
+        {"value": "12270-16218", "label": "12270 – 16218 SqM", "min": 12270, "max": 16218, "color": "#2e57c4"},
+        {"value": "16218-20166", "label": "16218 – 20166 SqM", "min": 16218, "max": 20166, "color": "#0216b1"}
+    ]'::jsonb,
+    popup_fields = '{Feature,"VolumeVolu:Volume(m³)","areaM:Area (SqM)"}',
+    min_lon = 71.737555, min_lat = 21.474284, max_lon = 71.819679, max_lat = 21.510452
+WHERE key = 'vantalawadi';
+
+-- Every Existing Water Conservation layer (Matipala, Vantalavadi, Checkdam,
+-- Causeway) is drawn solid-filled rather than as a light wash.
+UPDATE static_overlays SET fill_opacity = 1 WHERE group_id = grp('existing-water-conservation');
+
+-- Proposed Vantalavadi: classed by area (areaM) into five equal-interval
+-- classes, like Existing Vantalavadi. The client's legend printed the third
+-- class as "1955 - 2866"; the classes are 931 m² wide, so its upper bound is
+-- 2886, where the fourth class starts.
+UPDATE static_overlays SET color = '#9d5ec0', color_field = 'areaM',
+    categories = '[
+        {"value": "93-1024", "label": "93 – 1024 SqM", "min": 93, "max": 1024, "color": "#e9cefd"},
+        {"value": "1024-1955", "label": "1024 – 1955 SqM", "min": 1024, "max": 1955, "color": "#c7a3f3"},
+        {"value": "1955-2886", "label": "1955 – 2886 SqM", "min": 1955, "max": 2886, "color": "#9d5ec0"},
+        {"value": "2886-3817", "label": "2886 – 3817 SqM", "min": 2886, "max": 3817, "color": "#6e18b3"},
+        {"value": "3817-4748", "label": "3817 – 4748 SqM", "min": 3817, "max": 4748, "color": "#411270"}
+    ]'::jsonb,
+    popup_fields = '{"Name:Feature","Volume:Volume(m³)","Zone_2:Zone","areaM:Area (SqM)"}'
+WHERE key = 'proposedVantalavadi';
+
+-- Every Proposed Conservation Sites layer (Matipala, Vantalavadi, Checkdam)
+-- is drawn solid-filled too.
+UPDATE static_overlays SET fill_opacity = 1 WHERE group_id = grp('proposed-conservation-sites');
+
+-- Existing SMC (Check Dam, Causeway, Matipala): the client's symbology, a solid
+-- fill in each structure's colour inside a solid black outline. The files were
+-- re-delivered with Zone and areaHa; tools/prepare-smc.py adds each feature's
+-- grid cell (GridNum, from Zones.geojson) and Causeway's area, which it lacks.
+-- Popups gain Grid Number, Zone Number and Area (Ha).
+UPDATE static_overlays SET color = '#08fbc0', outline_color = '#000000' WHERE key = 'checkDam';
+UPDATE static_overlays SET color = '#f9cf08', outline_color = '#000000' WHERE key = 'causeway';
+UPDATE static_overlays SET color = '#f2319c', outline_color = '#000000' WHERE key = 'matiPala';
+UPDATE static_overlays SET popup_fields = '{Feature,"GridNum:Grid Number","Zone:Zone Number","areaHa:Area (Ha)"}'
+    WHERE key IN ('checkDam', 'causeway', 'matiPala');
+UPDATE static_overlays SET popup_fields = '{Feature,"VolumeVolu:Volume(m³)","areaM:Area (SqM)","GridNum:Grid Number","Zone:Zone Number","areaHa:Area (Ha)"}'
+    WHERE key = 'vantalawadi';
+
+-- Proposed SMC (Check Dam, Matipala): the client's symbology, a solid fill in
+-- each structure's colour inside a solid black outline (Vantalavadi keeps its
+-- area classes). tools/prepare-smc.py adds each feature's grid cell (GridNum).
+-- Popups gain Grid Number and Area (Ha); Zone_2 is the zone number.
+UPDATE static_overlays SET color = '#05f8f8', outline_color = '#000000' WHERE key = 'proposedCheckdam';
+UPDATE static_overlays SET color = '#ff00ff', outline_color = '#000000' WHERE key = 'proposedMatipala';
+UPDATE static_overlays SET popup_fields = '{"Name:Feature","GridNum:Grid Number","Zone_2:Zone Number","areaHa:Area (Ha)"}'
+    WHERE key = 'proposedMatipala';
+UPDATE static_overlays SET popup_fields = '{"Name:Feature","Volume:Volume(m³)","GridNum:Grid Number","Zone_2:Zone Number","areaHa:Area (Ha)"}'
+    WHERE key = 'proposedCheckdam';
+UPDATE static_overlays SET popup_fields = '{"Name:Feature","Volume:Volume(m³)","areaM:Area (SqM)","GridNum:Grid Number","Zone_2:Zone Number","areaHa:Area (Ha)"}'
+    WHERE key = 'proposedVantalavadi';
+
+-- ---------------------------------------------------------------------------
+-- Seed: the client's SMC Statistics table (see smc_zone_counts above).
+-- Causeway has no potential structures, so it has no Potential rows; the
+-- table shows those cells as "-".
+-- ---------------------------------------------------------------------------
+INSERT INTO smc_zone_counts (overlay_id, zone_no, zone_name, set_label, column_order, structure_count)
+SELECT o.id, v.zone_no, v.zone_name, v.set_label, v.column_order, v.structure_count
+FROM (VALUES
+    ('checkDam', 1, 'Main Temple Ridge', 'Existing', 1, 10),
+    ('checkDam', 2, 'Jivapar-Rohishala Escarpment', 'Existing', 1, 18),
+    ('checkDam', 3, 'Ghetipag Escarpment', 'Existing', 1, 20),
+    ('checkDam', 4, 'Six-Gau Ridge', 'Existing', 1, 14),
+    ('checkDam', 5, 'Khodiyar-Gheti Plateau', 'Existing', 1, 14),
+    ('checkDam', 6, 'Kanjarda Hill Complex', 'Existing', 1, 3),
+    ('proposedCheckdam', 1, 'Main Temple Ridge', 'Potential', 1, 1),
+    ('proposedCheckdam', 2, 'Jivapar-Rohishala Escarpment', 'Potential', 1, 3),
+    ('proposedCheckdam', 3, 'Ghetipag Escarpment', 'Potential', 1, 1),
+    ('proposedCheckdam', 4, 'Six-Gau Ridge', 'Potential', 1, 3),
+    ('proposedCheckdam', 5, 'Khodiyar-Gheti Plateau', 'Potential', 1, 1),
+    ('proposedCheckdam', 6, 'Kanjarda Hill Complex', 'Potential', 1, 0),
+    ('vantalawadi', 1, 'Main Temple Ridge', 'Existing', 2, 5),
+    ('vantalawadi', 2, 'Jivapar-Rohishala Escarpment', 'Existing', 2, 1),
+    ('vantalawadi', 3, 'Ghetipag Escarpment', 'Existing', 2, 4),
+    ('vantalawadi', 4, 'Six-Gau Ridge', 'Existing', 2, 1),
+    ('vantalawadi', 5, 'Khodiyar-Gheti Plateau', 'Existing', 2, 2),
+    ('vantalawadi', 6, 'Kanjarda Hill Complex', 'Existing', 2, 2),
+    ('proposedVantalavadi', 1, 'Main Temple Ridge', 'Potential', 2, 4),
+    ('proposedVantalavadi', 2, 'Jivapar-Rohishala Escarpment', 'Potential', 2, 2),
+    ('proposedVantalavadi', 3, 'Ghetipag Escarpment', 'Potential', 2, 5),
+    ('proposedVantalavadi', 4, 'Six-Gau Ridge', 'Potential', 2, 3),
+    ('proposedVantalavadi', 5, 'Khodiyar-Gheti Plateau', 'Potential', 2, 0),
+    ('proposedVantalavadi', 6, 'Kanjarda Hill Complex', 'Potential', 2, 3),
+    ('matiPala', 1, 'Main Temple Ridge', 'Existing', 3, 55),
+    ('matiPala', 2, 'Jivapar-Rohishala Escarpment', 'Existing', 3, 12),
+    ('matiPala', 3, 'Ghetipag Escarpment', 'Existing', 3, 36),
+    ('matiPala', 4, 'Six-Gau Ridge', 'Existing', 3, 65),
+    ('matiPala', 5, 'Khodiyar-Gheti Plateau', 'Existing', 3, 0),
+    ('matiPala', 6, 'Kanjarda Hill Complex', 'Existing', 3, 25),
+    ('proposedMatipala', 1, 'Main Temple Ridge', 'Potential', 3, 12),
+    ('proposedMatipala', 2, 'Jivapar-Rohishala Escarpment', 'Potential', 3, 12),
+    ('proposedMatipala', 3, 'Ghetipag Escarpment', 'Potential', 3, 1),
+    ('proposedMatipala', 4, 'Six-Gau Ridge', 'Potential', 3, 10),
+    ('proposedMatipala', 5, 'Khodiyar-Gheti Plateau', 'Potential', 3, 0),
+    ('proposedMatipala', 6, 'Kanjarda Hill Complex', 'Potential', 3, 8),
+    ('causeway', 1, 'Main Temple Ridge', 'Existing', 4, 1),
+    ('causeway', 2, 'Jivapar-Rohishala Escarpment', 'Existing', 4, 13),
+    ('causeway', 3, 'Ghetipag Escarpment', 'Existing', 4, 4),
+    ('causeway', 4, 'Six-Gau Ridge', 'Existing', 4, 4),
+    ('causeway', 5, 'Khodiyar-Gheti Plateau', 'Existing', 4, 11),
+    ('causeway', 6, 'Kanjarda Hill Complex', 'Existing', 4, 4)
+) AS v (overlay_key, zone_no, zone_name, set_label, column_order, structure_count)
+JOIN static_overlays o ON o.key = v.overlay_key;
+
+-- Zones: classified by zone (ZName), per the client's legend -- each zone in
+-- its own fill inside a white outline. The fill is a mid wash (0.5) rather
+-- than solid, so the imagery still reads through the 189 grid cells, and
+-- without the opacity slider the SMC layers get. ZName's "Zone  IV" carries a
+-- double space in the delivered file; the legend label drops it.
+UPDATE static_overlays SET kind = 'fill', fill_opacity = 0.5, outline_color = '#ffffff', color = '#d129d1',
+    color_field = 'ZName', categories = '[
+        {"value": "Zone I – Main Temple Ridge", "label": "Zone I – Main Temple Ridge", "color": "#d129d1"},
+        {"value": "Zone II – Jivapar–Rohishala Escarpment", "label": "Zone II – Jivapar–Rohishala Escarpment", "color": "#cf863b"},
+        {"value": "Zone III – Ghetipag Escarpment", "label": "Zone III – Ghetipag Escarpment", "color": "#53dc51"},
+        {"value": "Zone  IV – Six-Gau Ridge", "label": "Zone IV – Six-Gau Ridge", "color": "#e8f26d"},
+        {"value": "Zone V – Khodiyar–Gheti plateau", "label": "Zone V – Khodiyar–Gheti plateau", "color": "#5acab9"},
+        {"value": "Zone VI – Kanjarda Hill Complex", "label": "Zone VI – Kanjarda Hill Complex", "color": "#5208b5"}
+    ]'::jsonb
+WHERE key = 'zones';
+
+-- Geology (GSI layer): the client's symbology, a solid fill per lithology inside
+-- a solid black outline 0.46 mm wide (1.74 px at 96 dpi).
+UPDATE static_overlays SET kind = 'fill', fill_opacity = 1, outline_color = '#000000', line_width = 1.74,
+    solid = true, color = '#a26b0b', categories = '[
+        {"value": "PAHOEHOE BASALT", "label": "Pahoehoe Basalt", "color": "#a26b0b"},
+        {"value": "SAND, SILT AND CLAY", "label": "Sand, Silt and Clay", "color": "#8cf64f"}
+    ]'::jsonb
+WHERE key = 'geology';
+
+-- Geomorphology (GSI layer): the client's symbology, a solid fill per landform
+-- inside a solid black outline (at the default width; none was given).
+UPDATE static_overlays SET kind = 'fill', fill_opacity = 1, outline_color = '#000000', solid = true,
+    color = '#d07151', categories = '[
+        {"value": "Moderately Dissected Denudational Hills and Valleys", "label": "Moderately Dissected Denudational Hills and Valleys", "color": "#d07151"},
+        {"value": "Moderately Dissected Structural Lower Plateau", "label": "Moderately Dissected Structural Lower Plateau", "color": "#7ad8e7"},
+        {"value": "Pediment Pediplain Complex", "label": "Pediment Pediplain Complex", "color": "#fffd45"}
+    ]'::jsonb
+WHERE key = 'geomorphology';

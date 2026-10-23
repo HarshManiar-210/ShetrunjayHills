@@ -38,6 +38,10 @@ export interface OverlayMeta {
   dashed?: boolean;
   /** Stroke width in pixels, overriding the default for the kind. */
   line_width?: number;
+  /** A 'fill' row's interior opacity, 0-1. Absent draws the default light wash. */
+  fill_opacity?: number;
+  /** A 'fill' row's edge colour, when it differs from the fill. */
+  outline_color?: string;
   /** One continuous colour, without the animated dash gaps. */
   solid?: boolean;
   /** A feature property drawn as a text label on every feature. */
