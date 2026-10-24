@@ -177,3 +177,12 @@ apps/raster-data/*.pmtiles
 # The Toposheet's tiles (~135 MB, lossless) fit within LFS, so this one is
 # committed rather than copied to the server by hand.
 !apps/raster-data/toposheet.pmtiles
+
+# Slope/Aspect's per-class rasters (~10900x6950 px sources) and the tile
+# archives built from them — same scp-to-server treatment as the single-image
+# drone rasters above, and for the same reason: 14 archives at ~100+ MB each
+# is well past what's worth committing.
+apps/raster-data/slope-categories/*.png
+apps/raster-data/slope-categories/*.pmtiles
+apps/raster-data/aspect-categories/*.png
+apps/raster-data/aspect-categories/*.pmtiles
