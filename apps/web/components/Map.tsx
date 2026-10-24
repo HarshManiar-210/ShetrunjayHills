@@ -301,6 +301,43 @@ function clickableLayerIds(map: MapLibreMap, defs: OverlayDef[]): string[] {
   return ids.filter((id) => map.getLayer(id));
 }
 
+/**
+ * How far from a line, in screen pixels, a click or hover still counts as on
+ * it. Lines draw 1.5–3px wide; asking for a hit on exactly those pixels made
+ * streams and roads frustrating to pick.
+ */
+const LINE_HIT_TOLERANCE = 6;
+
+/**
+ * The feature under the cursor, for the popup and the pointer cursor alike.
+ *
+ * Lines are looked for first, in a box around the cursor rather than at its
+ * single pixel, and win over anything else there: a line usually runs across
+ * a polygon (a stream inside the study area), and without the priority a
+ * near-miss on the line would open the polygon underneath instead. Anything
+ * else is still hit-tested at the exact point.
+ */
+function featureAt(
+  map: MapLibreMap,
+  point: { x: number; y: number },
+  defs: OverlayDef[],
+): MapGeoJSONFeature | undefined {
+  const lineIds = ["lines", ...defs.filter((d) => d.kind === "line").map(hitLayerId)].filter((id) =>
+    map.getLayer(id),
+  );
+  if (lineIds.length > 0) {
+    const box: [[number, number], [number, number]] = [
+      [point.x - LINE_HIT_TOLERANCE, point.y - LINE_HIT_TOLERANCE],
+      [point.x + LINE_HIT_TOLERANCE, point.y + LINE_HIT_TOLERANCE],
+    ];
+    const line = map.queryRenderedFeatures(box, { layers: lineIds })[0];
+    if (line) return line;
+  }
+  const layers = clickableLayerIds(map, defs);
+  if (layers.length === 0) return undefined;
+  return map.queryRenderedFeatures([point.x, point.y], { layers })[0];
+}
+
 /** Which overlay a hit layer belongs to, so the popup can title itself. */
 function overlayForLayer(layerId: string, defs: OverlayDef[]): OverlayDef | undefined {
   return defs.find((d) => hitLayerId(d) === layerId);
@@ -329,11 +366,7 @@ function attachPopups(
     // While a measuring tool is open a click means "add a vertex", not
     // "identify what is under here".
     if (measuringRef.current) return;
-    const layers = clickableLayerIds(map, defsRef.current);
-    if (layers.length === 0) return;
-
-    const hits = map.queryRenderedFeatures(e.point, { layers });
-    const feature = hits[0] as MapGeoJSONFeature | undefined;
+    const feature = featureAt(map, e.point, defsRef.current);
     if (!feature) {
       popup.remove();
       return;
@@ -356,8 +389,7 @@ function attachPopups(
   map.on("mousemove", (e) => {
     // The measuring tool owns the cursor while it is open (crosshair).
     if (measuringRef.current) return;
-    const layers = clickableLayerIds(map, defsRef.current);
-    const over = layers.length > 0 && map.queryRenderedFeatures(e.point, { layers }).length > 0;
+    const over = featureAt(map, e.point, defsRef.current) !== undefined;
     map.getCanvas().style.cursor = over ? "pointer" : "";
   });
 
@@ -447,10 +479,19 @@ function flowLayerIds(defs: OverlayDef[]): string[] {
 // A flat colour for most overlays, or — when the row carries a colorField +
 // categories (Forest Cover FSI's density classes, Forest Type FSI's species
 // types) — a per-feature `match` on that property, falling back to the
-// overlay's own colour for a value not in the list. Typed loosely: MapLibre's
+// overlay's own colour for a value not in the list. Range classes (categories
+// carrying `min`, Existing Vantalavadi's area classes) become a `step` on the
+// property's number instead: each class from its min up to the next one's,
+// with anything below the first break taking the first class. Typed loosely: MapLibre's
 // expression grammar lives in @maplibre/maplibre-gl-style-spec, which pnpm
 // doesn't hoist into this package for import.
 // ponytail: any here, not a hand-rolled expression type.
+// A fill row's interior when its row sets no fill_opacity: a light wash that
+// keeps the imagery readable underneath.
+const DEFAULT_FILL_OPACITY = 0.15;
+
+const EMPTY_OPACITY: Record<string, number> = {};
+
 function overlayColorExpr(
   color: string,
   colorField: string | undefined,
@@ -458,6 +499,15 @@ function overlayColorExpr(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
   if (!colorField || !categories || categories.length === 0) return color;
+  if (categories.every((c) => typeof c.min === "number")) {
+    const ranked = [...categories].sort((a, b) => a.min! - b.min!);
+    return [
+      "step",
+      ["to-number", ["get", colorField], 0],
+      ranked[0].color,
+      ...ranked.slice(1).flatMap((c) => [c.min, c.color]),
+    ];
+  }
   return [
     "match",
     ["get", colorField],
@@ -467,7 +517,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url, dotted, dashed, lineWidth, solid, labelField } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted, dashed, lineWidth, fillOpacity, outlineColor, solid, labelField } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -574,7 +624,10 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         source: sourceId,
         ...from,
         layout: { visibility: "none" },
-        paint: { "fill-color": fillColor, "fill-opacity": kind === "outline" ? 0 : 0.15 },
+        paint: {
+          "fill-color": fillColor,
+          "fill-opacity": kind === "outline" ? 0 : (fillOpacity ?? DEFAULT_FILL_OPACITY),
+        },
       });
       map.addLayer({
         id: `${sourceId}-outline`,
@@ -583,7 +636,9 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         ...from,
         // Round joins, so a thick boundary does not spike at every vertex.
         layout: patterned ? strokeLayout : { visibility: "none", "line-join": "round" },
-        paint: patterned ? strokePaint : { "line-color": fillColor, "line-width": lineWidth ?? OUTLINE_WIDTH },
+        paint: patterned
+          ? strokePaint
+          : { "line-color": outlineColor ?? fillColor, "line-width": lineWidth ?? OUTLINE_WIDTH },
       });
       // A `solid` row has no flow layer at all: its colour runs unbroken, and
       // a patterned one keeps its own dashes.
@@ -757,6 +812,7 @@ export default function Map({
   rasterOverlays = EMPTY_RASTERS,
   overlays,
   overlayDefs = [],
+  overlayOpacity = EMPTY_OPACITY,
   basemap = DEFAULT_BASEMAP,
   bottomCenter,
   infoReachesCorner = false,
@@ -771,6 +827,11 @@ export default function Map({
   overlays?: Record<string, boolean>;
   /** Vector static-overlay defs (key/color/kind), derived from the API's overlay metadata. */
   overlayDefs?: OverlayDef[];
+  /**
+   * Overlay key → 0..1, from the layers panel's opacity slider: scales the
+   * overlay's fill and edge. Absent draws at the row's own opacity.
+   */
+  overlayOpacity?: Record<string, number>;
   /** Which basemap is active. See lib/basemaps.ts. */
   basemap?: BasemapId;
   /**
@@ -1201,6 +1262,24 @@ export default function Map({
       }
     }
   }, [overlays, overlayDefs, mapLoaded, markLoading, clearLoading]);
+
+  // The layers panel's opacity slider, for solid-filled overlays: scales the
+  // fill against the row's own fill_opacity, and the edge with it so the
+  // outline does not hang on once the fill has faded out.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    for (const def of overlayDefs) {
+      if (def.kind !== "fill") continue;
+      const factor = overlayOpacity[def.key] ?? 1;
+      const fillId = `overlay-${def.key}-fill`;
+      const outlineId = `overlay-${def.key}-outline`;
+      if (map.getLayer(fillId)) {
+        map.setPaintProperty(fillId, "fill-opacity", (def.fillOpacity ?? DEFAULT_FILL_OPACITY) * factor);
+      }
+      if (map.getLayer(outlineId)) map.setPaintProperty(outlineId, "line-opacity", factor);
+    }
+  }, [overlayOpacity, overlayDefs, mapLoaded]);
 
   // visibility toggles: filter, never re-fetch or refit. No layer is
   // selected by default, so this shows only ids explicitly switched on

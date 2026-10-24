@@ -296,6 +296,8 @@ function SidebarSectionsImpl({
   onCollapse,
   rasterOpacity,
   onRasterOpacityChange,
+  overlayOpacity,
+  onOverlayOpacityChange,
 }: {
   sections: SectionDef[];
   /** Toggle key → selected in the navbar picker, i.e. listed in this panel. */
@@ -316,6 +318,9 @@ function SidebarSectionsImpl({
   /** Group id → 0..1 opacity. Absent means DEFAULT_RASTER_OPACITY. */
   rasterOpacity: Record<string, number>;
   onRasterOpacityChange: (sectionId: string, opacity: number) => void;
+  /** Row key → 0..1 for rows with solid-filled overlays. Absent means opaque. */
+  overlayOpacity: Record<string, number>;
+  onOverlayOpacityChange: (rowKey: string, opacity: number) => void;
 }) {
   const [filter, setFilter] = useState(ALL);
   const sensors = useSensors(
@@ -458,6 +463,13 @@ function SidebarSectionsImpl({
                       label={row.label}
                       opacity={rasterOpacity[row.raster.id] ?? DEFAULT_RASTER_OPACITY}
                       onChange={(opacity) => onRasterOpacityChange(row.raster!.id, opacity)}
+                    />
+                  )}
+                  {row.opacityKeys && (
+                    <OpacityControl
+                      label={row.label}
+                      opacity={overlayOpacity[row.key] ?? 1}
+                      onChange={(opacity) => onOverlayOpacityChange(row.key, opacity)}
                     />
                   )}
                 </LayerRow>

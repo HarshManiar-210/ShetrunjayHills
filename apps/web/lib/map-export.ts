@@ -274,7 +274,7 @@ function drawSwatch(ctx: Ctx, x: number, y: number, color: string, kind: SwatchG
     ctx.lineWidth = 1.5;
     ctx.strokeRect(x + 0.75, y + 0.75, SWATCH - 1.5, SWATCH - 1.5);
   } else {
-    // A raster class: opaque pixels, so an opaque block.
+    // A raster class or a solid-filled polygon: an opaque block.
     ctx.fillRect(x, y, SWATCH, SWATCH);
   }
 

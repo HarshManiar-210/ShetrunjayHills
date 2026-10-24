@@ -242,16 +242,25 @@ export function iconForGeometry(kind: SwatchGeometryKind): LucideIcon {
   if (kind === "point") return MapPin;
   if (kind === "line" || kind === "dotted-line") return Route;
   if (kind === "raster") return Image;
-  return kind === "polygon" ? Square : SquareDashed;
+  return kind === "polygon-outline" ? SquareDashed : Square;
 }
 
 /** static_overlays.kind -> the legend's shape vocabulary. */
-export function swatchKindOf(kind: OverlayMeta["kind"], dotted = false): SwatchGeometryKind {
+export function swatchKindOf(
+  kind: OverlayMeta["kind"],
+  dotted = false,
+  fillOpacity?: number,
+): SwatchGeometryKind {
   if (kind === "line") return dotted ? "dotted-line" : "line";
   if (kind === "point") return "point";
   if (kind === "outline") return "polygon-outline";
+  // A fill drawn (near) opaque on the map gets an opaque swatch to match.
+  if (fillOpacity != null && fillOpacity >= SOLID_FILL_OPACITY) return "polygon-solid";
   return "polygon";
 }
+
+/** At or above this a fill reads as solid colour rather than a wash. */
+const SOLID_FILL_OPACITY = 0.7;
 
 const POINT_TYPES = new Set(["Point", "MultiPoint"]);
 const LINE_TYPES = new Set(["LineString", "MultiLineString"]);
@@ -321,7 +330,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       key: o.key,
       label: o.label,
       color: o.color ?? DEFAULT_OVERLAY_COLOR,
-      geometryKind: swatchKindOf(o.kind, o.dotted),
+      geometryKind: swatchKindOf(o.kind, o.dotted, o.fill_opacity),
       pending: o.status === "pending",
       icon: ITEM_STYLE[o.key],
       categories: o.categories,
@@ -421,6 +430,20 @@ export interface SectionLayer {
   raster?: SectionDef;
   /** Set when this layer is an options group: the rows picked in the side panel. */
   options?: SectionItem[];
+  /**
+   * The solid-filled overlays this row's opacity slider fades (the SMC
+   * layers). A solid fill hides the map under it, so it gets the same
+   * transparency control a raster does. Absent when there are none.
+   */
+  opacityKeys?: string[];
+}
+
+/** Overlay keys among `items` that draw as a solid fill, or undefined if none. */
+function solidKeys(items: SectionItem[]): string[] | undefined {
+  const keys = items
+    .filter((item) => !item.pending && item.geometryKind === "polygon-solid")
+    .map((item) => item.key);
+  return keys.length > 0 ? keys : undefined;
 }
 
 /**
@@ -453,6 +476,7 @@ export function sectionLayers(section: SectionDef): SectionLayer[] {
               icon: section.icon,
               accent: section.accent,
               options: section.items,
+              opacityKeys: solidKeys(section.items),
             },
           ]
         : section.items.map((item) => ({
@@ -463,6 +487,7 @@ export function sectionLayers(section: SectionDef): SectionLayer[] {
           geometryKind: item.geometryKind,
           icon: item.icon ?? iconForGeometry(item.geometryKind),
           accent: section.accent,
+          opacityKeys: solidKeys([item]),
         }));
 
   // Children are walked either way: a raster theme can still have groups

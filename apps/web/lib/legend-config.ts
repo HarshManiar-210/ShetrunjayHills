@@ -12,6 +12,14 @@ export interface LegendClass {
   color: string;
   /** Compact form, used when a long class list is laid out in columns. */
   shortLabel?: string;
+  /**
+   * Set on a vector layer's range class (Existing Vantalavadi's area
+   * classes): the class runs from `min` up to the next class's `min`, and
+   * the map colours by numeric range instead of matching `value` exactly.
+   * `max` is for display only.
+   */
+  min?: number;
+  max?: number;
 }
 
 export interface RasterLegend {

@@ -64,6 +64,12 @@ type StaticOverlay struct {
 	// LineWidth overrides the default stroke width for the row's kind, in
 	// pixels. nil draws at the default.
 	LineWidth *float64 `json:"line_width,omitempty"`
+	// FillOpacity is a 'fill' row's interior opacity, 0-1. nil draws the
+	// default light wash.
+	FillOpacity *float64 `json:"fill_opacity,omitempty"`
+	// OutlineColor is a 'fill' row's edge colour when it differs from the
+	// fill. Empty draws the edge in the fill's colour.
+	OutlineColor string `json:"outline_color,omitempty"`
 	// Solid draws the row in one continuous colour, without the animated
 	// dash gaps other lines and boundaries carry.
 	Solid bool `json:"solid,omitempty"`
@@ -122,4 +128,22 @@ type LayerGroup struct {
 	// StepNoun is what one step of a multi-image raster group is called on
 	// the year bar ("year", or "depth" for Flood Depth's depth levels).
 	StepNoun string `json:"step_noun"`
+}
+
+// SmcZoneCount is one cell of the client's SMC Statistics table: how many of
+// one SMC layer's structures stand in one study-area zone.
+type SmcZoneCount struct {
+	// OverlayKey is the SMC layer counted, so the frontend can tell which
+	// switched-on layers the table describes.
+	OverlayKey string `json:"overlay_key"`
+	// Structure is the layer's own label (Checkdam, Matipala, ...): the
+	// existing and potential layers of one structure share it.
+	Structure string `json:"structure"`
+	// SetLabel is the table's heading for the layer's set (Existing,
+	// Potential); ColumnOrder places the structure's column.
+	SetLabel    string `json:"set_label"`
+	ColumnOrder int    `json:"column_order"`
+	ZoneNo      int    `json:"zone_no"`
+	ZoneName    string `json:"zone_name"`
+	Count       int    `json:"count"`
 }
