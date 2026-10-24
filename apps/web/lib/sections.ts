@@ -30,6 +30,7 @@ import {
   Ruler,
   Scale,
   Waves,
+  Thermometer,
   type LucideIcon,
 } from "lucide-react";
 import type { LayerGroup, OverlayMeta } from "@/lib/overlays-api";
@@ -179,6 +180,7 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   landuse: { accent: "land", icon: LandPlot },
   "historical-land-use": { accent: "land", icon: LandPlot },
   "current-land-use": { accent: "land", icon: MapIcon },
+  "land-surface-temperature": { accent: "land", icon: Thermometer },
 
   "drone-data": { accent: "imagery", icon: Image },
   orthomosaic: { accent: "imagery", icon: Image },

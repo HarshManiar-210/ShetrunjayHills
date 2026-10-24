@@ -490,6 +490,26 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 13, label: "19.5 – 30.0 m", color: "#6c1b15" },
     ],
   },
+  // LST: client's 9-bucket colour ramp, coolest to hottest. The coolest
+  // class was handed over as ">10" in the client's doc; kept verbatim since
+  // its position in the ramp (coolest colour, first in the list) reads as
+  // "below 10°C" rather than "above" — flag if the client confirms a fix.
+  "land-surface-temperature": {
+    layerId: "land-surface-temperature",
+    ramp: "low-to-high",
+    rampLabels: ["< 10°C", "45 – 50°C"],
+    classes: [
+      { value: 1, label: "> 10°C", color: "#5ea7b1" },
+      { value: 2, label: "10 – 15°C", color: "#91cba8" },
+      { value: 3, label: "15 – 20°C", color: "#bce4a9" },
+      { value: 4, label: "20 – 25°C", color: "#ddf1b4" },
+      { value: 5, label: "25 – 30°C", color: "#ffffbf" },
+      { value: 6, label: "30 – 35°C", color: "#fedf99" },
+      { value: 7, label: "35 – 40°C", color: "#fdbe74" },
+      { value: 8, label: "40 – 45°C", color: "#f59053" },
+      { value: 9, label: "45 – 50°C", color: "#e65538" },
+    ],
+  },
   // DSM/DTM: the colour doc names a cpt-city gradient (DEM_screen,
   // wiki-knutux) and gives its stops with their elevation ranges.
   dsm: {

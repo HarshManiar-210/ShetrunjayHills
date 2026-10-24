@@ -347,6 +347,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
     ('historical-land-use',  'Historical Land Use (Satellite: 1978–2025)', grp('landuse'), 1),
     ('current-land-use',     'Current Land Use (Drone: 2026)',           grp('landuse'), 2),
+    ('land-surface-temperature', 'Land Surface Temperature (LST)',       grp('landuse'), 3),
 
     ('orthomosaic', 'Orthomosaic',                 grp('drone-data'), 1),
     ('dsm',         'DSM (Digital Surface Model)', grp('drone-data'), 2),
@@ -554,6 +555,17 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('lulc_2018', '2018', grp('historical-land-use'), 'raster', 'raster-data/lulc/2018.png', 2018, 71.7280361, 21.4512032, 71.8225123, 21.5130427),
     ('lulc_2025', '2025', grp('historical-land-use'), 'raster', 'raster-data/lulc/2025.png', 2025, 71.7280248, 21.4513280, 71.8225252, 21.5129805),
     ('lulc_2026', '2026', grp('current-land-use'), 'raster', 'raster-data/lulc/2026.png', 2026, 71.7277442, 21.4511012, 71.8227026, 21.5133776);
+
+-- LST: Land Surface Temperature, same per-year-raster shape as LULC (see
+-- legend-config.ts's 9-bucket colour ramp). Delivered already as a plain
+-- lat/lng box per year, so these bounds are used as given.
+INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
+    ('lst_1989', '1989', grp('land-surface-temperature'), 'raster', 'raster-data/LST/1989.png', 1989, 71.727525, 21.451999, 71.822415, 21.512170),
+    ('lst_1998', '1998', grp('land-surface-temperature'), 'raster', 'raster-data/LST/1998.png', 1998, 71.728114, 21.452531, 71.822983, 21.511618),
+    ('lst_2008', '2008', grp('land-surface-temperature'), 'raster', 'raster-data/LST/2008.png', 2008, 71.728119, 21.452802, 71.822405, 21.511628),
+    ('lst_2018', '2018', grp('land-surface-temperature'), 'raster', 'raster-data/LST/2018.png', 2018, 71.728119, 21.452802, 71.822405, 21.511628),
+    ('lst_2025', '2025', grp('land-surface-temperature'), 'raster', 'raster-data/LST/2025.png', 2025, 71.728409, 21.451769, 71.821924, 21.512136),
+    ('lst_2026', '2026', grp('land-surface-temperature'), 'raster', 'raster-data/LST/2026.png', 2026, 71.728409, 21.451769, 71.821924, 21.512136);
 
 -- Fragmentation: same per-year-raster shape as Forest Cover (see
 -- legend-config.ts's Patch/Edge/Perforated/Core class palette).
