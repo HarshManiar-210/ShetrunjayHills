@@ -719,6 +719,18 @@ UPDATE static_overlays SET color_field = 'lithologic',
     ]'::jsonb
 WHERE key = 'geology';
 
+-- Plantation Suitability Zones: sample-point layer (one point per survey
+-- grid cell), classed by the numeric `Pkantation` zone code rather than a
+-- text field like the other Hydrogeology layers above.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
+    ('plantationSuitabilityZones', 'Plantation Suitability Zones', grp('hydrogeology'), 'vector', 'point', '#3b862c', 'Pkantation', '[
+        {"value": 1, "label": "Water/Rocks/Builtup", "color": "#ff0000"},
+        {"value": 2, "label": "Herbs/Shrubs/Grass", "color": "#ffff00"},
+        {"value": 3, "label": "Trees/Dense Vegetation", "color": "#3b862c"},
+        {"value": 4, "label": "Plantation", "color": "#875400"}
+    ]'::jsonb, 'vector-data/plantation-suitabilty-zones.geojson', 5, 71.731250, 21.452646, 71.820588, 21.509122,
+        '{"Zone","Pkantation:Zone Code","ZoneName:Zone Name"}');
+
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds. Its pixels are square in metres (aspect
 -- 1.466, vs 1.465 for that box on the ground), not in degrees.
