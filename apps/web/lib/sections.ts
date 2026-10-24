@@ -117,6 +117,16 @@ export interface SectionItem {
   categories?: LegendClass[];
   /** Delivered class statistics exist — see OverlayMeta.has_stats. */
   hasStats?: boolean;
+  /** See OverlayMeta.asset_type. Absent for a layer not seeded through static_overlays. */
+  assetType?: "vector" | "raster";
+  /**
+   * SW/NE corners, set on a raster option row (Slope/Aspect's categories) so
+   * the map can place its image — see LayerGroup.multi_raster. Vector option
+   * rows don't need this; their geometry carries its own extent.
+   */
+  bounds?: [[number, number], [number, number]];
+  /** See OverlayMeta.tiled, for a raster option row. */
+  tiled?: boolean;
 }
 
 export interface RasterYear {
@@ -334,11 +344,22 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       key: o.key,
       label: o.label,
       color: o.color ?? DEFAULT_OVERLAY_COLOR,
-      geometryKind: swatchKindOf(o.kind, o.dotted, o.fill_opacity),
+      // A raster option row (Slope/Aspect's categories) draws as the opaque
+      // block a raster class gets, not the vector shape swatchKindOf would
+      // guess from its absent `kind`.
+      geometryKind: o.asset_type === "raster" ? "raster" : swatchKindOf(o.kind, o.dotted, o.fill_opacity),
       pending: o.status === "pending",
       icon: ITEM_STYLE[o.key],
       categories: o.categories,
       hasStats: o.has_stats,
+      assetType: o.asset_type,
+      bounds: hasExtent(o)
+        ? [
+            [o.min_lon!, o.min_lat!],
+            [o.max_lon!, o.max_lat!],
+          ]
+        : undefined,
+      tiled: o.tiled,
     };
   }
 
@@ -349,8 +370,11 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
 
     // A group holding placed rasters is one layer with a year picker. Rows
     // without an extent can't be drawn, so they fall through to `items` and
-    // render as the pending placeholders they are.
-    const rasters = rows.filter((o) => o.asset_type === "raster" && hasExtent(o));
+    // render as the pending placeholders they are. multi_raster groups
+    // (Slope/Aspect's categories) skip this entirely — their rasters are
+    // independently switchable classes, not years, so they fall through to
+    // the options branch below like a nested vector group's rows.
+    const rasters = group.multi_raster ? [] : rows.filter((o) => o.asset_type === "raster" && hasExtent(o));
 
     if (rasters.length > 0) {
       const years = rasters
