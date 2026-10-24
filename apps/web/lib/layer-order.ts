@@ -120,7 +120,15 @@ export function mapStack(order: string[], rows: PanelRow[]): MapStackEntry[] {
         { rasters: [id, compareRasterId(id)], overlays: layer.raster.items.map((i) => i.key) },
       ];
     }
-    if (layer.options) return [{ rasters: [], overlays: layer.options.map((o) => o.key) }];
+    if (layer.options) {
+      // A multi_raster group's rows (Slope/Aspect's categories) are raster
+      // image layers, not vector overlays — same rasterLayerId bucket a
+      // year-stepped theme's own image uses, so applyStack can actually find
+      // and move them.
+      const rasters = layer.options.filter((o) => o.assetType === "raster").map((o) => o.key);
+      const overlays = layer.options.filter((o) => o.assetType !== "raster").map((o) => o.key);
+      return [{ rasters, overlays }];
+    }
     if (layerIdOf(key) !== null) return [];
     return [{ rasters: [], overlays: [key] }];
   });

@@ -47,6 +47,7 @@ import { fetchSmcStats, type SmcZoneCount } from "@/lib/smc-stats-api";
 import {
   buildSections,
   flattenSections,
+  groupToggleKey,
   isGroupToggleKey,
   isRasterToggleKey,
   layerIdOf,
@@ -595,9 +596,39 @@ export function MapDashboard() {
     [focusedTheme],
   );
 
-  const rasterOverlays: RasterOverlay[] = useMemo(
+  /**
+   * A multi_raster group's switched-on classes (Slope/Aspect's categories) —
+   * each its own checkbox in the side panel, all drawn over the group's
+   * extent at once rather than stepped through one at a time like a year.
+   */
+  const activeRasterOptions = useMemo(
     () =>
-      activeRasters.flatMap(({ section, image }) => {
+      allSections.flatMap((section) => {
+        if (section.mode !== "options" || !visible[groupToggleKey(section.id)]) return [];
+        return section.items.filter(
+          (item) => item.assetType === "raster" && item.bounds && !item.pending && visible[item.key],
+        );
+      }),
+    [allSections, visible],
+  );
+
+  const rasterOptionOverlays: RasterOverlay[] = useMemo(
+    () =>
+      activeRasterOptions.map((item) => ({
+        id: item.key,
+        url: overlayDataUrl(item.key),
+        bounds: item.bounds!,
+        tiled: item.tiled ?? false,
+        opacity: DEFAULT_RASTER_OPACITY,
+        label: item.label,
+      })),
+    [activeRasterOptions],
+  );
+
+  const rasterOverlays: RasterOverlay[] = useMemo(
+    () => [
+      ...rasterOptionOverlays,
+      ...activeRasters.flatMap(({ section, image }) => {
         const opacity = rasterOpacity[section.id] ?? DEFAULT_RASTER_OPACITY;
         const base = {
           id: section.id,
@@ -627,7 +658,8 @@ export function MapDashboard() {
           },
         ];
       }),
-    [activeRasters, rasterOpacity, compareYear, blend],
+    ],
+    [rasterOptionOverlays, activeRasters, rasterOpacity, compareYear, blend],
   );
 
   const legendRasterLayers = useMemo(

@@ -92,6 +92,12 @@ export interface LayerGroup {
   draw_below?: boolean;
   /** What one of its images is called on the year bar: "year", or "depth". */
   step_noun?: string;
+  /**
+   * The group's raster rows are independently switchable classes, all drawn
+   * over the same extent at once (Slope/Aspect's categories), rather than
+   * one image stepped through by year.
+   */
+  multi_raster?: boolean;
 }
 
 export async function fetchLayerGroups(): Promise<LayerGroup[]> {

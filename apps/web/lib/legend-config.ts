@@ -560,39 +560,12 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 5, label: "Best Suitable", color: "#1a9641" },
     ],
   },
-  slope: {
-    layerId: "slope",
-    ramp: "low-to-high",
-    rampLabels: ["0°", "88.13°"],
-    classes: [
-      { value: 1, label: "Flat (0° – 8.24°)", color: "#2c7bb6" },
-      { value: 2, label: "Gentle (8.24° – 15.82°)", color: "#abd9e9" },
-      { value: 3, label: "Moderate (15.82° – 25.56°)", color: "#ffffbf" },
-      { value: 4, label: "Steep (25.56° – 60.25°)", color: "#fdae61" },
-      { value: 5, label: "Very Steep (60.25° – 88.13°)", color: "#d7191c" },
-    ],
-  },
-  aspect: {
-    layerId: "aspect",
-    // Azimuth is continuous and the palette runs along it, so this does get a
-    // bar — and uniquely, its eight classes are eight equal 45° sectors, so
-    // ticks can sit evenly under it and still be telling the truth about
-    // where the breaks are.
-    ramp: "low-to-high",
-    rampTicks: ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
-    rampLabels: ["North · 0°", "North west · 360°"],
-    classes: [
-      { value: "N1", label: "North (0°–22.5°)", color: "#30123b" },
-      { value: "NE", label: "North East (22.5°–67.5°)", color: "#466be3" },
-      { value: "E", label: "East (67.5°–112.5°)", color: "#28bceb" },
-      { value: "SE", label: "South East (112.5°–157.5°)", color: "#32f298" },
-      { value: "S", label: "South (157.5°–202.5°)", color: "#a4fc3c" },
-      { value: "SW", label: "South West (202.5°–247.5°)", color: "#eecf3a" },
-      { value: "W", label: "West (247.5°–292.5°)", color: "#fb7e21" },
-      { value: "NW", label: "North West (292.5°–337.5°)", color: "#d02f05" },
-      { value: "N2", label: "North (>337.5°)", color: "#30123b" },
-    ],
-  },
+  // Slope and Aspect used to be one continuous raster each, with a class
+  // list here. Re-delivered as one raster per class (static_overlays'
+  // slopeCat*/aspectCat* rows), each carrying its own flat `color` straight
+  // off this same palette — see init.sql — so there is no class list left to
+  // key a legend off; the sidebar's chip colours and the Legend's swatches
+  // are the whole of it now.
   // Not a class list — the generic R/G/B channel key for a photographic
   // raster (true-color composite: each channel is literally that band).
   orthomosaic: {
