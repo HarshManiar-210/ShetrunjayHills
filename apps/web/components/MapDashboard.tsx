@@ -658,7 +658,9 @@ export function MapDashboard() {
           // The overlay row for the year on screen — what the statistics
           // endpoint measures.
           imageKey: image.key,
-          year: image.year,
+          // A single-image theme has no year to show — its "year" is only the
+          // image's position, 0.
+          year: section.years.length > 1 ? image.year : null,
           // A single-image theme labels its one row with the theme's own name.
           yearLabel: image.label === section.label ? undefined : image.label,
           years: section.years.map((y) => y.year),

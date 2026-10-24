@@ -22,7 +22,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-# no public/ COPY: the dir is empty, and git doesn't track empty dirs — a COPY
-# here fails on a fresh clone. Add it back alongside the first real asset.
+# The standalone build leaves public/ out, so it is copied in beside server.js
+# — without it /logo.png and the map's label glyphs (public/fonts) 404 in
+# production while working under `next dev`.
+COPY --from=builder /app/apps/web/public ./apps/web/public
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]
