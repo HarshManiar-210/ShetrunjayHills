@@ -71,7 +71,9 @@ const INITIAL_ZOOM = 11;
 // its flow layer is built from the same resolved width.
 const LINE_WIDTH = 1;
 const LINE_CASING_WIDTH = 2;
-const OUTLINE_WIDTH = 0.75;
+// Polygon edges: 1.5 rather than a hairline, so a boundary reads over
+// satellite imagery without first hunting for it.
+const OUTLINE_WIDTH = 1.5;
 // A dotted line (static_overlays.dotted) is drawn as round-capped zero-length
 // dashes, one dot per DOTTED_GAP line-widths. At LINE_WIDTH the dots would
 // merge into a faint solid line, so it draws wider.
@@ -486,9 +488,11 @@ function flowLayerIds(defs: OverlayDef[]): string[] {
 // expression grammar lives in @maplibre/maplibre-gl-style-spec, which pnpm
 // doesn't hoist into this package for import.
 // ponytail: any here, not a hand-rolled expression type.
-// A fill row's interior when its row sets no fill_opacity: a light wash that
-// keeps the imagery readable underneath.
-const DEFAULT_FILL_OPACITY = 0.15;
+// A fill row's interior when its row sets no fill_opacity: strong enough to
+// read at a glance (0.15 left some layers barely visible), still letting the
+// imagery show through. Framing layers that cover most of the map set a
+// lighter fill_opacity of their own in the seed.
+const DEFAULT_FILL_OPACITY = 0.35;
 
 const EMPTY_OPACITY: Record<string, number> = {};
 

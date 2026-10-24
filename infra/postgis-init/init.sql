@@ -853,38 +853,38 @@ FROM (VALUES
     ('fragmentation_1980', 'patch', 'Patch', NULL, 46.1, 4.11, 1),
     ('fragmentation_1980', 'edge', 'Edge', NULL, 6.66, 0.59, 2),
     ('fragmentation_1980', 'perforated', 'Perforated', NULL, 369.34, 32.9, 3),
-    ('fragmentation_1980', 'core-small', 'Core (<250 acres)', NULL, 376.36, 33.53, 4),
-    ('fragmentation_1980', 'core-medium', 'Core (250–500 acres)', NULL, 324.11, 28.87, 5),
+    ('fragmentation_1980', 'core-small', 'Core (<101 Hectares)', NULL, 376.36, 33.53, 4),
+    ('fragmentation_1980', 'core-medium', 'Core (101-202 Hectares)', NULL, 324.11, 28.87, 5),
     ('fragmentation_1989', 'patch', 'Patch', NULL, 53.92, 2.7, 1),
     ('fragmentation_1989', 'edge', 'Edge', NULL, 682.63, 34.12, 2),
     ('fragmentation_1989', 'perforated', 'Perforated', NULL, 60.27, 3.01, 3),
-    ('fragmentation_1989', 'core-small', 'Core (<250 acres)', NULL, 858.56, 42.91, 4),
-    ('fragmentation_1989', 'core-large', 'Core (>500 acres)', NULL, 345.34, 17.26, 5),
+    ('fragmentation_1989', 'core-small', 'Core (<101 Hectares)', NULL, 858.56, 42.91, 4),
+    ('fragmentation_1989', 'core-large', 'Core (>202 Hectares)', NULL, 345.34, 17.26, 5),
     ('fragmentation_1998', 'patch', 'Patch', NULL, 67.52, 4.24, 1),
     ('fragmentation_1998', 'edge', 'Edge', NULL, 492.4, 30.92, 2),
     ('fragmentation_1998', 'perforated', 'Perforated', NULL, 92.33, 5.8, 3),
-    ('fragmentation_1998', 'core-small', 'Core (<250 acres)', NULL, 237.37, 14.91, 4),
-    ('fragmentation_1998', 'core-large', 'Core (>500 acres)', NULL, 702.69, 44.13, 5),
+    ('fragmentation_1998', 'core-small', 'Core (<101 Hectares)', NULL, 237.37, 14.91, 4),
+    ('fragmentation_1998', 'core-large', 'Core (>202 Hectares)', NULL, 702.69, 44.13, 5),
     ('fragmentation_2008', 'patch', 'Patch', NULL, 38.71, 2.27, 1),
     ('fragmentation_2008', 'edge', 'Edge', NULL, 403.5, 23.71, 2),
     ('fragmentation_2008', 'perforated', 'Perforated', NULL, 41.72, 2.45, 3),
-    ('fragmentation_2008', 'core-small', 'Core (<250 acres)', NULL, 247.17, 14.52, 4),
-    ('fragmentation_2008', 'core-large', 'Core (>500 acres)', NULL, 970.96, 57.05, 5),
+    ('fragmentation_2008', 'core-small', 'Core (<101 Hectares)', NULL, 247.17, 14.52, 4),
+    ('fragmentation_2008', 'core-large', 'Core (>202 Hectares)', NULL, 970.96, 57.05, 5),
     ('fragmentation_2018', 'patch', 'Patch', NULL, 99.31, 7.27, 1),
     ('fragmentation_2018', 'edge', 'Edge', NULL, 513.46, 37.61, 2),
     ('fragmentation_2018', 'perforated', 'Perforated', NULL, 16.02, 1.17, 3),
-    ('fragmentation_2018', 'core-small', 'Core (<250 acres)', NULL, 479.79, 35.14, 4),
-    ('fragmentation_2018', 'core-large', 'Core (>500 acres)', NULL, 256.61, 18.8, 5),
+    ('fragmentation_2018', 'core-small', 'Core (<101 Hectares)', NULL, 479.79, 35.14, 4),
+    ('fragmentation_2018', 'core-large', 'Core (>202 Hectares)', NULL, 256.61, 18.8, 5),
     ('fragmentation_2025', 'patch', 'Patch', NULL, 26.6, 1.54, 1),
     ('fragmentation_2025', 'edge', 'Edge', NULL, 400.57, 23.25, 2),
     ('fragmentation_2025', 'perforated', 'Perforated', NULL, 35.05, 2.03, 3),
-    ('fragmentation_2025', 'core-small', 'Core (<250 acres)', NULL, 306.87, 17.81, 4),
-    ('fragmentation_2025', 'core-large', 'Core (>500 acres)', NULL, 953.64, 55.36, 5),
+    ('fragmentation_2025', 'core-small', 'Core (<101 Hectares)', NULL, 306.87, 17.81, 4),
+    ('fragmentation_2025', 'core-large', 'Core (>202 Hectares)', NULL, 953.64, 55.36, 5),
     ('fragmentation_2026', 'patch', 'Patch', NULL, 50.18, 3.9, 1),
     ('fragmentation_2026', 'edge', 'Edge', NULL, 483.69, 37.59, 2),
     ('fragmentation_2026', 'perforated', 'Perforated', NULL, 16.35, 1.27, 3),
-    ('fragmentation_2026', 'core-small', 'Core (<250 acres)', NULL, 393.57, 30.59, 4),
-    ('fragmentation_2026', 'core-large', 'Core (>500 acres)', NULL, 342.82, 26.65, 5),
+    ('fragmentation_2026', 'core-small', 'Core (<101 Hectares)', NULL, 393.57, 30.59, 4),
+    ('fragmentation_2026', 'core-large', 'Core (>202 Hectares)', NULL, 342.82, 26.65, 5),
     ('vegetation_change_1980_1989', 'MDF-VDF', 'MDF → VDF', 'Improvement', 15.5232, 0.4574, 1),
     ('vegetation_change_1980_1989', 'OF-VDF', 'OF → VDF', 'Improvement', 0.7056, 0.0208, 2),
     ('vegetation_change_1980_1989', 'OF-MDF', 'OF → MDF', 'Improvement', 57.0752, 1.6818, 3),
@@ -1274,3 +1274,79 @@ UPDATE static_overlays SET kind = 'fill', fill_opacity = 1, outline_color = '#00
         {"value": "Pediment Pediplain Complex", "label": "Pediment Pediplain Complex", "color": "#fffd45"}
     ]'::jsonb
 WHERE key = 'geomorphology';
+
+-- Polygon prominence: thematic polygons take the frontend's default fill
+-- (0.35, raised from 0.15). The framing layers that cover most of the map --
+-- the Study Area (on by default), District, Taluka and the Tree Grid -- keep
+-- the lighter 0.15 so they don't wash out everything drawn above them.
+UPDATE static_overlays SET fill_opacity = 0.15
+WHERE key IN ('studyArea', 'districtBoundary', 'talukaBoundary', 'treeGrid') AND fill_opacity IS NULL;
+
+-- Forest Cover FSI / Forest Type FSI: the client re-delivered both as rasters
+-- (PNG, transparent outside the study area, white for "Other" inside it) in
+-- place of the vector polygons, placed at the EPSG:4326 extents delivered with
+-- them. A group holding rasters holds exactly one theme's, so each gets its
+-- own group under Forest Layers, as the single-image drone rasters do; the
+-- overlay rows keep their keys, so their delivered class statistics stay
+-- attached. Legends: apps/web/lib/legend-config.ts, from the client's
+-- Legend.xlsx. The vector GeoJSON files are no longer served.
+INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
+    ('forest-cover-fsi', 'Forest Cover FSI 2023', grp('forest-layers'), 7),
+    ('forest-type-fsi',  'Forest Type FSI 2023',  grp('forest-layers'), 8)
+ON CONFLICT (key) DO NOTHING;
+UPDATE static_overlays SET group_id = grp('forest-cover-fsi'), asset_type = 'raster', sort_order = 1,
+    kind = NULL, color = NULL, color_field = NULL, categories = NULL, popup_fields = NULL,
+    fill_opacity = NULL, outline_color = NULL, line_width = NULL, solid = false,
+    file_path = 'raster-data/fsi/forest-cover-fsi.png',
+    min_lon = 71.7285383, min_lat = 21.4506621, max_lon = 71.8213545, max_lat = 21.5126668
+WHERE key = 'forestCoverFSI';
+UPDATE static_overlays SET group_id = grp('forest-type-fsi'), asset_type = 'raster', sort_order = 1,
+    kind = NULL, color = NULL, color_field = NULL, categories = NULL, popup_fields = NULL,
+    fill_opacity = NULL, outline_color = NULL, line_width = NULL, solid = false,
+    file_path = 'raster-data/fsi/forest-type-fsi.png',
+    min_lon = 71.7285383, min_lat = 21.4506621, max_lon = 71.8213545, max_lat = 21.5126668
+WHERE key = 'forestTypeFSI';
+
+-- Forest Type FSI's statistics, re-delivered over the whole study area
+-- (3393.60 ha) rather than the forest alone: the same seven types plus the
+-- rest of the study area as "Other". Forest Cover FSI's are unchanged.
+DELETE FROM overlay_class_stats WHERE overlay_id = (SELECT id FROM static_overlays WHERE key = 'forestTypeFSI');
+INSERT INTO overlay_class_stats (overlay_id, class_value, label, class_group, area_ha, percentage, sort_order)
+SELECT o.id, v.class_value, v.label, NULL, v.area_ha, v.percentage, v.sort_order
+FROM (VALUES
+    ('3B/C2 Southern moist mixed deciduous forest', '3B/C2 Southern moist mixed deciduous forest', 1.03, 0.03, 1),
+    ('5/DS4 Dry Grassland', '5/DS4 Dry Grassland', 256.54, 7.56, 2),
+    ('5/E1 Anogeissus pendula Forest', '5/E1 Anogeissus pendula Forest', 501.25, 14.771, 3),
+    ('5/E 8c Salvadora-T amarix scrub', '5/E 8c Salvadora-Tamarix scrub', 8.82, 0.26, 4),
+    ('Acacia senegal forest', 'Acacia senegal forest', 1576.94, 46.468, 5),
+    ('6/E4 Salvadora scrub', '6/E4 Salvadora scrub', 9.78, 0.288, 6),
+    ('Water', 'Water', 8.34, 0.246, 7),
+    ('Other', 'Other', 1030.89, 30.377, 8)
+) AS v (class_value, label, area_ha, percentage, sort_order)
+JOIN static_overlays o ON o.key = 'forestTypeFSI';
+
+-- TOF (Trees Outside Forests), re-delivered: 408,604 tree polygons in
+-- TOF_with_SpeciesGuj.parquet (EPSG:4326 GeoParquet), now carrying each tree's
+-- predicted species and its Gujarati name. Rebuilt with:
+--   python (pyarrow + shapely) -> tof.geojson, one feature per line, keeping
+--     TOF_Class, Max_Height, Predicted_SN, GujaratiName at 7 decimals
+--   tools/prepare-vector-tiles.sh treesOutsideForests tof.geojson
+-- The parquet's own `area` column is empty (0 everywhere), so it is dropped;
+-- the class areas below are the client's delivered statistics.
+UPDATE static_overlays SET
+    popup_fields = '{"TOF_Class:TOF Class","Max_Height:Max Height","Predicted_SN:Species","GujaratiName:Gujarati Name"}',
+    min_lon = 71.728527, min_lat = 21.451974, max_lon = 71.821770, max_lat = 21.510731
+WHERE key = 'treesOutsideForests';
+
+-- TOF area statistics (delivered table, 192.56 ha in all). Its fourth row was
+-- labelled "Linear TOF" a second time; it is Built-up TOF (confirmed).
+DELETE FROM overlay_class_stats WHERE overlay_id = (SELECT id FROM static_overlays WHERE key = 'treesOutsideForests');
+INSERT INTO overlay_class_stats (overlay_id, class_value, label, class_group, area_ha, percentage, sort_order)
+SELECT o.id, v.class_value, v.class_value, NULL, v.area_ha, v.area_ha / 192.56 * 100, v.sort_order
+FROM (VALUES
+    ('Scattered TOF', 58.64, 1),
+    ('Linear TOF', 3.71, 2),
+    ('Block TOF', 129.96, 3),
+    ('Built-up TOF', 0.25, 4)
+) AS v (class_value, area_ha, sort_order)
+JOIN static_overlays o ON o.key = 'treesOutsideForests';

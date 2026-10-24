@@ -89,9 +89,9 @@ FRAGMENTATION = {
     "patch": ("patch", "Patch"),
     "edge": ("edge", "Edge"),
     "perforated": ("perforated", "Perforated"),
-    "core(<250 acres)": ("core-small", "Core (<250 acres)"),
-    "core(250-500 acres)": ("core-medium", "Core (250–500 acres)"),
-    "core(>500 acres)": ("core-large", "Core (>500 acres)"),
+    "core(<250 acres)": ("core-small", "Core (<101 Hectares)"),
+    "core(250-500 acres)": ("core-medium", "Core (101-202 Hectares)"),
+    "core(>500 acres)": ("core-large", "Core (>202 Hectares)"),
 }
 
 DENSITY_CODES = {"VDF", "MDF", "OF", "SCRUB", "NF"}

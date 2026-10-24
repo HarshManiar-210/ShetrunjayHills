@@ -170,6 +170,8 @@ const GROUP_STYLE: Record<string, { accent: SectionAccent; icon: LucideIcon }> =
   "forest-layers": { accent: "forest", icon: Trees },
   "green-cover": { accent: "forest", icon: Leaf },
   "forest-cover": { accent: "forest", icon: Trees },
+  "forest-cover-fsi": { accent: "forest", icon: Trees },
+  "forest-type-fsi": { accent: "forest", icon: Leaf },
   "vegetation-change": { accent: "change", icon: TrendingUp },
   "forest-fragmentation": { accent: "change", icon: Puzzle },
   "satellite-imagery": { accent: "imagery", icon: Aperture },

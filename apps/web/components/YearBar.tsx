@@ -111,7 +111,14 @@ export function YearBar({
 
   const comparing = compareYear !== null;
   const step = theme.stepNoun;
+  const Step = `${step[0].toUpperCase()}${step.slice(1)}`;
   const compareLabel = years.find((y) => y.year === compareYear)?.label;
+  // In compare mode the bar reads left to right as a span: the compared year
+  // is the start ("From"), the bar's own year the end ("To"). The timeline is
+  // only a readout then — both ends are set from the two dropdowns.
+  const compareIndex = years.findIndex((y) => y.year === compareYear);
+  const spanFrom = comparing && compareIndex >= 0 ? Math.min(compareIndex, current) : 0;
+  const spanTo = comparing && compareIndex >= 0 ? Math.max(compareIndex, current) : current;
 
   return (
     <div
@@ -130,6 +137,9 @@ export function YearBar({
         <Button
           size="icon-sm"
           className="size-7 shrink-0 rounded-full bg-brand text-brand-foreground hover:bg-brand/90"
+          // Playing moves the bar's year, which while comparing is the "To"
+          // end of the span — so it waits until comparing stops.
+          disabled={comparing}
           aria-label={playing ? "Pause the timeline" : `Play through the ${step}s`}
           onClick={() => {
             if (playing) {
@@ -150,7 +160,7 @@ export function YearBar({
             the bar exists to report, so it is read before the layer name. */}
         <div className="min-w-0 shrink-0">
           <p className="text-[13px] leading-tight font-semibold tabular-nums">
-            {years[current]?.label}
+            {comparing ? `${compareLabel} → ${years[current]?.label}` : years[current]?.label}
           </p>
           {themes.length > 1 ? (
             <Select value={theme.id} onValueChange={onFocusChange}>
@@ -193,35 +203,41 @@ export function YearBar({
           />
           <span
             aria-hidden
-            className="absolute top-[7px] left-2 h-px bg-brand transition-[width]"
+            className="absolute top-[7px] h-px bg-brand transition-[left,width]"
             style={{
+              left:
+                years.length > 1 ? `calc(0.5rem + (100% - 1rem) * ${spanFrom / (years.length - 1)})` : "0.5rem",
               width:
                 years.length > 1
-                  ? `calc((100% - 1rem) * ${current / (years.length - 1)})`
+                  ? `calc((100% - 1rem) * ${(spanTo - spanFrom) / (years.length - 1)})`
                   : "0px",
             }}
           />
 
           {years.map((y, i) => {
-            const active = i === current;
-            const compared = y.year === compareYear;
-            const past = i < current;
+            // Both compared years are selected points; otherwise just the one.
+            const active = i === current || (comparing && y.year === compareYear);
+            const within = i > spanFrom && i < spanTo;
+            const past = comparing ? within : i < current;
             return (
               <button
                 key={y.year}
                 type="button"
                 aria-current={active}
-                title={y.label}
+                title={comparing ? `${y.label} — pick ${step}s from the dropdowns while comparing` : y.label}
                 onClick={() => onYearChange(y.year)}
-                className="group relative flex shrink-0 flex-col items-center gap-1"
+                // Comparing, the two ends come from the dropdowns; a click on
+                // the line would silently move one of them.
+                disabled={comparing}
+                className="group relative flex shrink-0 flex-col items-center gap-1 disabled:cursor-default"
               >
                 <span
                   className={cn(
                     "size-[15px] rounded-full border-2 bg-card transition-colors",
                     active && "border-brand bg-brand",
-                    !active && compared && "border-brand bg-card",
-                    !active && !compared && past && "border-brand/60",
-                    !active && !compared && !past && "border-border group-hover:border-brand/60",
+                    !active && past && "border-brand/60",
+                    !active && !past && "border-border",
+                    !active && !past && !comparing && "group-hover:border-brand/60",
                   )}
                 />
                 <span
@@ -260,37 +276,72 @@ export function YearBar({
 
       {comparing && (
         <div className="mt-2 flex items-center gap-3 border-t border-border/60 pt-2">
-          <Select
-            value={String(compareYear)}
-            onValueChange={(v) => onCompareYearChange(Number(v))}
-          >
-            <SelectTrigger className="h-7 w-32 text-xs" aria-label={`${step[0].toUpperCase()}${step.slice(1)} to compare against`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((y) => (
-                <SelectItem key={y.year} value={String(y.year)}>
-                  {y.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <span className="shrink-0 text-[11px] text-muted-foreground">
-            {years[current]?.label}
-          </span>
+          {/* From and To, each unable to pick the year the other holds. The
+              slider between them fades left to right from the one to the
+              other: blend 0 shows only the bar's year (To), hence 1 - blend. */}
+          <YearSelect
+            label={`${Step} to compare from`}
+            caption="From"
+            years={years}
+            value={compareYear}
+            taken={years[current]?.year}
+            onChange={onCompareYearChange}
+          />
           <Slider
-            value={[Math.round(blend * 100)]}
+            value={[Math.round((1 - blend) * 100)]}
             min={0}
             max={100}
             step={5}
-            aria-label={`Blend between ${years[current]?.label} and ${compareLabel}`}
-            onValueChange={([next]) => onBlendChange(next / 100)}
+            aria-label={`Blend from ${compareLabel} to ${years[current]?.label}`}
+            onValueChange={([next]) => onBlendChange(1 - next / 100)}
             className="min-w-24 flex-1"
           />
-          <span className="shrink-0 text-[11px] text-muted-foreground">{compareLabel}</span>
+          <YearSelect
+            label={`${Step} to compare to`}
+            caption="To"
+            years={years}
+            value={years[current]?.year ?? null}
+            taken={compareYear}
+            onChange={onYearChange}
+          />
         </div>
       )}
+    </div>
+  );
+}
+
+/** One end of the compared span: a dropdown of the theme's years. */
+function YearSelect({
+  label,
+  caption,
+  years,
+  value,
+  taken,
+  onChange,
+}: {
+  label: string;
+  caption: string;
+  years: RasterYear[];
+  value: number | null;
+  /** The year the other end holds — shown, but not pickable. */
+  taken: number | null | undefined;
+  onChange: (year: number) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <span className="text-[11px] text-muted-foreground">{caption}</span>
+      <Select value={value === null ? undefined : String(value)} onValueChange={(v) => onChange(Number(v))}>
+        <SelectTrigger className="h-7 w-28 text-xs" aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {years.map((y) => (
+            <SelectItem key={y.year} value={String(y.year)} disabled={y.year === taken}>
+              {y.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

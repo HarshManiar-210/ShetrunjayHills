@@ -144,6 +144,53 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: 5, label: "Non Forest", color: "#f1f1f1" },
     ],
   },
+  // FSI 2023 (Forest Survey of India), delivered as rasters with the client's
+  // Legend.xlsx. Values are the classes' own names, which is how the
+  // delivered statistics (overlay_class_stats.class_value) find their colours.
+  // White is "Other": the rest of the study area, outside every FSI class.
+  "forest-cover-fsi": {
+    layerId: "forest-cover-fsi",
+    classes: [
+      {
+        value: "MODERATELY DENSE FOREST (Tree Canopy density 40% & above but < 70%)",
+        label: "Moderately Dense Forest",
+        color: "#00ff00",
+      },
+      {
+        value: "OPEN FOREST (Tree Canopy density 10% & above but < 40%)",
+        label: "Open Forest",
+        color: "#ffff00",
+      },
+      { value: "SCRUB (Tree Canopy density < 10%)", label: "Scrub", color: "#ff0000" },
+      { value: "WATER", label: "Water", color: "#009ee0" },
+      { value: "Other", label: "Other", color: "#ffffff" },
+    ],
+  },
+  "forest-type-fsi": {
+    layerId: "forest-type-fsi",
+    classes: [
+      {
+        value: "3B/C2 Southern moist mixed deciduous forest",
+        label: "3B/C2 Southern moist mixed deciduous forest",
+        color: "#1f6600",
+      },
+      { value: "5/DS4 Dry Grassland", label: "5/DS4 Dry Grassland", color: "#f7d161" },
+      {
+        value: "5/E1 Anogeissus pendula Forest",
+        label: "5/E1 Anogeissus pendula Forest",
+        color: "#ed7ad4",
+      },
+      {
+        value: "5/E 8c Salvadora-T amarix scrub",
+        label: "5/E 8c Salvadora-Tamarix scrub",
+        color: "#4fc26e",
+      },
+      { value: "Acacia senegal forest", label: "Acacia senegal forest", color: "#12abf5" },
+      { value: "6/E4 Salvadora scrub", label: "6/E4 Salvadora scrub", color: "#f5c429" },
+      { value: "Water", label: "Water", color: "#4014f7" },
+      { value: "Other", label: "Other", color: "#ffffff" },
+    ],
+  },
   "green-cover": {
     layerId: "green-cover",
     ramp: "low-to-high",
@@ -184,9 +231,9 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
       { value: "patch", label: "Patch", color: "#e07b34" },
       { value: "edge", label: "Edge", color: "#ffff00" },
       { value: "perforated", label: "Perforated", color: "#f0bf43" },
-      { value: "core-small", label: "Core (<250 acres)", color: "#01bd00" },
-      { value: "core-medium", label: "Core (250–500 acres)", color: "#009000" },
-      { value: "core-large", label: "Core (>500 acres)", color: "#004e00" },
+      { value: "core-small", label: "Core (<101 Hectares)", color: "#01bd00" },
+      { value: "core-medium", label: "Core (101-202 Hectares)", color: "#009000" },
+      { value: "core-large", label: "Core (>202 Hectares)", color: "#004e00" },
     ],
   },
   "vegetation-change": {
