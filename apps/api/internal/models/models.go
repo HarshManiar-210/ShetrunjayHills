@@ -128,6 +128,11 @@ type LayerGroup struct {
 	// StepNoun is what one step of a multi-image raster group is called on
 	// the year bar ("year", or "depth" for Flood Depth's depth levels).
 	StepNoun string `json:"step_noun"`
+	// MultiRaster marks a group whose raster rows are independently
+	// switchable classes, all drawn over the same extent at once
+	// (Slope/Aspect's categories), rather than one image stepped through by
+	// year.
+	MultiRaster bool `json:"multi_raster"`
 }
 
 // SmcZoneCount is one cell of the client's SMC Statistics table: how many of
