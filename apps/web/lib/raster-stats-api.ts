@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/layers-api";
+import { getToken } from "@/lib/auth";
 import { legendFor, type LegendClass } from "@/lib/legend-config";
 
 /**
@@ -60,7 +61,11 @@ export async function fetchOverlayStats(overlayKey: string): Promise<OverlayStat
   // answers with a measurement until official figures are seeded, and a hard
   // refresh does not reach this request (it is made after the page loads), so
   // a stored measurement would otherwise keep hiding newly seeded figures.
-  const res = await fetch(`${API_URL}/api/overlays/${overlayKey}/stats`, { cache: "no-cache" });
+  const token = getToken();
+  const res = await fetch(`${API_URL}/api/overlays/${overlayKey}/stats`, {
+    cache: "no-cache",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) throw new Error(`failed to load statistics for ${overlayKey}`);
   return res.json();
 }

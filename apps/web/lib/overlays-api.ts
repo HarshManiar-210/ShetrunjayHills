@@ -1,4 +1,5 @@
-import { API_URL } from "@/lib/layers-api";
+import { API_URL, UnauthorizedError } from "@/lib/layers-api";
+import { getToken } from "@/lib/auth";
 import type { LegendClass } from "@/lib/legend-config";
 
 // Mirrors models.StaticOverlay's JSON shape (apps/api/internal/models) —
@@ -100,14 +101,24 @@ export interface LayerGroup {
   multi_raster?: boolean;
 }
 
+// Every route below now requires a logged-in user (see apps/api/cmd/api's
+// RequireLogin group) — there is no public/anonymous role for these any
+// more, so a missing or expired token is always a 401.
+function authHeaders(): HeadersInit {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function fetchLayerGroups(): Promise<LayerGroup[]> {
-  const res = await fetch(`${API_URL}/api/layer-groups`);
+  const res = await fetch(`${API_URL}/api/layer-groups`, { headers: authHeaders() });
+  if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new Error("failed to load layer groups");
   return res.json();
 }
 
 export async function fetchOverlays(): Promise<OverlayMeta[]> {
-  const res = await fetch(`${API_URL}/api/overlays`);
+  const res = await fetch(`${API_URL}/api/overlays`, { headers: authHeaders() });
+  if (res.status === 401) throw new UnauthorizedError();
   if (!res.ok) throw new Error("failed to load overlays");
   return res.json();
 }
