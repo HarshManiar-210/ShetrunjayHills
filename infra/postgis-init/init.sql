@@ -653,10 +653,16 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- Orthomosaic's bounds were off by ~98m east/28m north of the basemap (the
 -- source PNG is gone, so the archive was rebuilt from its own z19 tiles with
 -- the geotransform re-stamped — see the git history for the measurement).
+-- DSM and DTM carried the same ~98m east/28m north displacement (same flight,
+-- same misregistration) and got the identical correction, same method: each
+-- archive's own z19 tiles extracted, geotransform re-stamped by the same
+-- delta, z10-19 re-tiled. CHM still carries DSM's *old* bounds below and is
+-- now off by that amount relative to DSM/basemap — not corrected here since
+-- only DSM/DTM were asked for; flag if CHM should follow too.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
-    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
-    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
+    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
     ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053);
 
 -- Slope/Aspect: re-delivered as one raster per class instead of one
