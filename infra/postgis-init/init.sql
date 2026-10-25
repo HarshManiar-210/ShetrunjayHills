@@ -650,8 +650,11 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- the placement in: change a row's bounds here and rebuild its archive.
 -- CHM is re-delivered on DSM's exact footprint (its outline matches DSM's to
 -- 99.96%), so it now carries DSM's bounds.
+-- Orthomosaic's bounds were off by ~98m east/28m north of the basemap (the
+-- source PNG is gone, so the archive was rebuilt from its own z19 tiles with
+-- the geotransform re-stamped — see the git history for the measurement).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
     ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
     ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
     ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053);
