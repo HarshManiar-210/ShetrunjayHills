@@ -70,18 +70,28 @@ func main() {
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
 
-	// Everything else requires a logged-in user — no anonymous/public
-	// access to any layer, overlay or stat. RequireLogin rejects a missing
-	// or invalid token with 401 rather than falling back to a public role.
+	// Everything that the frontend itself fetches (and so can attach a
+	// Bearer token to) requires a logged-in user — RequireLogin rejects a
+	// missing or invalid token with 401 rather than falling back to a
+	// public role.
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.RequireLogin([]byte(jwtSecret)))
 		r.Get("/api/layer-groups", handlers.LayerGroups(repo))
 		r.Get("/api/smc-stats", handlers.SmcStats(repo))
 		r.Get("/api/overlays", handlers.Overlays(repo, dataRoot))
-		r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
 		r.Get("/api/overlays/{key}/stats", handlers.OverlayStats(repo, dataRoot))
 		r.Get("/api/layers", handlers.Layers(repo))
 	})
+
+	// The one exception: overlay bytes (GeoJSON/raster/pmtiles) are handed
+	// to MapLibre as a bare URL, not fetched by our own code, specifically
+	// so the fetch, JSON parse and tile indexing run off the main thread —
+	// see Map.tsx. MapLibre's own fetch carries no Authorization header, so
+	// gating this one on the same Bearer token would 401 every layer for a
+	// logged-in user too. Left open until that's solved properly (a
+	// same-site session cookie, most likely) rather than gated in a way
+	// that just breaks the map.
+	r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
 
 	srv := &http.Server{Addr: ":" + port, Handler: r}
 
