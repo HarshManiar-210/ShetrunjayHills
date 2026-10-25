@@ -15,6 +15,7 @@ import { LayerPicker, SectionLayerPicker, SectionPicker } from "@/components/Lay
 import { ExportButton } from "@/components/ExportButton";
 import { Header } from "@/components/Header";
 import { LoginDialog } from "@/components/LoginDialog";
+import { LoginGate } from "@/components/LoginGate";
 import {
   Dialog,
   DialogContent,
@@ -267,8 +268,9 @@ export function MapDashboard() {
           setVisible((v) => ({ ...on, ...v }));
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
+        if (err instanceof UnauthorizedError) auth.logout();
         setLayerGroups([]);
         setOverlayMeta([]);
         setTreeError(true);
@@ -277,7 +279,8 @@ export function MapDashboard() {
       cancelled = true;
       setTreeError(false);
     };
-  }, [retryTick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, retryTick]);
 
   /**
    * Watch the legend and statistics column, and move the tool stack out of its
@@ -876,6 +879,13 @@ export function MapDashboard() {
       ))}
     </>
   );
+
+  // Nothing on the site is reachable without a session — every data route
+  // requires login now (see apps/api/cmd/api's RequireLogin group), so an
+  // unauthenticated render would just be a shell with nothing to show.
+  if (!auth.user) {
+    return <LoginGate onSuccess={auth.onLoginSuccess} />;
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">

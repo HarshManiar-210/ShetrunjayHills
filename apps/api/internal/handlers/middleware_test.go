@@ -79,6 +79,50 @@ func TestAuth(t *testing.T) {
 	}
 }
 
+func TestRequireLogin(t *testing.T) {
+	secret := []byte("test-secret")
+	validToken := signToken(t, secret, jwt.MapClaims{"role_id": float64(2), "role_name": "admin"})
+
+	cases := []struct {
+		name       string
+		header     string
+		want       int
+		wantRoleID int
+	}{
+		// Unlike Auth, a missing header is rejected rather than resolved to
+		// a public role — RequireLogin has no anonymous fallback.
+		{"missing header", "", http.StatusUnauthorized, 0},
+		{"not bearer", "Token abc", http.StatusUnauthorized, 0},
+		{"invalid token", "Bearer not-a-jwt", http.StatusUnauthorized, 0},
+		{"valid token", "Bearer " + validToken, http.StatusOK, 2},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotRoleID int
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotRoleID, _ = RoleIDFromContext(r.Context())
+				w.WriteHeader(http.StatusOK)
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+			if tc.header != "" {
+				req.Header.Set("Authorization", tc.header)
+			}
+			w := httptest.NewRecorder()
+
+			RequireLogin(secret)(next).ServeHTTP(w, req)
+
+			if w.Code != tc.want {
+				t.Fatalf("status = %d, want %d", w.Code, tc.want)
+			}
+			if tc.want == http.StatusOK && gotRoleID != tc.wantRoleID {
+				t.Errorf("role_id in context = %d, want %d", gotRoleID, tc.wantRoleID)
+			}
+		})
+	}
+}
+
 func TestCORS(t *testing.T) {
 	reached := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

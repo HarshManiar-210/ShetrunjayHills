@@ -114,10 +114,13 @@ function OpacityControl({
 }
 
 /**
- * An options group's rows, as chips under its switch. Any number can be on,
- * unlike a raster's year. A row with no data yet is shown but can't be picked.
+ * An options group's rows, as checkboxes under its switch — the same
+ * checkbox-row language as the panel's own layers (LayerRow), so a nested
+ * group of options reads as more layers rather than a different kind of
+ * control. Any number can be on, unlike a raster's year. A row with no data
+ * yet is shown but can't be picked.
  */
-function OptionChips({
+function OptionList({
   label,
   options,
   visibility,
@@ -129,28 +132,38 @@ function OptionChips({
   onToggle: (key: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-1" role="group" aria-label={`${label} options`}>
+    <div className="flex flex-col gap-0.5" role="group" aria-label={`${label} options`}>
       {options.map((option) => {
         const active = !option.pending && Boolean(visibility[option.key]);
         return (
-          <button
+          <div
             key={option.key}
-            type="button"
-            aria-pressed={active}
-            disabled={option.pending}
+            role="checkbox"
+            aria-checked={active}
+            aria-disabled={option.pending}
             title={option.pending ? "Coming soon" : undefined}
-            onClick={() => onToggle(option.key)}
+            tabIndex={option.pending ? -1 : 0}
+            onClick={() => !option.pending && onToggle(option.key)}
+            onKeyDown={(e) => {
+              if (option.pending) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onToggle(option.key);
+              }
+            }}
             className={cn(
-              "flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] transition-colors",
-              active
-                ? "bg-brand font-semibold text-brand-foreground"
-                : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
-              option.pending && "pointer-events-none opacity-40",
+              "flex items-center gap-2 rounded-md py-1 pr-1.5 pl-1 text-[11px] transition-colors",
+              option.pending
+                ? "pointer-events-none opacity-40"
+                : "cursor-pointer hover:bg-foreground/5",
             )}
           >
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: option.color }} />
-            {option.label}
-          </button>
+            <Checkbox checked={active} tabIndex={-1} className="pointer-events-none size-3.5" />
+            <LayerDot color={option.color} className="size-1.5" />
+            <span className={cn("min-w-0 flex-1 truncate", active && "font-medium")}>
+              {option.label}
+            </span>
+          </div>
         );
       })}
     </div>
@@ -451,7 +464,7 @@ function SidebarSectionsImpl({
                   onRemove={() => onDeselectLayer(row.key)}
                 >
                   {row.options && (
-                    <OptionChips
+                    <OptionList
                       label={row.label}
                       options={row.options}
                       visibility={visibility}
