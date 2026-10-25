@@ -37,6 +37,12 @@ its own delivered extent):
    the one seeded. Only their bounds change; a 4326 grid over ~0.06 deg is
    drawn within a pixel of linear in Web Mercator, so the PNGs stay as they are.
 
+4. Forest Cover / Forest Type FSI 2023 are also EPSG:4326 grids clipped to
+   the study area, but at ~24 m cells: even at the best fit (IoU ~0.954)
+   cells straddling the outline poke past it, a visible stair-step beyond the
+   boundary. So after fitting, pixels outside the outline are made
+   transparent ("4326-clip"); the delivered PNGs stay in originals/fsi.
+
 3. Fragmentation came with its extent in EPSG:4326 per year
    (FRAGMENTATION_EXTENTS), so it is placed there as delivered rather than
    fitted: its forest patches don't match any outline or Green Cover class
@@ -89,6 +95,7 @@ PRODUCTS = [
     ("fragmentation/*.png", "extent", "nearest"),
     ("growingstock.png", "4326", None),
     ("habitat.png", "4326", None),
+    ("fsi/*.png", "4326-clip", None),
 ]
 
 # The delivered Toposheet's sheet extent: W, S, E, N in EPSG:4326.
@@ -340,6 +347,20 @@ def main():
                     img.save(os.path.join(RASTER_DIR, rel), optimize=True)
                 continue
 
+            if grid == "4326-clip":
+                box, score = fit(opaque, deg_ref, deg_start, 0.0004)
+                bounds[rel] = tuple(box)
+                inside = sample(deg_ref, box, opaque.shape)
+                out = src.copy()
+                out[~inside, 3] = 0
+                spill = (opaque & ~inside).sum() / max(opaque.sum(), 1)
+                print(f"{rel:36s} 4326  IoU {score:.4f}, clipped {spill:.1%} of pixels to the outline")
+                if args.write:
+                    dst = os.path.join(RASTER_DIR, rel)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    Image.fromarray(out, "RGBA").save(dst, optimize=True)
+                continue
+
             if grid == "4326":
                 box, score = fit(opaque, deg_ref, deg_start, 0.0004)
                 bounds[rel] = tuple(box)
@@ -369,6 +390,13 @@ def main():
             pat = re.compile(r"('raster-data/" + re.escape(rel) + r"', \d+, )"
                              r"[-\d.]+, [-\d.]+, [-\d.]+, [-\d.]+\)")
             sql, n = pat.subn(lambda m: m.group(1) + ", ".join(f"{v:.7f}" for v in b) + ")", sql)
+            if n == 0:
+                # A row moved later by an UPDATE (the FSI rasters) carries its
+                # bounds as named columns rather than in an INSERT's VALUES.
+                upd = re.compile(r"(file_path = 'raster-data/" + re.escape(rel) + r"',\s*)"
+                                 r"min_lon = [-\d.]+, min_lat = [-\d.]+, max_lon = [-\d.]+, max_lat = [-\d.]+")
+                sql, n = upd.subn(lambda m: m.group(1) + "min_lon = {:.7f}, min_lat = {:.7f}, "
+                                  "max_lon = {:.7f}, max_lat = {:.7f}".format(*b), sql)
             # A product now served as tiles (the Toposheet) has its row on the
             # .pmtiles file, with bounds set by prepare-raster-tiles.sh -- e.g.
             # a CLIP window -- so the PNG's full extent must not overwrite them.
