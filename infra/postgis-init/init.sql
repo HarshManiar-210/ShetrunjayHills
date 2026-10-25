@@ -1158,9 +1158,9 @@ UPDATE static_overlays SET popup_fields = '{Name,area}' WHERE key = 'studyArea';
 UPDATE static_overlays SET kind = 'outline', dashed = true WHERE key = 'grazingLand';
 
 -- Field Plots: drawn with the Growing Stock raster's own switch, as a solid line;
--- the popup shows the grid number, zone number (Name) and the grid's growing stock.
+-- the popup shows the grid number, plot number (Name) and the grid's growing stock.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, solid, line_width) VALUES
-    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Grid No.:Grid Number","Name:Zone Number","Growing St:Grid Growing Stock"}', true, 2)
+    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Grid No.:Grid Number","Name:Plot Number","Growing St:Grid Growing Stock"}', true, 2)
 ON CONFLICT (key) DO NOTHING;
 
 -- Cadastral: a solid outline whose popup shows Village and Plot Number (Plot_No).
