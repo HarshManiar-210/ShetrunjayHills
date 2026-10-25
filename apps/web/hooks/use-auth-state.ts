@@ -17,9 +17,14 @@ export function useAuthState() {
     loginOpen,
     openLogin: () => setLoginOpen(true),
     setLoginOpen,
-    // The dialog already called setToken(); closing it re-renders this
-    // component, and the getUser() call above naturally picks up the token.
-    onLoginSuccess: () => setLoginOpen(false),
+    // The form already called setToken(); this needs to force a re-render
+    // the same way logout does, since setLoginOpen(false) is a no-op (and
+    // re-renders nothing) when the dialog was never opened in the first
+    // place — true for every LoginGate caller, not just LoginDialog's.
+    onLoginSuccess: () => {
+      setLoginOpen(false);
+      forceUpdate();
+    },
     logout: () => {
       clearToken();
       forceUpdate();

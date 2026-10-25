@@ -243,6 +243,18 @@ INSERT INTO users (username, password_hash, role_id) VALUES
     ('support_user', '$2b$10$6M2JLxqpCoDqqcwvA0Ubd.nEOAvxYm4zUfBJ5Jabiuptc3b4doREq', (SELECT id FROM roles WHERE name = 'support_team'));
 
 -- ---------------------------------------------------------------------------
+-- Seed: the site login. username holds an email address — the users table
+-- has no dedicated email column, and nothing else reads this field as
+-- anything but an opaque identifier, so widening the schema for it isn't
+-- needed. Real login for the deployed site, not a mock role fixture like
+-- the three above; password is Example@123, replace both when real
+-- credentials are ready.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO users (username, password_hash, role_id) VALUES
+    ('example@gmail.com', '$2a$10$qL8c848SRHwmRP0GeNtjOeUSX9Jzo34u.SdlbOkYtENo1rSlWufuG', (SELECT id FROM roles WHERE name = 'admin'));
+
+-- ---------------------------------------------------------------------------
 -- Seed: layers
 -- shatrunjay_hill_boundary and species_points are real client-supplied data
 -- (PalitanaStudyArea.geojson / SpeciesPoints.geojson): a surveyed outline of
@@ -638,10 +650,19 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- the placement in: change a row's bounds here and rebuild its archive.
 -- CHM is re-delivered on DSM's exact footprint (its outline matches DSM's to
 -- 99.96%), so it now carries DSM's bounds.
+-- Orthomosaic's bounds were off by ~98m east/28m north of the basemap (the
+-- source PNG is gone, so the archive was rebuilt from its own z19 tiles with
+-- the geotransform re-stamped — see the git history for the measurement).
+-- DSM and DTM carried the same ~98m east/28m north displacement (same flight,
+-- same misregistration) and got the identical correction, same method: each
+-- archive's own z19 tiles extracted, geotransform re-stamped by the same
+-- delta, z10-19 re-tiled. CHM still carries DSM's *old* bounds below and is
+-- now off by that amount relative to DSM/basemap — not corrected here since
+-- only DSM/DTM were asked for; flag if CHM should follow too.
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
-    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7268383, 21.4503137, 71.8240547, 21.5128380),
-    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
+    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
+    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
+    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
     ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053);
 
 -- Slope/Aspect: re-delivered as one raster per class instead of one
@@ -1095,9 +1116,9 @@ UPDATE static_overlays SET popup_fields = '{Volume,Zone_2}' WHERE key = 'propose
 -- Forest Survey Number, Forest Type, Section, Range and Division.
 UPDATE static_overlays SET kind = 'outline', solid = true, color = '#0B3D24', line_width = 2, popup_fields = '{"F_SNO:Forest Survey Number",F_TYPE,SECTION,RANGE,DIVISION}' WHERE key = 'forestBoundary';
 
--- Streams: the popup shows only Stream Order and Length, with its unit (m)
--- after the value.
-UPDATE static_overlays SET popup_fields = '{strmOrder,"Length::m"}' WHERE key = 'streams';
+-- Streams: the popup shows only Stream Order and Length, labelled with its
+-- unit (metres) rather than appended after the value.
+UPDATE static_overlays SET popup_fields = '{strmOrder,"Length:Length (Meters):m"}' WHERE key = 'streams';
 
 -- District Boundary: a solid outline whose popup shows only District.
 UPDATE static_overlays SET solid = true, popup_fields = '{District}' WHERE key = 'districtBoundary';
@@ -1158,9 +1179,9 @@ UPDATE static_overlays SET popup_fields = '{Name,area}' WHERE key = 'studyArea';
 UPDATE static_overlays SET kind = 'outline', dashed = true WHERE key = 'grazingLand';
 
 -- Field Plots: drawn with the Growing Stock raster's own switch, as a solid line;
--- the popup shows the plot number (Name).
+-- the popup shows the grid number, plot number (Name) and the grid's growing stock.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, solid, line_width) VALUES
-    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Name:Plot Number"}', true, 2)
+    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Grid No.:Grid Number","Name:Plot Number","Growing St:Grid Growing Stock"}', true, 2)
 ON CONFLICT (key) DO NOTHING;
 
 -- Cadastral: a solid outline whose popup shows Village and Plot Number (Plot_No).
@@ -1175,6 +1196,10 @@ UPDATE static_overlays SET kind = 'fill'
 WHERE asset_type = 'vector' AND kind = 'outline'
   AND key NOT IN ('cadastralMap', 'villages', 'forestBoundary', 'grazingLand');
 UPDATE static_overlays SET kind = 'fill', solid = true WHERE key = 'watershed';
+-- Greenwash Area is a fifth exception: border only, no fill. Its outline
+-- colour is kept bright (#00ff4b) rather than 019's #00340a, which read as
+-- near-black against Study Area Boundary's own dark outline.
+UPDATE static_overlays SET kind = 'outline', color = '#00ff4b' WHERE key = 'greenwash';
 
 -- Existing Vantalavadi: solid-filled polygons classed by area (areaM) into five
 -- equal-interval classes, per the client's legend. A category carrying `min`

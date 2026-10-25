@@ -45,6 +45,38 @@ func CORS(origin string) func(http.Handler) http.Handler {
 	}
 }
 
+// bearerRoleID validates the Bearer JWT in header and returns the role_id
+// claim it carries. ok is false for anything that isn't a validly-signed,
+// unexpired token with a numeric role_id — the caller decides what that
+// means (reject, or fall back to a public role).
+func bearerRoleID(jwtSecret []byte, header string) (roleID int, ok bool) {
+	if !strings.HasPrefix(header, "Bearer ") {
+		return 0, false
+	}
+
+	token, err := jwt.Parse(
+		strings.TrimPrefix(header, "Bearer "),
+		func(t *jwt.Token) (any, error) { return jwtSecret, nil },
+		jwt.WithValidMethods([]string{"HS256"}),
+	)
+	if err != nil || !token.Valid {
+		return 0, false
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, false
+	}
+	// Fail closed: a signed token with a missing or non-numeric role_id
+	// would otherwise pass through as role 0 and be served an empty layer
+	// set instead of being rejected.
+	roleIDFloat, ok := claims["role_id"].(float64)
+	if !ok {
+		return 0, false
+	}
+	return int(roleIDFloat), true
+}
+
 // Auth validates the Bearer JWT and injects role_id/role_name into the
 // request context for downstream handlers to read. A request with no
 // Authorization header at all is anonymous, not invalid — it's injected
@@ -60,37 +92,32 @@ func Auth(jwtSecret []byte, publicRoleID int) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-			if !strings.HasPrefix(header, "Bearer ") {
-				http.Error(w, "missing bearer token", http.StatusUnauthorized)
-				return
-			}
 
-			token, err := jwt.Parse(
-				strings.TrimPrefix(header, "Bearer "),
-				func(t *jwt.Token) (any, error) { return jwtSecret, nil },
-				jwt.WithValidMethods([]string{"HS256"}),
-			)
-			if err != nil || !token.Valid {
-				http.Error(w, "invalid token", http.StatusUnauthorized)
-				return
-			}
-
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
-				http.Error(w, "invalid token", http.StatusUnauthorized)
-				return
-			}
-			// Fail closed: a signed token with a missing or non-numeric
-			// role_id would otherwise pass through as role 0 and be served an
-			// empty layer set instead of being rejected.
-			roleID, ok := claims["role_id"].(float64)
+			roleID, ok := bearerRoleID(jwtSecret, header)
 			if !ok {
 				http.Error(w, "invalid token", http.StatusUnauthorized)
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), ctxKeyRoleID, int(roleID))
+			ctx := context.WithValue(r.Context(), ctxKeyRoleID, roleID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
 
+// RequireLogin is Auth without the anonymous fallback: a missing
+// Authorization header is rejected with 401 rather than resolved to the
+// public role. For routes the site should only serve to a logged-in user.
+func RequireLogin(jwtSecret []byte) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			roleID, ok := bearerRoleID(jwtSecret, r.Header.Get("Authorization"))
+			if !ok {
+				http.Error(w, "login required", http.StatusUnauthorized)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), ctxKeyRoleID, roleID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
