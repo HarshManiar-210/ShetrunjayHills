@@ -61,13 +61,6 @@ func main() {
 
 	repo := repository.New(pool)
 
-	// Resolved once at startup, not hardcoded: whichever row is named
-	// 'public' in this deployment's seed data is the anonymous role.
-	publicRoleID, err := repo.GetRoleIDByName(ctx, "public")
-	if err != nil {
-		log.Fatalf("resolve public role id: %v", err)
-	}
-
 	r := chi.NewRouter()
 	r.Use(handlers.CORS(corsOrigin))
 	// Ahead of every route: the overlay GeoJSON files are the bulk of what
@@ -77,17 +70,16 @@ func main() {
 	r.Get("/healthz", healthzHandler(repo))
 	r.Post("/api/login", handlers.Login(repo, []byte(jwtSecret)))
 
-	// Static overlays (Base Layers, Watershed Analysis, Forest Cover raster)
-	// aren't RBAC-permissioned rows, so they sit outside the Auth group —
-	// every visitor sees the same reference geometry/imagery.
-	r.Get("/api/layer-groups", handlers.LayerGroups(repo))
-	r.Get("/api/smc-stats", handlers.SmcStats(repo))
-	r.Get("/api/overlays", handlers.Overlays(repo, dataRoot))
-	r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
-	r.Get("/api/overlays/{key}/stats", handlers.OverlayStats(repo, dataRoot))
-
+	// Everything else requires a logged-in user — no anonymous/public
+	// access to any layer, overlay or stat. RequireLogin rejects a missing
+	// or invalid token with 401 rather than falling back to a public role.
 	r.Group(func(r chi.Router) {
-		r.Use(handlers.Auth([]byte(jwtSecret), publicRoleID))
+		r.Use(handlers.RequireLogin([]byte(jwtSecret)))
+		r.Get("/api/layer-groups", handlers.LayerGroups(repo))
+		r.Get("/api/smc-stats", handlers.SmcStats(repo))
+		r.Get("/api/overlays", handlers.Overlays(repo, dataRoot))
+		r.Get("/api/overlays/{key}/data", handlers.OverlayData(repo, dataRoot))
+		r.Get("/api/overlays/{key}/stats", handlers.OverlayStats(repo, dataRoot))
 		r.Get("/api/layers", handlers.Layers(repo))
 	})
 

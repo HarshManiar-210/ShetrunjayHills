@@ -243,6 +243,18 @@ INSERT INTO users (username, password_hash, role_id) VALUES
     ('support_user', '$2b$10$6M2JLxqpCoDqqcwvA0Ubd.nEOAvxYm4zUfBJ5Jabiuptc3b4doREq', (SELECT id FROM roles WHERE name = 'support_team'));
 
 -- ---------------------------------------------------------------------------
+-- Seed: the site login. username holds an email address — the users table
+-- has no dedicated email column, and nothing else reads this field as
+-- anything but an opaque identifier, so widening the schema for it isn't
+-- needed. Real login for the deployed site, not a mock role fixture like
+-- the three above; password is Example@123, replace both when real
+-- credentials are ready.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO users (username, password_hash, role_id) VALUES
+    ('example@gmail.com', '$2a$10$qL8c848SRHwmRP0GeNtjOeUSX9Jzo34u.SdlbOkYtENo1rSlWufuG', (SELECT id FROM roles WHERE name = 'admin'));
+
+-- ---------------------------------------------------------------------------
 -- Seed: layers
 -- shatrunjay_hill_boundary and species_points are real client-supplied data
 -- (PalitanaStudyArea.geojson / SpeciesPoints.geojson): a surveyed outline of
