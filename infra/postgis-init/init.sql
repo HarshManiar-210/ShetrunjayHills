@@ -1196,8 +1196,10 @@ UPDATE static_overlays SET kind = 'fill'
 WHERE asset_type = 'vector' AND kind = 'outline'
   AND key NOT IN ('cadastralMap', 'villages', 'forestBoundary', 'grazingLand');
 UPDATE static_overlays SET kind = 'fill', solid = true WHERE key = 'watershed';
--- Greenwash Area is a fifth exception: border only, no fill.
-UPDATE static_overlays SET kind = 'outline' WHERE key = 'greenwash';
+-- Greenwash Area is a fifth exception: border only, no fill. Its outline
+-- colour is kept bright (#00ff4b) rather than 019's #00340a, which read as
+-- near-black against Study Area Boundary's own dark outline.
+UPDATE static_overlays SET kind = 'outline', color = '#00ff4b' WHERE key = 'greenwash';
 
 -- Existing Vantalavadi: solid-filled polygons classed by area (areaM) into five
 -- equal-interval classes, per the client's legend. A category carrying `min`
