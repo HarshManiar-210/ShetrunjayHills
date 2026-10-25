@@ -1378,13 +1378,13 @@ UPDATE static_overlays SET group_id = grp('forest-cover-fsi'), asset_type = 'ras
     kind = NULL, color = NULL, color_field = NULL, categories = NULL, popup_fields = NULL,
     fill_opacity = NULL, outline_color = NULL, line_width = NULL, solid = false,
     file_path = 'raster-data/fsi/forest-cover-fsi.png',
-    min_lon = 71.7281248, min_lat = 21.4511923, max_lon = 71.8216458, max_lat = 21.5121722
+    min_lon = 71.7283031, min_lat = 21.4511155, max_lon = 71.8217109, max_lat = 21.5125335
 WHERE key = 'forestCoverFSI';
 UPDATE static_overlays SET group_id = grp('forest-type-fsi'), asset_type = 'raster', sort_order = 1,
     kind = NULL, color = NULL, color_field = NULL, categories = NULL, popup_fields = NULL,
     fill_opacity = NULL, outline_color = NULL, line_width = NULL, solid = false,
     file_path = 'raster-data/fsi/forest-type-fsi.png',
-    min_lon = 71.7281062, min_lat = 21.4513183, max_lon = 71.8215115, max_lat = 21.5120283
+    min_lon = 71.7283274, min_lat = 21.4509208, max_lon = 71.8217617, max_lat = 21.5124803
 WHERE key = 'forestTypeFSI';
 
 -- Forest Type FSI's statistics, re-delivered over the whole study area
