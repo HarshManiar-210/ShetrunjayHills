@@ -236,27 +236,18 @@ INSERT INTO roles (name) VALUES
     ('public');
 
 -- ---------------------------------------------------------------------------
--- Seed: users (one mock account per role)
--- password for all three mock users is: password123
--- (bcrypt hashes below, cost factor 10 — verify with golang.org/x/crypto/bcrypt)
+-- Seed: the site login — the only account. username holds an email address:
+-- the users table has no dedicated email column, and nothing else reads this
+-- field as anything but an opaque identifier, so widening the schema for it
+-- isn't needed. Seeded with the placeholder hash '!', which bcrypt never
+-- matches, so the account cannot sign in until its password is set with
+-- tools/set-user-password.sh — no password or hash is kept in the repo. The
+-- roles above stay seeded so permissions remain rows; to test as another
+-- role locally, insert a temporary user for it.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO users (username, password_hash, role_id) VALUES
-    ('regular_user', '$2b$10$8bt7OLcdto4aL/acSufj1.aQNguwzrKyCFpLGYWQPy.1fFyLpFjdW', (SELECT id FROM roles WHERE name = 'regular_user')),
-    ('admin_user',   '$2b$10$lWZ3JeJgUw3DzdvnVrpMBu3YVLvUPAFsz4vi1IZh4OePqBOlHj7le', (SELECT id FROM roles WHERE name = 'admin')),
-    ('support_user', '$2b$10$6M2JLxqpCoDqqcwvA0Ubd.nEOAvxYm4zUfBJ5Jabiuptc3b4doREq', (SELECT id FROM roles WHERE name = 'support_team'));
-
--- ---------------------------------------------------------------------------
--- Seed: the site login. username holds an email address — the users table
--- has no dedicated email column, and nothing else reads this field as
--- anything but an opaque identifier, so widening the schema for it isn't
--- needed. Real login for the deployed site, not a mock role fixture like
--- the three above; password is Example@123, replace both when real
--- credentials are ready.
--- ---------------------------------------------------------------------------
-
-INSERT INTO users (username, password_hash, role_id) VALUES
-    ('example@gmail.com', '$2a$10$qL8c848SRHwmRP0GeNtjOeUSX9Jzo34u.SdlbOkYtENo1rSlWufuG', (SELECT id FROM roles WHERE name = 'admin'));
+    ('admin@shantrunjayforest.org', '!', (SELECT id FROM roles WHERE name = 'admin'));
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers

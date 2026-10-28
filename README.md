@@ -21,16 +21,17 @@ docker compose up --build
 ```
 
 This starts `postgis` (host port `5433`), `api` (`http://localhost:8080`), and `web`
-(`http://localhost:3000`). Once all three are up, open `http://localhost:3000` and log in with
-one of the mock users below.
+(`http://localhost:3000`). Once all three are up, open `http://localhost:3000` and log in.
 
-**Mock credentials** (password `password123` for all three):
+**Login**: the only account is `admin@shantrunjayforest.org` (role `admin`). Neither its
+password nor a hash of it is kept in the repo: the seed gives it an unusable placeholder, so set
+the password once after the database is created:
 
-| Username       | Role           | Sees layers                           |
-| -------------- | -------------- | ------------------------------------- |
-| `regular_user` | `regular_user` | `city_border`, `roads`                |
-| `admin_user`   | `admin`        | `city_border`, `roads`, `metro_train` |
-| `support_user` | `support_team` | `city_border`, `roads`, `metro_train` |
+```
+tools/set-user-password.sh admin@shantrunjayforest.org
+```
+ The roles (`regular_user`, `admin`, `support_team`, `public`) are
+still seeded, so to check behaviour as another role locally, insert a temporary user for it.
 
 To run the API's Go test suite, including the RBAC repository integration test, against the
 running `db` container:
@@ -112,7 +113,8 @@ repo as the thing the archive is rebuilt from.
 
 ## Mock RBAC Model
 
-- **Roles**: `regular_user`, `admin`, `support_team` — one mock user each.
+- **Roles**: `regular_user`, `admin`, `support_team`. Only one user is seeded, an `admin`
+  (see Login above).
 - **Layers**: `city_border` (Polygon), `roads` (LineString), `metro_train` (LineString) — mock
   geometries around Ahmedabad.
 - **Permissions**: `regular_user` → `city_border` + `roads`. `admin` and `support_team` → all
