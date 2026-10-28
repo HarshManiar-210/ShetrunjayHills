@@ -515,7 +515,8 @@ function overlayColorExpr(
   return [
     "match",
     ["get", colorField],
-    ...categories.flatMap((c) => [c.value, c.color]),
+    // A class with aliases matches any of its values (a match label may be a list).
+    ...categories.flatMap((c) => [c.aliases?.length ? [c.value, ...c.aliases] : c.value, c.color]),
     color,
   ];
 }

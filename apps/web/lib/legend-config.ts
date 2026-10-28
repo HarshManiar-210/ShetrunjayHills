@@ -20,6 +20,15 @@ export interface LegendClass {
    */
   min?: number;
   max?: number;
+  /** Further property values drawn in this class (Trees' Predicted_SN spellings). */
+  aliases?: string[];
+  /** Set on a species class (Trees): its Gujarati name, shown after the label. */
+  gujaratiName?: string;
+  /**
+   * Set on a counted class (Trees' species): shown after the label, and the
+   * legend totals them under the class list.
+   */
+  count?: number;
 }
 
 export interface RasterLegend {
