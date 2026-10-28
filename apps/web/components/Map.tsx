@@ -522,7 +522,7 @@ function overlayColorExpr(
 }
 
 function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
-  for (const { key, kind, color, colorField, categories, tiled, url, dotted, dashed, lineWidth, fillOpacity, outlineColor, solid, labelField } of defs) {
+  for (const { key, kind, color, colorField, categories, tiled, url, dotted, dashed, lineWidth, pointRadius, fillOpacity, outlineColor, solid, labelField } of defs) {
     const fillColor = overlayColorExpr(color, colorField, categories);
     const sourceId = `overlay-${key}`;
     if (map.getSource(sourceId)) continue;
@@ -613,7 +613,8 @@ function addOverlaySources(map: MapLibreMap, defs: OverlayDef[]) {
         layout: { visibility: "none" },
         paint: {
           "circle-color": fillColor,
-          "circle-radius": 2.5,
+          // A row's static_overlays.point_radius replaces the default.
+          "circle-radius": pointRadius ?? 2.5,
           "circle-stroke-width": 0.5,
           "circle-stroke-color": CASING,
         },

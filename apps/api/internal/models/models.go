@@ -64,6 +64,9 @@ type StaticOverlay struct {
 	// LineWidth overrides the default stroke width for the row's kind, in
 	// pixels. nil draws at the default.
 	LineWidth *float64 `json:"line_width,omitempty"`
+	// PointRadius overrides a 'point' row's default circle radius, in pixels.
+	// nil draws at the default.
+	PointRadius *float64 `json:"point_radius,omitempty"`
 	// FillOpacity is a 'fill' row's interior opacity, 0-1. nil draws the
 	// default light wash.
 	FillOpacity *float64 `json:"fill_opacity,omitempty"`

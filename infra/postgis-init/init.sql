@@ -149,6 +149,10 @@ CREATE TABLE static_overlays (
     -- the frontend's default width for its kind; set it to make one boundary
     -- stand out from the rest (the Study Area).
     line_width DOUBLE PRECISION CHECK (line_width > 0),
+    -- Circle radius in pixels for a 'point' row. NULL draws at the frontend's
+    -- default; set it to make a sparse point layer readable (Plantation
+    -- Suitability Zones).
+    point_radius DOUBLE PRECISION CHECK (point_radius > 0),
     -- Opacity of a 'fill' row's interior, 0-1. NULL draws the frontend's
     -- default light wash; 1 is a solid fill (Existing Vantalavadi).
     fill_opacity DOUBLE PRECISION CHECK (fill_opacity BETWEEN 0 AND 1),
@@ -734,16 +738,18 @@ UPDATE static_overlays SET color_field = 'lithologic',
 WHERE key = 'geology';
 
 -- Plantation Suitability Zones: sample-point layer (one point per survey
--- grid cell), classed by the numeric `Pkantation` zone code rather than a
--- text field like the other Hydrogeology layers above.
-INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
-    ('plantationSuitabilityZones', 'Plantation Suitability Zones', grp('hydrogeology'), 'vector', 'point', '#3b862c', 'Pkantation', '[
-        {"value": 1, "label": "Water/Rocks/Builtup", "color": "#ff0000"},
-        {"value": 2, "label": "Herbs/Shrubs/Grass", "color": "#ffff00"},
-        {"value": 3, "label": "Trees/Dense Vegetation", "color": "#3b862c"},
-        {"value": 4, "label": "Plantation", "color": "#875400"}
+-- grid cell), classed by the `P_Zone` class name the updated delivery added
+-- (one-to-one with the numeric `Pkantation` code it replaces here). Drawn at
+-- a larger point_radius than the default: 199 points over the whole study
+-- area otherwise read as specks.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, point_radius) VALUES
+    ('plantationSuitabilityZones', 'Plantation Suitability Zones', grp('hydrogeology'), 'vector', 'point', '#3b862c', 'P_Zone', '[
+        {"value": "Water/Rocks/Builtup", "label": "Water/Rocks/Builtup", "color": "#ff0000"},
+        {"value": "Herbs/Shrubs/Grass", "label": "Herbs/Shrubs/Grass", "color": "#ffff00"},
+        {"value": "Trees/Dense Vegetation", "label": "Trees/Dense Vegetation", "color": "#3b862c"},
+        {"value": "Plantation", "label": "Plantation", "color": "#875400"}
     ]'::jsonb, 'vector-data/plantation-suitabilty-zones.geojson', 5, 71.731250, 21.452646, 71.820588, 21.509122,
-        '{"Zone","Pkantation:Zone Code","ZoneName:Zone Name"}');
+        '{"Zone","P_Zone:Plantation Zone","ZoneName:Zone Name"}', 5);
 
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds. Its pixels are square in metres (aspect

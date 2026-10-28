@@ -30,6 +30,8 @@ export interface OverlayDef {
   dashed?: boolean;
   /** See OverlayMeta.line_width. */
   lineWidth?: number;
+  /** See OverlayMeta.point_radius. */
+  pointRadius?: number;
   /** See OverlayMeta.fill_opacity. */
   fillOpacity?: number;
   /** See OverlayMeta.outline_color. */
@@ -74,6 +76,7 @@ export function vectorOverlayDefs(meta: OverlayMeta[]): OverlayDef[] {
       dotted: o.dotted,
       dashed: o.dashed,
       lineWidth: o.line_width,
+      pointRadius: o.point_radius,
       fillOpacity: o.fill_opacity,
       outlineColor: o.outline_color,
       solid: o.solid,
