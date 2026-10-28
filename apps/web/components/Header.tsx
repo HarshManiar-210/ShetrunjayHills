@@ -135,6 +135,21 @@ export function Header({
           </Button>
         )}
 
+        {/* Standalone while the profile menu above is hidden, so there is
+            still a way to sign out. Built like the export pill beside it. */}
+        {user && !SHOW_PROFILE_MENU && (
+          <Button
+            variant="outline"
+            className="h-10 shrink-0 gap-2 rounded-full border-nav-line bg-nav-soft px-3.5 text-sm font-medium shadow-[inset_0_1px_2px_oklch(0.30_0.01_96_/_0.07)] transition-[color,box-shadow,background-color,border-color] hover:border-nav-accent/45 hover:bg-nav-soft"
+            aria-label={`Log out ${user.username}`}
+            title={`Signed in as ${user.username}`}
+            onClick={onLogoutClick}
+          >
+            <LogOut className="size-4 shrink-0 text-nav-accent" strokeWidth={2} />
+            <span className="hidden sm:inline">Logout</span>
+          </Button>
+        )}
+
         {SHOW_PROFILE_MENU && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
