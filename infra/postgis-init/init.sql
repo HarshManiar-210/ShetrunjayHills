@@ -1409,12 +1409,12 @@ WHERE key = 'treesOutsideForests';
 
 -- TOF (Trees Outside Forests): every class drawn with a solid fill and a
 -- solid outline (client's symbology table), not the default translucent
--- fill with an animated edge. `solid` alone only drops the animation --
--- without outline_color set, the edge falls back to each feature's own fill
--- colour, which on ~400k densely packed tree-crown polygons reads as no
--- edge at all. outline_color = black gives every class a visible, genuinely
--- solid line while leaving the fill colours exactly as delivered.
-UPDATE static_overlays SET fill_opacity = 1, solid = true, outline_color = '#000000' WHERE key = 'treesOutsideForests';
+-- fill with an animated edge. "Solid" here means each class's own colour,
+-- continuous and unbroken -- not a fixed black border (the client corrected
+-- this after an earlier pass tried black); outline_color stays unset so
+-- Map.tsx's `outlineColor ?? fillColor` fallback colours the edge the same
+-- as the class it belongs to.
+UPDATE static_overlays SET fill_opacity = 1, solid = true, outline_color = NULL WHERE key = 'treesOutsideForests';
 -- TOF area statistics (delivered table, 192.56 ha in all). Its fourth row was
 -- labelled "Linear TOF" a second time; it is Built-up TOF (confirmed).
 DELETE FROM overlay_class_stats WHERE overlay_id = (SELECT id FROM static_overlays WHERE key = 'treesOutsideForests');
