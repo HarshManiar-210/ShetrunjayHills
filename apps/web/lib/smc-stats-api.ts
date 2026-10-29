@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/layers-api";
+import { getToken } from "@/lib/auth";
 
 /**
  * The client's SMC Statistics table (smc_zone_counts): how many soil &
@@ -18,7 +19,12 @@ export interface SmcZoneCount {
 }
 
 export async function fetchSmcStats(): Promise<SmcZoneCount[]> {
-  const res = await fetch(`${API_URL}/api/smc-stats`);
+  // Sent with the session's token like every other API call: the API answers
+  // 401 without one.
+  const token = getToken();
+  const res = await fetch(`${API_URL}/api/smc-stats`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) throw new Error("failed to load SMC statistics");
   return res.json();
 }

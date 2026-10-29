@@ -149,6 +149,10 @@ CREATE TABLE static_overlays (
     -- the frontend's default width for its kind; set it to make one boundary
     -- stand out from the rest (the Study Area).
     line_width DOUBLE PRECISION CHECK (line_width > 0),
+    -- Circle radius in pixels for a 'point' row. NULL draws at the frontend's
+    -- default; set it to make a sparse point layer readable (Plantation
+    -- Suitability Zones).
+    point_radius DOUBLE PRECISION CHECK (point_radius > 0),
     -- Opacity of a 'fill' row's interior, 0-1. NULL draws the frontend's
     -- default light wash; 1 is a solid fill (Existing Vantalavadi).
     fill_opacity DOUBLE PRECISION CHECK (fill_opacity BETWEEN 0 AND 1),
@@ -232,27 +236,18 @@ INSERT INTO roles (name) VALUES
     ('public');
 
 -- ---------------------------------------------------------------------------
--- Seed: users (one mock account per role)
--- password for all three mock users is: password123
--- (bcrypt hashes below, cost factor 10 — verify with golang.org/x/crypto/bcrypt)
+-- Seed: the site login — the only account. username holds an email address:
+-- the users table has no dedicated email column, and nothing else reads this
+-- field as anything but an opaque identifier, so widening the schema for it
+-- isn't needed. Seeded with the placeholder hash '!', which bcrypt never
+-- matches, so the account cannot sign in until its password is set with
+-- tools/set-user-password.sh — no password or hash is kept in the repo. The
+-- roles above stay seeded so permissions remain rows; to test as another
+-- role locally, insert a temporary user for it.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO users (username, password_hash, role_id) VALUES
-    ('regular_user', '$2b$10$8bt7OLcdto4aL/acSufj1.aQNguwzrKyCFpLGYWQPy.1fFyLpFjdW', (SELECT id FROM roles WHERE name = 'regular_user')),
-    ('admin_user',   '$2b$10$lWZ3JeJgUw3DzdvnVrpMBu3YVLvUPAFsz4vi1IZh4OePqBOlHj7le', (SELECT id FROM roles WHERE name = 'admin')),
-    ('support_user', '$2b$10$6M2JLxqpCoDqqcwvA0Ubd.nEOAvxYm4zUfBJ5Jabiuptc3b4doREq', (SELECT id FROM roles WHERE name = 'support_team'));
-
--- ---------------------------------------------------------------------------
--- Seed: the site login. username holds an email address — the users table
--- has no dedicated email column, and nothing else reads this field as
--- anything but an opaque identifier, so widening the schema for it isn't
--- needed. Real login for the deployed site, not a mock role fixture like
--- the three above; password is Example@123, replace both when real
--- credentials are ready.
--- ---------------------------------------------------------------------------
-
-INSERT INTO users (username, password_hash, role_id) VALUES
-    ('example@gmail.com', '$2a$10$qL8c848SRHwmRP0GeNtjOeUSX9Jzo34u.SdlbOkYtENo1rSlWufuG', (SELECT id FROM roles WHERE name = 'admin'));
+    ('admin@shantrunjayforest.org', '!', (SELECT id FROM roles WHERE name = 'admin'));
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers
@@ -432,8 +427,12 @@ WHERE key = 'watershed';
 --   tools/prepare-vector-tiles.sh treeStatistics tree-statistics.geojson
 -- Tiled (a whole-file GeoJSON of that many points kills the tab); the API
 -- stamps that from the .pmtiles extension. Trees are coloured by species, one
--- colour per Predicted_SN value in the tiles; the unnamed trees fall through
--- to `color`, the "Unidentified" row.
+-- colour per Predicted_SN value in the tiles (`aliases` are further spellings
+-- drawn in the same class); the unnamed trees fall through to `color`, the
+-- "Unidentified" row. Each species row carries its Gujarati name and tree
+-- count, from Tree_Stats_Guj.parquet (one row per tree; Predicted_SN and
+-- GujaratiName counted), and the legend sums the counts for the total.
+-- Scientific names (`label`) follow the client's species table.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
     ('treeStatistics', 'Trees', grp('tree-statistics'), 'vector', 'point',   '#bab0ac', 'vector-data/tree-statistics.pmtiles', 2, 71.728574, 21.451984, 71.821788, 21.511942,
         '{Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum}');
@@ -451,41 +450,30 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 
 UPDATE static_overlays SET color_field = 'Predicted_SN',
     categories = '[
-        {"value": "Butea monosperma", "label": "Butea monosperma", "color": "#f28e2b"},
-        {"value": "Senegalia senegal", "label": "Senegalia senegal", "color": "#4e79a7"},
-        {"value": "Dichrostachys cinerea", "label": "Dichrostachys cinerea", "color": "#e15759"},
-        {"value": "Acacia nilotica", "label": "Acacia nilotica", "color": "#76b7b2"},
-        {"value": "Ficus benjamina L.", "label": "Ficus benjamina", "color": "#59a14f"},
-        {"value": "Anogeissus latifolia", "label": "Anogeissus latifolia", "color": "#edc948"},
-        {"value": "Azadirachta indica", "label": "Azadirachta indica", "color": "#b07aa1"},
-        {"value": "Prosopis juliflora", "label": "Prosopis juliflora", "color": "#ff9da7"},
-        {"value": "Boswellia serrata", "label": "Boswellia serrata", "color": "#9c755f"},
-        {"value": "Mangifera indica", "label": "Mangifera indica", "color": "#17becf"},
-        {"value": "Vachellia nilotica", "label": "Vachellia nilotica", "color": "#1f77b4"},
-        {"value": "Tamarindus indica L", "label": "Tamarindus indica L", "color": "#d62728"},
-        {"value": "Senna cericulata", "label": "Senna cericulata", "color": "#2ca02c"},
-        {"value": "Pongamia pinnata", "label": "Pongamia pinnata", "color": "#9467bd"},
-        {"value": "Neltuma juliflora", "label": "Neltuma juliflora", "color": "#8c564b"},
-        {"value": "Manilkara hexandra", "label": "Manilkara hexandra", "color": "#e377c2"},
-        {"value": "Leucaena leucocephala", "label": "Leucaena leucocephala", "color": "#7f7f7f"},
-        {"value": "Lannea coromandelica (Houtt.) Merr.", "label": "Lannea coromandelica (Houtt.) Merr.", "color": "#bcbd22"},
-        {"value": "Fugeea Sp", "label": "Fugeea Sp", "color": "#aec7e8"},
-        {"value": "Ficus religiosa", "label": "Ficus religiosa", "color": "#ffbb78"},
-        {"value": "Ficus benghalensis", "label": "Ficus benghalensis", "color": "#98df8a"},
-        {"value": "Ficus bengalensis", "label": "Ficus bengalensis", "color": "#ff9896"},
-        {"value": "Euphorbia", "label": "Euphorbia", "color": "#c5b0d5"},
-        {"value": "Diospyros melanoxylon Roxb.", "label": "Diospyros melanoxylon Roxb.", "color": "#c49c94"},
-        {"value": "Diospyros melanoxylon", "label": "Diospyros melanoxylon", "color": "#f7b6d2"},
-        {"value": "Delonix regia", "label": "Delonix regia", "color": "#dbdb8d"},
-        {"value": "Cassia fistula", "label": "Cassia fistula", "color": "#9edae5"},
-        {"value": "Butea monosperma var. lutea", "label": "Butea monosperma var. lutea", "color": "#393b79"},
-        {"value": "Bambusa vulgaris", "label": "Bambusa vulgaris", "color": "#637939"},
-        {"value": "Balanites roxburghii", "label": "Balanites roxburghii", "color": "#8c6d31"},
-        {"value": "Bahunia", "label": "Bahunia", "color": "#843c39"},
-        {"value": "Albizia amara", "label": "Albizia amara", "color": "#7b4173"},
-        {"value": "Albizia Sp", "label": "Albizia Sp", "color": "#3182bd"},
-        {"value": "Ailanthus excelsa", "label": "Ailanthus excelsa", "color": "#e6550d"},
-        {"value": "Unidentified", "label": "Unidentified", "color": "#bab0ac"}
+        {"value": "Acacia nilotica", "aliases": ["Vachellia nilotica"], "label": "Vachellia nilotica", "gujaratiName": "બાવળ", "count": 73331, "color": "#76b7b2"},
+        {"value": "Ailanthus excelsa", "label": "Ailanthus excelsa", "gujaratiName": "અરડૂસો", "count": 6817, "color": "#e6550d"},
+        {"value": "Albizia amara", "aliases": ["Albizia Amara"], "label": "Albizia amara", "gujaratiName": "સિરિસ", "count": 902, "color": "#7b4173"},
+        {"value": "Anogeissus latifolia", "label": "Anogeissus latifolia", "gujaratiName": "ધાવડો", "count": 50633, "color": "#edc948"},
+        {"value": "Azadirachta indica", "label": "Azadirachta indica", "gujaratiName": "લીમડો", "count": 24920, "color": "#b07aa1"},
+        {"value": "Bahunia", "label": "Bauhinia sp.", "gujaratiName": "કાંચનાર/અસુંદરો", "count": 357, "color": "#843c39"},
+        {"value": "Balanites roxburghii", "label": "Balanites roxburghii", "gujaratiName": "ઇંગોરિયો", "count": 8438, "color": "#8c6d31"},
+        {"value": "Bambusa vulgaris", "label": "Bambusa vulgaris", "gujaratiName": "વાંસ", "count": 2454, "color": "#637939"},
+        {"value": "Boswellia serrata", "label": "Boswellia serrata", "gujaratiName": "સલાઈ ગૂગળ", "count": 12327, "color": "#9c755f"},
+        {"value": "Butea monosperma", "label": "Butea monosperma", "gujaratiName": "ખાખરો / કેસૂડો", "count": 206503, "color": "#f28e2b"},
+        {"value": "Dichrostachys cinerea", "label": "Dichrostachys cinerea", "gujaratiName": "મોરઢુંધિયું", "count": 142705, "color": "#e15759"},
+        {"value": "Diospyros melanoxylon", "aliases": ["Diospyros melanoxylon Roxb."], "label": "Diospyros melanoxylon", "gujaratiName": "ટીમરુ", "count": 826, "color": "#f7b6d2"},
+        {"value": "Euphorbia", "label": "Euphorbia sp.", "gujaratiName": "થોર", "count": 96, "color": "#c5b0d5"},
+        {"value": "Ficus benghalensis", "aliases": ["Ficus bengalensis"], "label": "Ficus benghalensis", "gujaratiName": "વડ", "count": 1974, "color": "#98df8a"},
+        {"value": "Ficus benjamina L.", "label": "Ficus benjamina", "gujaratiName": "વડ", "count": 65670, "color": "#59a14f"},
+        {"value": "Ficus religiosa", "label": "Ficus religiosa", "gujaratiName": "પીપળો", "count": 6, "color": "#ffbb78"},
+        {"value": "Fugeea Sp", "label": "Flueggea sp.", "gujaratiName": "શીવણી", "count": 1564, "color": "#aec7e8"},
+        {"value": "Lannea coromandelica (Houtt.) Merr.", "label": "Lannea coromandelica", "gujaratiName": "મોદડ", "count": 1584, "color": "#bcbd22"},
+        {"value": "Leucaena leucocephala", "label": "Leucaena leucocephala", "gujaratiName": "સુબાવળ", "count": 4153, "color": "#7f7f7f"},
+        {"value": "Mangifera indica", "label": "Mangifera indica", "gujaratiName": "આંબો", "count": 8968, "color": "#17becf"},
+        {"value": "Neltuma juliflora", "aliases": ["Prosopis juliflora"], "label": "Neltuma juliflora", "gujaratiName": "જંગલી બાવળ", "count": 25416, "color": "#8c564b"},
+        {"value": "Senegalia senegal", "label": "Senegalia senegal", "gujaratiName": "ઘોરાળ બાવળ", "count": 179313, "color": "#4e79a7"},
+        {"value": "Senna cericulata", "label": "Senna auriculata", "gujaratiName": "આવળ", "count": 4014, "color": "#2ca02c"},
+        {"value": "Unidentified", "label": "Unidentified", "gujaratiName": "અજ્ઞાત", "count": 23, "color": "#bab0ac"}
     ]'::jsonb
 WHERE key = 'treeStatistics';
 
@@ -741,16 +729,18 @@ UPDATE static_overlays SET color_field = 'lithologic',
 WHERE key = 'geology';
 
 -- Plantation Suitability Zones: sample-point layer (one point per survey
--- grid cell), classed by the numeric `Pkantation` zone code rather than a
--- text field like the other Hydrogeology layers above.
-INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
-    ('plantationSuitabilityZones', 'Plantation Suitability Zones', grp('hydrogeology'), 'vector', 'point', '#3b862c', 'Pkantation', '[
-        {"value": 1, "label": "Water/Rocks/Builtup", "color": "#ff0000"},
-        {"value": 2, "label": "Herbs/Shrubs/Grass", "color": "#ffff00"},
-        {"value": 3, "label": "Trees/Dense Vegetation", "color": "#3b862c"},
-        {"value": 4, "label": "Plantation", "color": "#875400"}
+-- grid cell), classed by the `P_Zone` class name the updated delivery added
+-- (one-to-one with the numeric `Pkantation` code it replaces here). Drawn at
+-- a larger point_radius than the default: 199 points over the whole study
+-- area otherwise read as specks.
+INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, color_field, categories, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, point_radius) VALUES
+    ('plantationSuitabilityZones', 'Plantation Suitability Zones', grp('hydrogeology'), 'vector', 'point', '#3b862c', 'P_Zone', '[
+        {"value": "Water/Rocks/Builtup", "label": "Water/Rocks/Builtup", "color": "#ff0000"},
+        {"value": "Herbs/Shrubs/Grass", "label": "Herbs/Shrubs/Grass", "color": "#ffff00"},
+        {"value": "Trees/Dense Vegetation", "label": "Trees/Dense Vegetation", "color": "#3b862c"},
+        {"value": "Plantation", "label": "Plantation", "color": "#875400"}
     ]'::jsonb, 'vector-data/plantation-suitabilty-zones.geojson', 5, 71.731250, 21.452646, 71.820588, 21.509122,
-        '{"Zone","Pkantation:Zone Code","ZoneName:Zone Name"}');
+        '{"Zone","P_Zone:Plantation Zone","ZoneName:Zone Name"}', 5);
 
 -- Tree Density: drone-derived, tight-cropped to the flight footprint, so it
 -- takes the Orthomosaic's bounds. Its pixels are square in metres (aspect
@@ -1181,7 +1171,7 @@ UPDATE static_overlays SET kind = 'outline', dashed = true WHERE key = 'grazingL
 -- Field Plots: drawn with the Growing Stock raster's own switch, as a solid line;
 -- the popup shows the grid number, plot number (Name) and the grid's growing stock.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields, solid, line_width) VALUES
-    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Grid No.:Grid Number","Name:Plot Number","Growing St:Grid Growing Stock"}', true, 2)
+    ('fieldPlots', 'Field Plots', grp('growing-stock'), 'vector', 'line', '#FFFFFF', 'vector-data/FieldPlots.geojson', 2, 71.734647, 21.456098, 71.820704, 21.510483, '{"Grid No.:Grid Number","Name:Plot Number","Growing St:Grid Growing Stock","ZName:Zone"}', true, 2)
 ON CONFLICT (key) DO NOTHING;
 
 -- Cadastral: a solid outline whose popup shows Village and Plot Number (Plot_No).
@@ -1418,6 +1408,11 @@ UPDATE static_overlays SET
     min_lon = 71.728527, min_lat = 21.451974, max_lon = 71.821770, max_lat = 21.510731
 WHERE key = 'treesOutsideForests';
 
+
+-- TOF (Trees Outside Forests): every class drawn with a solid fill and a
+-- solid outline (client's symbology table), not the default translucent
+-- fill with an animated edge.
+UPDATE static_overlays SET fill_opacity = 1, solid = true WHERE key = 'treesOutsideForests';
 -- TOF area statistics (delivered table, 192.56 ha in all). Its fourth row was
 -- labelled "Linear TOF" a second time; it is Built-up TOF (confirmed).
 DELETE FROM overlay_class_stats WHERE overlay_id = (SELECT id FROM static_overlays WHERE key = 'treesOutsideForests');

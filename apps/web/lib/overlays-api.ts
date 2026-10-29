@@ -39,6 +39,8 @@ export interface OverlayMeta {
   dashed?: boolean;
   /** Stroke width in pixels, overriding the default for the kind. */
   line_width?: number;
+  /** A 'point' row's circle radius in pixels, overriding the default. */
+  point_radius?: number;
   /** A 'fill' row's interior opacity, 0-1. Absent draws the default light wash. */
   fill_opacity?: number;
   /** A 'fill' row's edge colour, when it differs from the fill. */

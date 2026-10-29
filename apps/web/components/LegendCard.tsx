@@ -27,6 +27,19 @@ function isLong(legend: { classes: unknown[] }): boolean {
   return legend.classes.length > TWO_COLUMN_THRESHOLD;
 }
 
+// A species class (Trees) reads "Scientific Name (Gujarati Name) - Count".
+function categoryLabel(cls: LegendClass): string {
+  const local = cls.gujaratiName ? ` (${cls.gujaratiName})` : "";
+  const count = typeof cls.count === "number" ? ` - ${cls.count}` : "";
+  return `${cls.label}${local}${count}`;
+}
+
+// The overlay's total when its classes are counted (Trees), else null.
+function categoryTotal(categories: LegendClass[]): number | null {
+  if (!categories.some((c) => typeof c.count === "number")) return null;
+  return categories.reduce((sum, c) => sum + (c.count ?? 0), 0);
+}
+
 export interface LegendRasterLayer {
   id: string;
   name: string;
@@ -169,21 +182,27 @@ export function LegendContent({
         </div>
       )}
 
-      {categoricalOverlays.map((overlay) => (
-        <div key={overlay.key} className="flex flex-col gap-1.5">
-          <span className="text-[13px] leading-tight font-semibold">{overlay.label}</span>
-          <div className="flex flex-col gap-1">
-            {overlay.categories!.map((cls) => (
-              <div key={cls.value} className="flex items-center gap-1.5 text-xs">
-                <LayerSwatch color={cls.color} geometryKind={overlay.geometryKind} />
-                <span className="truncate" title={cls.label}>
-                  {cls.label}
-                </span>
-              </div>
-            ))}
+      {categoricalOverlays.map((overlay) => {
+        const total = categoryTotal(overlay.categories!);
+        return (
+          <div key={overlay.key} className="flex flex-col gap-1.5">
+            <span className="text-[13px] leading-tight font-semibold">{overlay.label}</span>
+            <div className="flex flex-col gap-1">
+              {overlay.categories!.map((cls) => (
+                <div key={cls.value} className="flex items-center gap-1.5 text-xs">
+                  <LayerSwatch color={cls.color} geometryKind={overlay.geometryKind} />
+                  <span className="truncate" title={categoryLabel(cls)}>
+                    {categoryLabel(cls)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {total !== null && (
+              <span className="text-xs font-semibold">Total - {total}</span>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {rasterLayers.map((raster) => {
         const legend = legendFor(raster.id, raster.imageKey);
