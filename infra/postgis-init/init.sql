@@ -384,12 +384,15 @@ UPDATE layer_groups SET multi_raster = true WHERE key = 'slope';
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
 -- layer, which would swallow the vector rows next to it.
--- Tree Statistics is a nested group (see lib/sections.ts, mode "options");
--- the grid cells it used to pair with now live under Admin Boundaries.
+-- Tree Statistics used to be its own nested group this same way, wrapping
+-- one vector row (Trees) -- but a one-item "options" group still renders as
+-- a parent row plus one child checkbox, which read as a pointless extra
+-- layer of nesting. Client asked for it as a normal point layer instead, so
+-- the Trees row below sits directly on Drone Analysis now, the same as TOF;
+-- the grid cells it used to pair with live under Admin Boundaries.
 INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
     ('tree-density',    'Tree Density (Drone)', grp('drone-analysis'), 1),
-    ('growing-stock',   'Growing Stock',   grp('drone-analysis'), 2),
-    ('tree-statistics', 'Tree Statistics', grp('drone-analysis'), 3);
+    ('growing-stock',   'Growing Stock',   grp('drone-analysis'), 2);
 
 -- ---------------------------------------------------------------------------
 -- Seed: static overlays
@@ -434,7 +437,7 @@ WHERE key = 'watershed';
 -- GujaratiName counted), and the legend sums the counts for the total.
 -- Scientific names (`label`) follow the client's species table.
 INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat, popup_fields) VALUES
-    ('treeStatistics', 'Trees', grp('tree-statistics'), 'vector', 'point',   '#bab0ac', 'vector-data/tree-statistics.pmtiles', 2, 71.728574, 21.451984, 71.821788, 21.511942,
+    ('treeStatistics', 'Trees', grp('drone-analysis'), 'vector', 'point',   '#bab0ac', 'vector-data/tree-statistics.pmtiles', 3, 71.728574, 21.451984, 71.821788, 21.511942,
         '{Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum}');
 
 -- Tree Grid: the 189-cell grid the tree survey's totals are summarised over.
