@@ -37,6 +37,17 @@ its own delivered extent):
    the one seeded. Only their bounds change; a 4326 grid over ~0.06 deg is
    drawn within a pixel of linear in Web Mercator, so the PNGs stay as they are.
 
+4. Forest Cover / Forest Type FSI 2023 are also EPSG:4326 grids clipped to
+   the study area, but at ~24 m cells: even at the best fit (IoU ~0.954)
+   cells straddling the outline poke past it, a visible stair-step beyond the
+   boundary. So after fitting, pixels outside the outline are made
+   transparent ("4326-clip"); the delivered PNGs stay in originals/fsi.
+   The outline only constrains their edges, though, and the stair-stepped
+   footprint pulls that fit tens of metres off inside. FSI also came as
+   georeferenced vector polygons (VECTOR_REFS), so the box is refined by
+   fitting the raster's forest pixels (coloured, not the white "Other") to
+   them; their class edges then coincide across the whole layer.
+
 3. Fragmentation came with its extent in EPSG:4326 per year
    (FRAGMENTATION_EXTENTS), so it is placed there as delivered rather than
    fitted: its forest patches don't match any outline or Green Cover class
@@ -89,7 +100,15 @@ PRODUCTS = [
     ("fragmentation/*.png", "extent", "nearest"),
     ("growingstock.png", "4326", None),
     ("habitat.png", "4326", None),
+    ("fsi/*.png", "4326-clip", None),
 ]
+
+# Rasters that also came as vector polygons of the same classes: fitted to
+# those (see fit_to_polygons) after the outline fit gives a starting box.
+VECTOR_REFS = {
+    "fsi/forest-cover-fsi.png": "forest-cover-FSI.geojson",
+    "fsi/forest-type-fsi.png": "forest-type-FSI.geojson",
+}
 
 # The delivered Toposheet's sheet extent: W, S, E, N in EPSG:4326.
 TOPOSHEET_EXTENT = (71.499945, 21.249988, 72.000122, 21.750008)
@@ -235,6 +254,53 @@ def fit(opaque, ref, start, step):
     return list(res.x), -res.fun
 
 
+def fit_to_polygons(src, geojson_path, start):
+    """Best lon/lat box placing src's forest pixels on the GeoJSON polygons.
+
+    Forest pixels are the opaque, non-white ones (white is the "Other"
+    class). Scored by IoU against the polygons rasterised on a ~2 m grid.
+    """
+    with open(geojson_path, encoding="utf-8") as f:
+        gj = json.load(f)
+    pad = 0.01
+    w0, s0, e0, n0 = start[0] - pad, start[1] - pad, start[2] + pad, start[3] + pad
+    rw = int((e0 - w0) * 111_320 * np.cos(np.radians((s0 + n0) / 2)) / 2)
+    rh = int((n0 - s0) * 110_700 / 2)
+    ref = Image.new("1", (rw, rh), 0)
+    d = ImageDraw.Draw(ref)
+    to_px = lambda x, y: ((x - w0) / (e0 - w0) * rw, (n0 - y) / (n0 - s0) * rh)
+    for feat in gj["features"]:
+        g = feat["geometry"]
+        polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
+        for poly in polys:
+            for i, ring in enumerate(poly):
+                d.polygon([to_px(x, y) for x, y, *_ in ring], fill=1 if i == 0 else 0)
+    ref = np.asarray(ref)
+
+    white = (src[:, :, 0] > 240) & (src[:, :, 1] > 240) & (src[:, :, 2] > 240)
+    forest = (src[:, :, 3] >= MIN_OPAQUE_ALPHA) & ~white
+    h, w = forest.shape
+    rr, cc = np.mgrid[1:h:2, 1:w:2]
+    fv = forest[rr, cc].ravel()
+    u, v = ((cc + 0.5) / w).ravel(), ((rr + 0.5) / h).ravel()
+
+    def iou(b):
+        lon = b[0] + u * (b[2] - b[0])
+        lat = b[3] - v * (b[3] - b[1])
+        c = ((lon - w0) / (e0 - w0) * rw).astype(int)
+        r = ((n0 - lat) / (n0 - s0) * rh).astype(int)
+        ok = (c >= 0) & (c < rw) & (r >= 0) & (r < rh)
+        pv = np.zeros_like(fv)
+        pv[ok] = ref[r[ok], c[ok]]
+        return (fv & pv).sum() / max((fv | pv).sum(), 1)
+
+    start = np.array(start, float)
+    simplex = [start] + [start + np.eye(4)[i] * 0.0004 for i in range(4)]
+    res = optimize.minimize(lambda b: -iou(b), start, method="Nelder-Mead",
+                            options=dict(initial_simplex=simplex, xatol=1e-7, fatol=1e-6, maxiter=2000))
+    return list(res.x), -res.fun
+
+
 def fit_corners(opaque, extent):
     """UTM box of a canvas whose opaque quad is `extent`'s lat/lng corners.
 
@@ -340,6 +406,24 @@ def main():
                     img.save(os.path.join(RASTER_DIR, rel), optimize=True)
                 continue
 
+            if grid == "4326-clip":
+                box, score = fit(opaque, deg_ref, deg_start, 0.0004)
+                if rel in VECTOR_REFS:
+                    box, vscore = fit_to_polygons(
+                        src, os.path.join(REPO, "apps", "vector-data", VECTOR_REFS[rel]), box)
+                    print(f"{rel:36s} fitted to {VECTOR_REFS[rel]}: IoU {vscore:.4f}")
+                bounds[rel] = tuple(box)
+                inside = sample(deg_ref, box, opaque.shape)
+                out = src.copy()
+                out[~inside, 3] = 0
+                spill = (opaque & ~inside).sum() / max(opaque.sum(), 1)
+                print(f"{rel:36s} 4326  IoU {score:.4f}, clipped {spill:.1%} of pixels to the outline")
+                if args.write:
+                    dst = os.path.join(RASTER_DIR, rel)
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    Image.fromarray(out, "RGBA").save(dst, optimize=True)
+                continue
+
             if grid == "4326":
                 box, score = fit(opaque, deg_ref, deg_start, 0.0004)
                 bounds[rel] = tuple(box)
@@ -369,6 +453,13 @@ def main():
             pat = re.compile(r"('raster-data/" + re.escape(rel) + r"', \d+, )"
                              r"[-\d.]+, [-\d.]+, [-\d.]+, [-\d.]+\)")
             sql, n = pat.subn(lambda m: m.group(1) + ", ".join(f"{v:.7f}" for v in b) + ")", sql)
+            if n == 0:
+                # A row moved later by an UPDATE (the FSI rasters) carries its
+                # bounds as named columns rather than in an INSERT's VALUES.
+                upd = re.compile(r"(file_path = 'raster-data/" + re.escape(rel) + r"',\s*)"
+                                 r"min_lon = [-\d.]+, min_lat = [-\d.]+, max_lon = [-\d.]+, max_lat = [-\d.]+")
+                sql, n = upd.subn(lambda m: m.group(1) + "min_lon = {:.7f}, min_lat = {:.7f}, "
+                                  "max_lon = {:.7f}, max_lat = {:.7f}".format(*b), sql)
             # A product now served as tiles (the Toposheet) has its row on the
             # .pmtiles file, with bounds set by prepare-raster-tiles.sh -- e.g.
             # a CLIP window -- so the PNG's full extent must not overwrite them.
