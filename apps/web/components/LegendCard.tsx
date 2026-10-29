@@ -186,7 +186,10 @@ export function LegendContent({
         const total = categoryTotal(overlay.categories!);
         return (
           <div key={overlay.key} className="flex flex-col gap-1.5">
-            <span className="text-[13px] leading-tight font-semibold">{overlay.label}</span>
+            <span className="text-[13px] leading-tight font-semibold">
+              {overlay.label}
+              {total !== null && ` (${total.toLocaleString()})`}
+            </span>
             <div className="flex flex-col gap-1">
               {overlay.categories!.map((cls) => (
                 <div key={cls.value} className="flex items-center gap-1.5 text-xs">
