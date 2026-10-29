@@ -1231,28 +1231,31 @@ UPDATE static_overlays SET fill_opacity = 1 WHERE group_id = grp('proposed-conse
 
 -- Existing SMC (Check Dam, Causeway, Matipala): the client's symbology, a solid
 -- fill in each structure's colour inside a solid black outline. The files were
--- re-delivered with Zone and areaHa; tools/prepare-smc.py adds each feature's
--- grid cell (GridNum, from Zones.geojson) and Causeway's area, which it lacks.
--- Popups gain Grid Number, Zone Number and Area (Ha).
+-- re-delivered with Zone, areaHa and areaM; tools/prepare-smc.py adds each
+-- feature's grid cell (GridNum, from Zones.geojson) and Causeway's area,
+-- which it lacked (both areaHa and areaM).
+-- Popups gain Grid Number, Zone Number and Area (SqM) -- not Area (Ha): the
+-- client asked for every SMC layer's metadata to show SqM instead of Ha.
 UPDATE static_overlays SET color = '#08fbc0', outline_color = '#000000' WHERE key = 'checkDam';
 UPDATE static_overlays SET color = '#f9cf08', outline_color = '#000000' WHERE key = 'causeway';
 UPDATE static_overlays SET color = '#f2319c', outline_color = '#000000' WHERE key = 'matiPala';
-UPDATE static_overlays SET popup_fields = '{Feature,"GridNum:Grid Number","Zone:Zone Number","areaHa:Area (Ha)"}'
+UPDATE static_overlays SET popup_fields = '{Feature,"GridNum:Grid Number","Zone:Zone Number","areaM:Area (SqM)"}'
     WHERE key IN ('checkDam', 'causeway', 'matiPala');
-UPDATE static_overlays SET popup_fields = '{Feature,"VolumeVolu:Volume(m³)","areaM:Area (SqM)","GridNum:Grid Number","Zone:Zone Number","areaHa:Area (Ha)"}'
+UPDATE static_overlays SET popup_fields = '{Feature,"VolumeVolu:Volume(m³)","areaM:Area (SqM)","GridNum:Grid Number","Zone:Zone Number"}'
     WHERE key = 'vantalawadi';
 
 -- Proposed SMC (Check Dam, Matipala): the client's symbology, a solid fill in
 -- each structure's colour inside a solid black outline (Vantalavadi keeps its
 -- area classes). tools/prepare-smc.py adds each feature's grid cell (GridNum).
--- Popups gain Grid Number and Area (Ha); Zone_2 is the zone number.
+-- Popups gain Grid Number and Area (SqM), not Area (Ha) -- same client ask as
+-- Existing SMC above; Zone_2 is the zone number.
 UPDATE static_overlays SET color = '#05f8f8', outline_color = '#000000' WHERE key = 'proposedCheckdam';
 UPDATE static_overlays SET color = '#ff00ff', outline_color = '#000000' WHERE key = 'proposedMatipala';
-UPDATE static_overlays SET popup_fields = '{"Name:Feature","GridNum:Grid Number","Zone_2:Zone Number","areaHa:Area (Ha)"}'
+UPDATE static_overlays SET popup_fields = '{"Name:Feature","GridNum:Grid Number","Zone_2:Zone Number","areaM:Area (SqM)"}'
     WHERE key = 'proposedMatipala';
-UPDATE static_overlays SET popup_fields = '{"Name:Feature","Volume:Volume(m³)","GridNum:Grid Number","Zone_2:Zone Number","areaHa:Area (Ha)"}'
+UPDATE static_overlays SET popup_fields = '{"Name:Feature","Volume:Volume(m³)","GridNum:Grid Number","Zone_2:Zone Number","areaM:Area (SqM)"}'
     WHERE key = 'proposedCheckdam';
-UPDATE static_overlays SET popup_fields = '{"Name:Feature","Volume:Volume(m³)","areaM:Area (SqM)","GridNum:Grid Number","Zone_2:Zone Number","areaHa:Area (Ha)"}'
+UPDATE static_overlays SET popup_fields = '{"Name:Feature","Volume:Volume(m³)","areaM:Area (SqM)","GridNum:Grid Number","Zone_2:Zone Number"}'
     WHERE key = 'proposedVantalavadi';
 
 -- ---------------------------------------------------------------------------

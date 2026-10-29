@@ -11,9 +11,10 @@ lacks:
     189 cells, each with its GridNum) that the feature's centre falls in.
     None of the delivered files carry it. A feature outside every cell
     gets no GridNum, and the popup leaves the field out.
-  * areaHa  -- only where the delivery has none (Causeway): the feature's
-    area on the sphere, in hectares, to the delivery's own 3 decimals. A
-    delivered areaHa is kept as delivered.
+  * areaHa, areaM -- only where the delivery has none (Causeway lacks
+    both): the feature's area on the sphere, in hectares and square
+    metres, to the delivery's own 3 decimals. A delivered value is kept
+    as delivered.
 
 Everything else (geometry, zone, name, volume) passes through unchanged.
 Pure Python, no GDAL/shapely: the polygons are small enough that the
@@ -88,13 +89,12 @@ def ring_area_m2(ring: list[list[float]]) -> float:
     return abs(total) * EARTH_RADIUS_M**2 / 2
 
 
-def area_ha(geometry: dict) -> float:
+def area_m2(geometry: dict) -> float:
     if geometry["type"] == "Polygon":
         polys = [geometry["coordinates"]]
     else:
         polys = geometry["coordinates"]
-    m2 = sum(ring_area_m2(p[0]) - sum(ring_area_m2(h) for h in p[1:]) for p in polys)
-    return m2 / 10_000
+    return sum(ring_area_m2(p[0]) - sum(ring_area_m2(h) for h in p[1:]) for p in polys)
 
 
 def main() -> int:
@@ -124,8 +124,12 @@ def main() -> int:
                 unplaced += 1
             else:
                 props["GridNum"] = hit
-            if props.get("areaHa") is None:
-                props["areaHa"] = round(area_ha(feature["geometry"]), 3)
+            if props.get("areaHa") is None or props.get("areaM") is None:
+                m2 = area_m2(feature["geometry"])
+                if props.get("areaHa") is None:
+                    props["areaHa"] = round(m2 / 10_000, 3)
+                if props.get("areaM") is None:
+                    props["areaM"] = round(m2, 3)
 
         (VECTOR / served).write_text(
             json.dumps(data, separators=(",", ":"), ensure_ascii=False), encoding="utf-8"
