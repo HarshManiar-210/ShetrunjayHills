@@ -1334,9 +1334,13 @@ UPDATE static_overlays SET kind = 'fill', fill_opacity = 1, outline_color = '#00
 WHERE key = 'geology';
 
 -- Geomorphology (GSI layer): the client's symbology, a solid fill per landform
--- inside a solid black outline (at the default width; none was given).
+-- inside a solid black outline (at the default width; none was given). dotted
+-- is explicitly cleared here -- 051-line-styles-and-popups.sql set it true
+-- for a since-replaced dotted-boundary treatment, and Map.tsx's `patterned`
+-- check reads dotted regardless of `solid`, so a leftover true kept drawing
+-- this outline dotted even though every other flag here already said solid.
 UPDATE static_overlays SET kind = 'fill', fill_opacity = 1, outline_color = '#000000', solid = true,
-    color = '#d07151', categories = '[
+    dotted = false, color = '#d07151', categories = '[
         {"value": "Moderately Dissected Denudational Hills and Valleys", "label": "Moderately Dissected Denudational Hills and Valleys", "color": "#d07151"},
         {"value": "Moderately Dissected Structural Lower Plateau", "label": "Moderately Dissected Structural Lower Plateau", "color": "#7ad8e7"},
         {"value": "Pediment Pediplain Complex", "label": "Pediment Pediplain Complex", "color": "#fffd45"}
