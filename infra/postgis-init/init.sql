@@ -379,7 +379,7 @@ INSERT INTO layer_groups (key, label, parent_id, sort_order) VALUES
 
 UPDATE layer_groups SET draw_below = true WHERE key = 'toposheet';
 UPDATE layer_groups SET step_noun = 'depth' WHERE key = 'flood-depth';
-UPDATE layer_groups SET multi_raster = true WHERE key IN ('slope', 'aspect');
+UPDATE layer_groups SET multi_raster = true WHERE key = 'slope';
 
 -- Tree Density and Growing Stock are both rasters, so each gets its own group
 -- under Drone Analysis: a group holding placed rasters becomes a single
@@ -651,34 +651,32 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
     ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
     ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053);
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053),
+    -- Aspect went back to one continuous raster (one on/off switch, no
+    -- per-direction toggling) after the per-class split below proved more
+    -- than was wanted — see migration 084. Same footprint the aspectCat
+    -- rows shared; legend-config.ts's `aspect` entry still carries the
+    -- 9-class key, unchanged.
+    ('aspect', 'Aspect', grp('aspect'), 'raster', 'raster-data/Aspect.pmtiles', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052);
 
--- Slope/Aspect: re-delivered as one raster per class instead of one
--- continuous image, so each class can be switched on or off independently
--- while the others stay on screen — a multi_raster group (see layer_groups),
--- not a year-stepped one. All rows in a group share that group's extent
--- (the same footprint the old single Slope/Aspect.pmtiles used), since
--- they're class masks cut from the same grid. Colours match
--- legend-config.ts's slope/aspect classes exactly, so a switched-on row's
--- chip and legend swatch are the same colour as the pixels it draws.
+-- Slope: re-delivered as one raster per class instead of one continuous
+-- image, so each class can be switched on or off independently while the
+-- others stay on screen — a multi_raster group (see layer_groups), not a
+-- year-stepped one. All rows in the group share the group's extent (the
+-- same footprint the old single Slope.pmtiles used), since they're class
+-- masks cut from the same grid. Colours match legend-config.ts's slope
+-- classes exactly, so a switched-on row's chip and legend swatch are the
+-- same colour as the pixels it draws.
 -- Tiled for the same reason as the single-image drone products above: each
 -- source PNG is ~10900x6950px, over the ~8192px GPU texture cap.
+-- Aspect used to be re-delivered the same way (aspectCat1-9 here); migration
+-- 084 moved it back to the single raster above.
 INSERT INTO static_overlays (key, label, group_id, asset_type, color, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('slopeCat1', 'Flat (0° – 8.24°)',           grp('slope'), 'raster', '#2c7bb6', 'raster-data/slope-categories/Slope_Cat1.pmtiles', 1, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
     ('slopeCat2', 'Gentle (8.24° – 15.82°)',      grp('slope'), 'raster', '#abd9e9', 'raster-data/slope-categories/Slope_Cat2.pmtiles', 2, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
     ('slopeCat3', 'Moderate (15.82° – 25.56°)',   grp('slope'), 'raster', '#ffffbf', 'raster-data/slope-categories/Slope_Cat3.pmtiles', 3, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
     ('slopeCat4', 'Steep (25.56° – 60.25°)',      grp('slope'), 'raster', '#fdae61', 'raster-data/slope-categories/Slope_Cat4.pmtiles', 4, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
-    ('slopeCat5', 'Very Steep (60.25° – 88.13°)', grp('slope'), 'raster', '#d7191c', 'raster-data/slope-categories/Slope_Cat5.pmtiles', 5, 71.7271993, 21.4507049, 71.8234530, 21.5119052),
-
-    ('aspectCat1', 'North (0° – 22.5°)',       grp('aspect'), 'raster', '#30123b', 'raster-data/aspect-categories/Aspect_Cat1.pmtiles', 1, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat2', 'North East (22.5° – 67.5°)',  grp('aspect'), 'raster', '#466be3', 'raster-data/aspect-categories/Aspect_Cat2.pmtiles', 2, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat3', 'East (67.5° – 112.5°)',       grp('aspect'), 'raster', '#28bceb', 'raster-data/aspect-categories/Aspect_Cat3.pmtiles', 3, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat4', 'South East (112.5° – 157.5°)',grp('aspect'), 'raster', '#32f298', 'raster-data/aspect-categories/Aspect_Cat4.pmtiles', 4, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat5', 'South (157.5° – 202.5°)',     grp('aspect'), 'raster', '#a4fc3c', 'raster-data/aspect-categories/Aspect_Cat5.pmtiles', 5, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat6', 'South West (202.5° – 247.5°)',grp('aspect'), 'raster', '#eecf3a', 'raster-data/aspect-categories/Aspect_Cat6.pmtiles', 6, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat7', 'West (247.5° – 292.5°)',      grp('aspect'), 'raster', '#fb7e21', 'raster-data/aspect-categories/Aspect_Cat7.pmtiles', 7, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat8', 'North West (292.5° – 337.5°)',grp('aspect'), 'raster', '#d02f05', 'raster-data/aspect-categories/Aspect_Cat8.pmtiles', 8, 71.7271993, 21.4507049, 71.8234229, 21.5119052),
-    ('aspectCat9', 'North (337.5° – 360°)',       grp('aspect'), 'raster', '#30123b', 'raster-data/aspect-categories/Aspect_Cat9.pmtiles', 9, 71.7271993, 21.4507049, 71.8234229, 21.5119052);
+    ('slopeCat5', 'Very Steep (60.25° – 88.13°)', grp('slope'), 'raster', '#d7191c', 'raster-data/slope-categories/Slope_Cat5.pmtiles', 5, 71.7271993, 21.4507049, 71.8234530, 21.5119052);
 
 -- FCC (False Color Composite): same per-year-raster shape as Forest Cover.
 -- Photographic (RGB band composition, not discrete classes) like Orthomosaic
