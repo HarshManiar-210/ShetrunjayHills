@@ -1413,13 +1413,26 @@ FROM (VALUES
 JOIN static_overlays o ON o.key = 'forestTypeFSI';
 
 -- TOF (Trees Outside Forests), re-delivered: 408,604 tree polygons in
--- TOF_with_SpeciesGuj.parquet (EPSG:4326 GeoParquet), now carrying each tree's
--- predicted species and its Gujarati name. Rebuilt with:
---   python (pyarrow + shapely) -> tof.geojson, one feature per line, keeping
---     TOF_Class, Max_Height, Predicted_SN, GujaratiName at 7 decimals
---   tools/prepare-vector-tiles.sh treesOutsideForests tof.geojson
--- The parquet's own `area` column is empty (0 everywhere), so it is dropped;
--- the class areas below are the client's delivered statistics.
+-- TOF_with_SpeciesGuj.parquet (EPSG:4326 GeoParquet), now carrying each
+-- tree's predicted species (English/scientific, Predicted_SN) and its
+-- Gujarati name (GujaratiName) -- both shown in the popup, Species then
+-- Gujarati Name. This popup_fields row was already in place from an earlier
+-- PR, but apps/vector-data/tree-outside-forest.pmtiles itself hadn't
+-- actually been rebuilt from the new parquet yet (it still only carried
+-- TOF_Class and Max_Height) until this delivery. Rebuilt with:
+--   ogr2ogr -f GeoJSON tof.geojson TOF_with_SpeciesGuj.parquet \
+--     -t_srs EPSG:4326 -lco COORDINATE_PRECISION=7 \
+--     -select TOF_Class,Max_Height,Predicted_SN,GujaratiName
+--   ogr2ogr -f PMTiles tree-outside-forest.pmtiles tof.geojson \
+--     -nln treesOutsideForests -dsco MINZOOM=9 -dsco MAXZOOM=16 \
+--     -dsco NAME=treesOutsideForests
+-- (skips tools/prepare-vector-tiles.sh's shuffle step -- at 408,604 polygons
+-- the intermediate GeoJSON is ~3.65 GB, too large for that script's
+-- read-the-whole-file-into-memory approach; solid polygon coverage also
+-- needs the even-at-low-zoom thinning the shuffle buys points far less than
+-- Trees did). The parquet's own `area` column is empty (0 everywhere), so
+-- it is dropped; the class areas below are the client's delivered
+-- statistics.
 UPDATE static_overlays SET
     popup_fields = '{"TOF_Class:TOF Class","Max_Height:Max Height","Predicted_SN:Species","GujaratiName:Gujarati Name"}',
     min_lon = 71.728527, min_lat = 21.451974, max_lon = 71.821770, max_lat = 21.510731
