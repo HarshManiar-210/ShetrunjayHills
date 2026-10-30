@@ -427,6 +427,7 @@ WHERE key = 'watershed';
 --   ogr2ogr -f GeoJSON tree-statistics.geojson tree-statistics.parquet \
 --     -t_srs EPSG:4326 -lco COORDINATE_PRECISION=7 \
 --     -select Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum
+--   (join GujaratiName per feature from Predicted_SN, see below)
 --   tools/prepare-vector-tiles.sh treeStatistics tree-statistics.geojson
 -- Tiled (a whole-file GeoJSON of that many points kills the tab); the API
 -- stamps that from the .pmtiles extension. Trees are coloured by species, one
@@ -1123,9 +1124,13 @@ UPDATE static_overlays SET solid = true, popup_fields = '{District,Taluka,Villag
 -- Roads: the popup shows Category and the road's name (NAME, captioned "Road Name").
 UPDATE static_overlays SET popup_fields = '{Category,"NAME:Road Name"}' WHERE key = 'roads';
 
--- Tree Statistics (trees): popup shows Tree Id, Species, Max Height, Carbon and
--- Grid Number (True_Heigh is dropped).
-UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Species","Max_Height:Max Height","Carbon_kg:Carbon","GridNum:Grid Number"}' WHERE key = 'treeStatistics';
+-- Tree Statistics (trees): popup shows Tree Id, Species, Gujarati Name, Max
+-- Height, Carbon and Grid Number (True_Heigh is dropped). GujaratiName is a
+-- per-tree property added to the tiles by joining Predicted_SN against the
+-- same species table the legend uses (see the gujaratiName values in this
+-- overlay's `categories`, set below); trees whose species isn't in that
+-- table are left without one rather than guessed.
+UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Species","GujaratiName:Gujarati Name","Max_Height:Max Height","Carbon_kg:Carbon","GridNum:Grid Number"}' WHERE key = 'treeStatistics';
 
 -- Rivers: the popup shows only the Categories column, captioned "Type".
 UPDATE static_overlays SET popup_fields = '{"Categories:Type"}' WHERE key = 'rivers';
