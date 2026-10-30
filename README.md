@@ -23,12 +23,12 @@ docker compose up --build
 This starts `postgis` (host port `5433`), `api` (`http://localhost:8080`), and `web`
 (`http://localhost:3000`). Once all three are up, open `http://localhost:3000` and log in.
 
-**Login**: the only account is `admin@shantrunjayforest.org` (role `admin`). Neither its
+**Login**: the only account is `admin@shatrunjayforest.org` (role `admin`). Neither its
 password nor a hash of it is kept in the repo: the seed gives it an unusable placeholder, so set
 the password once after the database is created:
 
 ```
-tools/set-user-password.sh admin@shantrunjayforest.org
+tools/set-user-password.sh admin@shatrunjayforest.org
 ```
  The roles (`regular_user`, `admin`, `support_team`, `public`) are
 still seeded, so to check behaviour as another role locally, insert a temporary user for it.
