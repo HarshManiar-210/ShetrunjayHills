@@ -247,7 +247,7 @@ INSERT INTO roles (name) VALUES
 -- ---------------------------------------------------------------------------
 
 INSERT INTO users (username, password_hash, role_id) VALUES
-    ('admin@shantrunjayforest.org', '!', (SELECT id FROM roles WHERE name = 'admin'));
+    ('admin@shatrunjayforest.org', '!', (SELECT id FROM roles WHERE name = 'admin'));
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers
