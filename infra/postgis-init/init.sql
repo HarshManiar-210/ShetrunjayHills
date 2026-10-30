@@ -648,14 +648,18 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- DSM and DTM carried the same ~98m east/28m north displacement (same flight,
 -- same misregistration) and got the identical correction, same method: each
 -- archive's own z19 tiles extracted, geotransform re-stamped by the same
--- delta, z10-19 re-tiled. CHM still carries DSM's *old* bounds below and is
--- now off by that amount relative to DSM/basemap — not corrected here since
--- only DSM/DTM were asked for; flag if CHM should follow too.
+-- delta, z10-19 re-tiled. CHM has since followed too: it was re-delivered at
+-- 23537x15234 px (no white padding, its own alpha already cut to the
+-- footprint — content fills the canvas on all four edges, no crop needed),
+-- too wide for a single MapLibre image source, so it is now tiled the same
+-- way as its siblings (tools/prepare-raster-tiles.sh) and carries DSM's
+-- current bounds outright, which its content's pixel aspect (1.5450) matches
+-- far closer than the old CHM bounds did (1.5546 vs 1.6054).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
     ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
     ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053),
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
     -- Aspect went back to one continuous raster (one on/off switch, no
     -- per-direction toggling) after the per-class split below proved more
     -- than was wanted — see migration 084. Same footprint the aspectCat
