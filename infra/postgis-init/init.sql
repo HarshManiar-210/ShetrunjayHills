@@ -247,7 +247,7 @@ INSERT INTO roles (name) VALUES
 -- ---------------------------------------------------------------------------
 
 INSERT INTO users (username, password_hash, role_id) VALUES
-    ('admin@shantrunjayforest.org', '!', (SELECT id FROM roles WHERE name = 'admin'));
+    ('admin@shatrunjayforest.org', '!', (SELECT id FROM roles WHERE name = 'admin'));
 
 -- ---------------------------------------------------------------------------
 -- Seed: layers
@@ -427,6 +427,7 @@ WHERE key = 'watershed';
 --   ogr2ogr -f GeoJSON tree-statistics.geojson tree-statistics.parquet \
 --     -t_srs EPSG:4326 -lco COORDINATE_PRECISION=7 \
 --     -select Tree_ID,Predicted_SN,Max_Height,True_Heigh,Carbon_kg,GridNum
+--   (join GujaratiName per feature from Predicted_SN, see below)
 --   tools/prepare-vector-tiles.sh treeStatistics tree-statistics.geojson
 -- Tiled (a whole-file GeoJSON of that many points kills the tab); the API
 -- stamps that from the .pmtiles extension. Trees are coloured by species, one
@@ -647,14 +648,18 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- DSM and DTM carried the same ~98m east/28m north displacement (same flight,
 -- same misregistration) and got the identical correction, same method: each
 -- archive's own z19 tiles extracted, geotransform re-stamped by the same
--- delta, z10-19 re-tiled. CHM still carries DSM's *old* bounds below and is
--- now off by that amount relative to DSM/basemap — not corrected here since
--- only DSM/DTM were asked for; flag if CHM should follow too.
+-- delta, z10-19 re-tiled. CHM has since followed too: it was re-delivered at
+-- 23537x15234 px (no white padding, its own alpha already cut to the
+-- footprint — content fills the canvas on all four edges, no crop needed),
+-- too wide for a single MapLibre image source, so it is now tiled the same
+-- way as its siblings (tools/prepare-raster-tiles.sh) and carries DSM's
+-- current bounds outright, which its content's pixel aspect (1.5450) matches
+-- far closer than the old CHM bounds did (1.5546 vs 1.6054).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
     ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
     ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
-    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.png',       1, 71.727066, 21.452069, 71.823365, 21.512053),
+    ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
     -- Aspect went back to one continuous raster (one on/off switch, no
     -- per-direction toggling) after the per-class split below proved more
     -- than was wanted — see migration 084. Same footprint the aspectCat
@@ -1123,9 +1128,13 @@ UPDATE static_overlays SET solid = true, popup_fields = '{District,Taluka,Villag
 -- Roads: the popup shows Category and the road's name (NAME, captioned "Road Name").
 UPDATE static_overlays SET popup_fields = '{Category,"NAME:Road Name"}' WHERE key = 'roads';
 
--- Tree Statistics (trees): popup shows Tree Id, Species, Max Height, Carbon and
--- Grid Number (True_Heigh is dropped).
-UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Species","Max_Height:Max Height","Carbon_kg:Carbon","GridNum:Grid Number"}' WHERE key = 'treeStatistics';
+-- Tree Statistics (trees): popup shows Tree Id, Species, Gujarati Name, Max
+-- Height, Carbon and Grid Number (True_Heigh is dropped). GujaratiName is a
+-- per-tree property added to the tiles by joining Predicted_SN against the
+-- same species table the legend uses (see the gujaratiName values in this
+-- overlay's `categories`, set below); trees whose species isn't in that
+-- table are left without one rather than guessed.
+UPDATE static_overlays SET popup_fields = '{"Tree_ID:Tree Id","Predicted_SN:Species","GujaratiName:Gujarati Name","Max_Height:Max Height","Carbon_kg:Carbon","GridNum:Grid Number"}' WHERE key = 'treeStatistics';
 
 -- Rivers: the popup shows only the Categories column, captioned "Type".
 UPDATE static_overlays SET popup_fields = '{"Categories:Type"}' WHERE key = 'rivers';
@@ -1404,13 +1413,26 @@ FROM (VALUES
 JOIN static_overlays o ON o.key = 'forestTypeFSI';
 
 -- TOF (Trees Outside Forests), re-delivered: 408,604 tree polygons in
--- TOF_with_SpeciesGuj.parquet (EPSG:4326 GeoParquet), now carrying each tree's
--- predicted species and its Gujarati name. Rebuilt with:
---   python (pyarrow + shapely) -> tof.geojson, one feature per line, keeping
---     TOF_Class, Max_Height, Predicted_SN, GujaratiName at 7 decimals
---   tools/prepare-vector-tiles.sh treesOutsideForests tof.geojson
--- The parquet's own `area` column is empty (0 everywhere), so it is dropped;
--- the class areas below are the client's delivered statistics.
+-- TOF_with_SpeciesGuj.parquet (EPSG:4326 GeoParquet), now carrying each
+-- tree's predicted species (English/scientific, Predicted_SN) and its
+-- Gujarati name (GujaratiName) -- both shown in the popup, Species then
+-- Gujarati Name. This popup_fields row was already in place from an earlier
+-- PR, but apps/vector-data/tree-outside-forest.pmtiles itself hadn't
+-- actually been rebuilt from the new parquet yet (it still only carried
+-- TOF_Class and Max_Height) until this delivery. Rebuilt with:
+--   ogr2ogr -f GeoJSON tof.geojson TOF_with_SpeciesGuj.parquet \
+--     -t_srs EPSG:4326 -lco COORDINATE_PRECISION=7 \
+--     -select TOF_Class,Max_Height,Predicted_SN,GujaratiName
+--   ogr2ogr -f PMTiles tree-outside-forest.pmtiles tof.geojson \
+--     -nln treesOutsideForests -dsco MINZOOM=9 -dsco MAXZOOM=16 \
+--     -dsco NAME=treesOutsideForests
+-- (skips tools/prepare-vector-tiles.sh's shuffle step -- at 408,604 polygons
+-- the intermediate GeoJSON is ~3.65 GB, too large for that script's
+-- read-the-whole-file-into-memory approach; solid polygon coverage also
+-- needs the even-at-low-zoom thinning the shuffle buys points far less than
+-- Trees did). The parquet's own `area` column is empty (0 everywhere), so
+-- it is dropped; the class areas below are the client's delivered
+-- statistics.
 UPDATE static_overlays SET
     popup_fields = '{"TOF_Class:TOF Class","Max_Height:Max Height","Predicted_SN:Species","GujaratiName:Gujarati Name"}',
     min_lon = 71.728527, min_lat = 21.451974, max_lon = 71.821770, max_lat = 21.510731
