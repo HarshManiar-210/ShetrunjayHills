@@ -549,13 +549,16 @@ const REAL_LEGENDS: Record<string, RasterLegend> = {
   "growing-stock": {
     layerId: "growing-stock",
     ramp: "low-to-high",
-    rampLabels: ["0.03 m³/ha", "> 5.0 m³/ha"],
+    rampLabels: ["0 m³/ha", "19 m³/ha"],
     classes: [
-      { value: 1, label: "0.03 – 1.5 m³/ha", color: "#30123b" },
-      { value: 2, label: "1.5 – 2.5 m³/ha", color: "#28bceb" },
-      { value: 3, label: "2.5 – 3.5 m³/ha", color: "#a4fc3c" },
-      { value: 4, label: "3.5 – 5.0 m³/ha", color: "#fb7e21" },
-      { value: 5, label: "> 5.0 m³/ha", color: "#7a0403" },
+      { value: 1, label: "0 – 0.5 m³/ha", color: "#0571b0" },
+      { value: 2, label: "0.52 – 0.67 m³/ha", color: "#56a1ca" },
+      { value: 3, label: "0.67 – 0.82 m³/ha", color: "#a0cccf" },
+      { value: 4, label: "0.82 – 1.01 m³/ha", color: "#dae993" },
+      { value: 5, label: "1.01 – 1.17 m³/ha", color: "#deec79" },
+      { value: 6, label: "1.17 – 1.44 m³/ha", color: "#acd67f" },
+      { value: 7, label: "1.44 – 1.89 m³/ha", color: "#6ba14a" },
+      { value: 8, label: "1.89 – 19 m³/ha", color: "#256200" },
     ],
   },
   "habitat-suitability": {

@@ -133,10 +133,14 @@ function useOverlayStats(imageKey: string) {
 
 function BlockHeading({ name, detail }: { name: string; detail?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
+    // Wraps rather than overlapping: a long detail (a dated label such as
+    // "Orthomosaic – Drone Survey: 12 June 2026") drops to its own line.
+    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
       <span className="min-w-0 text-xs leading-tight font-medium">{name}</span>
       {detail && (
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{detail}</span>
+        <span className="min-w-0 text-[10px] leading-tight tabular-nums text-muted-foreground">
+          {detail}
+        </span>
       )}
     </div>
   );
