@@ -656,9 +656,9 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, file
 -- current bounds outright, which its content's pixel aspect (1.5450) matches
 -- far closer than the old CHM bounds did (1.5546 vs 1.6054).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
-    ('orthomosaic', 'Orthomosaic', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
-    ('dsm',   'DSM (Digital Surface Model)',   grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
-    ('dtm',   'DTM (Digital Terrain Model)',   grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
+    ('orthomosaic', 'Orthomosaic – Drone Survey: 12 June 2026', grp('orthomosaic'), 'raster', 'raster-data/Orthomosaic.pmtiles', 1, 71.7255921, 21.4501217, 71.8234103, 21.5125858),
+    ('dsm',   'DSM (Digital Surface Model) – Drone Survey: 12 June 2026', grp('dsm'),   'raster', 'raster-data/DSM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
+    ('dtm',   'DTM (Digital Terrain Model) – Drone Survey: 12 June 2026', grp('dtm'),   'raster', 'raster-data/DTM.pmtiles',   1, 71.7262540, 21.4504527, 71.8225077, 21.5116530),
     ('chm',   'CHM (Canopy Height Model)',   grp('chm'),   'raster', 'raster-data/CHM.pmtiles',   1, 71.7258930, 21.4500615, 71.8231094, 21.5125858),
     -- Aspect went back to one continuous raster (one on/off switch, no
     -- per-direction toggling) after the per-class split below proved more
@@ -756,7 +756,7 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, kind, color, colo
 -- tools/prepare-study-area-rasters.py (the PNGs are served as delivered).
 INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_order, min_lon, min_lat, max_lon, max_lat) VALUES
     ('treeDensity',   'Tree Density (Drone)', grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
-    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284712, 21.4519605, 71.8218126, 21.5120078),
+    ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284723, 21.4519475, 71.8218132, 21.5120057),
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033);
 
 -- Wildlife Corridors: the corridor lines alone (7, with Length). The group
