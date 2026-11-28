@@ -98,6 +98,11 @@ type StaticOverlay struct {
 	// it has none, so this matters mostly for a classed vector layer, which
 	// the Statistics panel can only describe when it is set.
 	HasStats bool `json:"has_stats,omitempty"`
+	// ShowStats reports whether the Statistics panel (and the map export)
+	// lists this overlay at all — false hides it there while the layer and
+	// its legend stay (static_overlays.show_stats). Always sent, since false
+	// is the meaningful value.
+	ShowStats bool `json:"show_stats"`
 }
 
 // OverlayClassStat is one class's delivered area and share for one overlay.

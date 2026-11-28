@@ -101,5 +101,11 @@ func TestOverlayClassStats(t *testing.T) {
 		if o.Key == "roads" && o.HasStats {
 			t.Error("roads: HasStats = true, want false")
 		}
+		if o.Key == "growingStock" && o.ShowStats {
+			t.Error("growingStock: ShowStats = true, want false")
+		}
+		if o.Key == "forestCoverFSI" && !o.ShowStats {
+			t.Error("forestCoverFSI: ShowStats = false, want true")
+		}
 	}
 }
