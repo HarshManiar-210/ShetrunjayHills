@@ -167,7 +167,12 @@ CREATE TABLE static_overlays (
     label_field TEXT,
     -- Selected and switched on when the dashboard opens, before anything is
     -- picked. Which layers start on is this flag, not a key in the frontend.
-    default_on BOOLEAN NOT NULL DEFAULT false
+    default_on BOOLEAN NOT NULL DEFAULT false,
+    -- Whether the Statistics panel (and the map export's statistics) lists
+    -- this layer. Set false for a layer the client doesn't want measured
+    -- (Growing Stock); the layer and its legend are unaffected. Which layers
+    -- are hidden is this flag, not a key list in the frontend.
+    show_stats BOOLEAN NOT NULL DEFAULT true
 );
 
 -- The client's official class statistics: area and share per class, per
@@ -758,6 +763,10 @@ INSERT INTO static_overlays (key, label, group_id, asset_type, file_path, sort_o
     ('treeDensity',   'Tree Density (Drone)', grp('tree-density'),   'raster', 'raster-data/tree-density.png', 1, 71.7265374, 21.4503739, 71.8243556, 21.5128380),
     ('growingStock',  'Growing Stock',  grp('growing-stock'),  'raster', 'raster-data/growingstock.png', 1, 71.7284723, 21.4519475, 71.8218132, 21.5120057),
     ('habitatSuitability', 'Habitat Suitability', grp('habitat-suitability'), 'raster', 'raster-data/habitat.png', 1, 71.7289941, 21.4522722, 71.8216515, 21.5119033);
+
+-- The client asked for no Growing Stock statistics; the layer and its legend
+-- stay.
+UPDATE static_overlays SET show_stats = false WHERE key = 'growingStock';
 
 -- Wildlife Corridors: the corridor lines alone (7, with Length). The group
 -- had a least-cost raster beside them, since removed; with only this row it
