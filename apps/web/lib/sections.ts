@@ -117,6 +117,8 @@ export interface SectionItem {
   categories?: LegendClass[];
   /** Delivered class statistics exist — see OverlayMeta.has_stats. */
   hasStats?: boolean;
+  /** Listed in the Statistics panel — see OverlayMeta.show_stats. */
+  showStats?: boolean;
   /** See OverlayMeta.asset_type. Absent for a layer not seeded through static_overlays. */
   assetType?: "vector" | "raster";
   /**
@@ -140,6 +142,8 @@ export interface RasterYear {
   bounds: [[number, number], [number, number]];
   /** Served as a PMTiles raster archive rather than one image — see OverlayMeta.tiled. */
   tiled: boolean;
+  /** Listed in the Statistics panel — see OverlayMeta.show_stats. */
+  showStats: boolean;
 }
 
 export interface SectionDef {
@@ -352,6 +356,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
       icon: ITEM_STYLE[o.key],
       categories: o.categories,
       hasStats: o.has_stats,
+      showStats: o.show_stats !== false,
       assetType: o.asset_type,
       bounds: hasExtent(o)
         ? [
@@ -388,6 +393,7 @@ export function buildSections(groups: LayerGroup[], overlays: OverlayMeta[]): Se
             [o.max_lon!, o.max_lat!],
           ] as [[number, number], [number, number]],
           tiled: o.tiled ?? false,
+          showStats: o.show_stats !== false,
         }))
         .filter((y) => !Number.isNaN(y.year))
         .sort((a, b) => a.year - b.year);

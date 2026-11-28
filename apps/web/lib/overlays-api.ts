@@ -76,6 +76,12 @@ export interface OverlayMeta {
    * vector layer (the FSI layers), which only gets statistics when set.
    */
   has_stats?: boolean;
+  /**
+   * Whether the Statistics panel (and the map export) lists this overlay.
+   * false hides it there while the layer and its legend stay — which layers
+   * is static_overlays.show_stats, not a key list here.
+   */
+  show_stats?: boolean;
 }
 
 /**

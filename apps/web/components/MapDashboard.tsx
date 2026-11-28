@@ -683,31 +683,36 @@ export function MapDashboard() {
 
   const statsRasterLayers: StatsRasterLayer[] = useMemo(
     () => [
-      ...activeRasters.map(({ section, image }) => {
-        // Same lookup the map uses to draw the compared year.
-        const against = compareYear[section.id];
-        const other = against != null ? section.years.find((y) => y.year === against) : undefined;
-        return {
-          id: section.id,
-          name: section.label,
-          // The overlay row for the year on screen — what the statistics
-          // endpoint measures.
-          imageKey: image.key,
-          // A single-image theme has no year to show — its "year" is only the
-          // image's position, 0.
-          year: section.years.length > 1 ? image.year : null,
-          // A single-image theme labels its one row with the theme's own name.
-          yearLabel: image.label === section.label ? undefined : image.label,
-          years: section.years.map((y) => y.year),
-          compare: other && { imageKey: other.key, year: other.year, label: other.label },
-        };
-      }),
+      // An image whose overlay row has show_stats off (Growing Stock) stays
+      // on the map and in the legend but is left out here — and so out of
+      // the map export, which reads this same list.
+      ...activeRasters
+        .filter(({ image }) => image.showStats)
+        .map(({ section, image }) => {
+          // Same lookup the map uses to draw the compared year.
+          const against = compareYear[section.id];
+          const other = against != null ? section.years.find((y) => y.year === against) : undefined;
+          return {
+            id: section.id,
+            name: section.label,
+            // The overlay row for the year on screen — what the statistics
+            // endpoint measures.
+            imageKey: image.key,
+            // A single-image theme has no year to show — its "year" is only the
+            // image's position, 0.
+            year: section.years.length > 1 ? image.year : null,
+            // A single-image theme labels its one row with the theme's own name.
+            yearLabel: image.label === section.label ? undefined : image.label,
+            years: section.years.map((y) => y.year),
+            compare: other && { imageKey: other.key, year: other.year, label: other.label },
+          };
+        }),
       // Switched-on vector overlays the client delivered class figures for
       // (the FSI layers). Which ones is the overlay's has_stats flag, not a
       // key list.
       ...allSections
         .flatMap((section) => section.items)
-        .filter((item) => item.hasStats && overlays[item.key])
+        .filter((item) => item.hasStats && item.showStats !== false && overlays[item.key])
         .map((item) => ({
           id: item.key,
           name: item.label,
